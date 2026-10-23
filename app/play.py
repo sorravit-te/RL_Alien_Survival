@@ -104,6 +104,8 @@ def percentile(values, fraction):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--map', type=str, default=None, help='Tiled .tmj map file')
+    parser.add_argument('--materials', type=str, default=None, help='Local JSON material-ID to texture path mapping')
     parser.add_argument('--fps-limit', type=int, default=60, help='0 = uncapped')
     parser.add_argument('--benchmark-seconds', type=float, default=0,
                         help='Auto-close after this duration; print metrics after 1s warmup')
@@ -116,9 +118,22 @@ def main(argv=None):
     try:
         screen = pygame.display.set_mode((960, 540))
         pygame.display.set_caption('Alien Survival - Heuristic Test')
-        renderer = RaycastingRenderer()
+        material_paths = None
+        if args.materials:
+            from pathlib import Path
+            path = Path(args.materials).resolve()
+            materials = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(materials, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in materials.items()):
+                raise ValueError("Materials must be an object of material IDs to texture file paths")
+            material_paths = {key: (path.parent / value).resolve() for key, value in materials.items()}
+        renderer = RaycastingRenderer(material_paths=material_paths)
         font = pygame.font.Font(None, 22)
-        loop = FixedStepLoop(GameCore())
+        if args.map:
+            from game.map_loader import load_tiled_map
+            world = load_tiled_map(args.map)
+            loop = FixedStepLoop(GameCore(world))
+        else:
+            loop = FixedStepLoop(GameCore())
         session = PlaySession(loop)
         clock = pygame.time.Clock()
         start = previous = perf_counter()
