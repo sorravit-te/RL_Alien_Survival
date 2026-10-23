@@ -27,6 +27,7 @@ class WorldMap:
     objects: tuple[MapObject, ...] = ()
     alien_spawn: tuple[float, float, float] | None = None
     patrol_waypoints: tuple[tuple[float, float], ...] = ()
+    wall_materials: tuple[tuple[str, ...], ...] = ()
 
     def __post_init__(self):
         # Own immutable copies even when a caller supplies lists.
@@ -46,10 +47,13 @@ class WorldMap:
         object.__setattr__(self, "patrol_waypoints", tuple(tuple(p) for p in self.patrol_waypoints))
         if any(len(p) != 2 or not all(isfinite(v) for v in p) for p in self.patrol_waypoints):
             raise ValueError("Patrol waypoint must contain finite x/y")
+        object.__setattr__(self, "wall_materials", tuple(tuple(row) for row in self.wall_materials))
         if not self.rows or not self.rows[0]:
             raise ValueError("Map must not be empty")
         if any(len(row) != self.width or set(row) - {"#", "."} for row in self.rows):
             raise ValueError("Map must be rectangular and contain only # or .")
+        if self.wall_materials and (len(self.wall_materials) != self.height or any(len(row) != self.width for row in self.wall_materials)):
+            raise ValueError("Wall material grid must match geometry dimensions")
         if not self.spawn_points:
             raise ValueError("Map needs at least one spawn point")
         if any(len(p) != 2 or not all(isfinite(v) for v in p) for p in self.spawn_points):
@@ -65,6 +69,13 @@ class WorldMap:
     @property
     def height(self):
         return len(self.rows)
+
+    def wall_material(self, x: int, y: int) -> str:
+        if not self.blocked(x, y):
+            return ""
+        if 0 <= x < self.width and 0 <= y < self.height and self.wall_materials:
+            return self.wall_materials[y][x] or "wall"
+        return "wall"
 
     def blocked(self, x: int, y: int) -> bool:
         return not (0 <= x < self.width and 0 <= y < self.height) or self.rows[y][x] == "#"
