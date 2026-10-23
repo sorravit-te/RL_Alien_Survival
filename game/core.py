@@ -1,7 +1,7 @@
 """Fixed-tick headless movement. No wall clock, window or asset dependencies."""
 
 from dataclasses import replace
-from math import atan2, ceil, cos, hypot, pi, sin
+from math import atan2, ceil, cos, floor, hypot, isfinite, pi, sin
 from random import Random
 
 from ai.controller import ControllerState, choose_target
@@ -22,7 +22,16 @@ from game.state import (
 
 
 class GameCore:
-    def __init__(self, world_map: WorldMap | None = None, config: CoreConfig | None = None):
+    def __init__(
+        self,
+        world_map: WorldMap | None = None,
+        config: CoreConfig | None = None,
+        *,
+        alien_control: str = "heuristic",
+    ):
+        if alien_control not in ("heuristic", "external"):
+            raise ValueError("Alien control must be heuristic or external")
+        self.alien_control = alien_control
         self.world_map = world_map if world_map is not None else small_test_map()
         self.config = config if config is not None else CoreConfig()
         for x, y in self.world_map.spawn_points:
@@ -90,6 +99,29 @@ class GameCore:
             self._navigator.path,
         )
 
+    def set_alien_target(self, target, *, source="external"):
+        """External controller owns a copied target snapshot; None explicitly stops.
+
+        Caller must enforce its knowledge boundary. No hidden Survivor lookup or
+        heuristic fallback occurs here. Unreachable floor targets yield an empty path.
+        """
+        if self.alien_control != "external":
+            raise RuntimeError("External targets require external control mode")
+        if self._alien is None:
+            raise RuntimeError("No active Alien")
+        if not isinstance(source, str) or not source:
+            raise ValueError("Target source must be a nonempty string")
+        if target is not None:
+            target = tuple(float(value) for value in target)
+            if len(target) != 2 or not all(isfinite(v) for v in target):
+                raise ValueError("Target must be a finite x/y snapshot")
+            if self.world_map.blocked(floor(target[0]), floor(target[1])):
+                raise ValueError("Target must be on floor")
+        self._controller = ControllerState(target, source)
+        self._navigator.set_target(
+            self.world_map, (self._alien.x, self._alien.y), target, self.config.alien_radius
+        )
+
     def step(self, command: SurvivorCommand) -> WorldSnapshot:
         """Advance exactly 1/30 second; rotate first, then move in the new frame."""
         self._events = ()  # events belong to this step, including post-terminal calls
@@ -127,7 +159,7 @@ class GameCore:
         )
         self._alien = replace(self._alien, speed_mode="chase" if chasing else "search")
         period = max(1, ceil(self.config.alien_decision_seconds * self.config.tick_hz - 1e-12))
-        if self._tick % period == 0:
+        if self.alien_control == "heuristic" and self._tick % period == 0:
             self._controller = choose_target(
                 self._alien,
                 self._perception,
