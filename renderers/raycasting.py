@@ -52,7 +52,7 @@ def cast_ray(world, x, y, dx, dy):
 
 
 class RaycastingRenderer:
-    def __init__(self, texture_path=WALL_TEXTURE, size=(320, 180), fov=75):
+    def __init__(self, texture_path=WALL_TEXTURE, size=(320, 180), fov=75, material_paths=None):
         texture_path = Path(texture_path)
         if not texture_path.is_file():
             raise FileNotFoundError(
@@ -61,6 +61,19 @@ class RaycastingRenderer:
                 'LICENSE.txt), then run: .venv/Scripts/python.exe -m tools.prepare_assets'
             )
         self.texture = pygame.image.load(str(texture_path))
+        self.material_textures = {"wall": self.texture}
+        for material_id, material_path in (material_paths or {}).items():
+            if not isinstance(material_id, str) or not material_id:
+                raise ValueError("Invalid material ID")
+            path = Path(material_path)
+            if not path.is_file():
+                raise FileNotFoundError(f"Material {material_id}: {path}")
+            self.material_textures[material_id] = pygame.image.load(str(path))
+        self.material_columns = {
+            key: [surface.subsurface((x, 0, 1, surface.get_height()))
+                  for x in range(surface.get_width())]
+            for key, surface in self.material_textures.items()
+        }
         self.width, self.height = size
         self.plane_scale = tan(radians(fov) / 2)
         self.focal_length = self.width / (2 * self.plane_scale)
@@ -82,19 +95,22 @@ class RaycastingRenderer:
         facing_x, facing_y = cos(camera.yaw), sin(camera.yaw)
         plane_x, plane_y = -facing_y * self.plane_scale, facing_x * self.plane_scale
         depths = []
-        tw, th = self.texture.get_size()
         for column in range(self.width):
             screen_x = 2 * (column + 0.5) / self.width - 1
             dx, dy = facing_x + plane_x * screen_x, facing_y + plane_y * screen_x
             hit = cast_ray(snapshot.world_map, camera.x, camera.y, dx, dy)
             depths.append(hit.distance)
             height = max(1, round(self.focal_length / max(hit.distance, 1e-6)))
+            material_id = snapshot.world_map.wall_material(hit.cell_x, hit.cell_y)
+            texture = self.material_textures.get(material_id, self.texture)
+            columns = self.material_columns.get(material_id, self.material_columns["wall"])
+            tw, th = texture.get_size()
             # One tile is one wall-height; preserve non-square texture aspect by tiling.
             u = (hit.wall_position / (tw / th)) % 1
             texture_x = min(tw - 1, int(u * tw))
             if (hit.side == 0 and dx > 0) or (hit.side == 1 and dy < 0):
                 texture_x = tw - 1 - texture_x
-            strip = pygame.transform.scale(self.columns[texture_x], (1, height))
+            strip = pygame.transform.scale(columns[texture_x], (1, height))
             self.frame.blit(strip, (column, (self.height - height) // 2 + offset))
         self.depth = tuple(depths)
         self._draw_objects(snapshot, horizon)
