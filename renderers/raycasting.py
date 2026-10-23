@@ -58,6 +58,7 @@ class RaycastingRenderer:
         self.focal_length = self.width / (2 * self.plane_scale)
         self.frame = pygame.Surface(size)
         self.depth = ()
+        self.sprites = self._placeholders()
         self.columns = [self.texture.subsurface((x, 0, 1, self.texture.get_height()))
                         for x in range(self.texture.get_width())]
 
@@ -88,4 +89,52 @@ class RaycastingRenderer:
             strip = pygame.transform.scale(self.columns[texture_x], (1, height))
             self.frame.blit(strip, (column, (self.height - height) // 2 + offset))
         self.depth = tuple(depths)
+        self._draw_objects(snapshot, horizon)
         return self.frame
+
+    @staticmethod
+    def _placeholders():
+        """Self-made pictograms; no purchased sprites or collision side effects."""
+        card = pygame.Surface((64, 40), pygame.SRCALPHA)
+        pygame.draw.rect(card, (245, 205, 65), (2, 2, 60, 36), border_radius=4)
+        pygame.draw.rect(card, (35, 55, 65), (5, 6, 54, 8))
+        pygame.draw.rect(card, (65, 170, 195), (10, 19, 15, 12))
+        pygame.draw.line(card, (35, 55, 65), (32, 22), (53, 22), 3)
+        pygame.draw.line(card, (35, 55, 65), (32, 29), (48, 29), 3)
+        exit_sign = pygame.Surface((64, 96), pygame.SRCALPHA)
+        pygame.draw.rect(exit_sign, (20, 80, 65), (2, 2, 60, 94))
+        pygame.draw.rect(exit_sign, (80, 240, 165), (2, 2, 60, 94), 4)
+        pygame.draw.rect(exit_sign, (220, 255, 235), (29, 26, 7, 38))
+        pygame.draw.polygon(exit_sign, (220, 255, 235), [(17, 38), (32, 20), (47, 38)])
+        pygame.draw.rect(exit_sign, (80, 240, 165), (12, 78, 40, 5))
+        return {"keycard": (card, .50, .3125), "exit": (exit_sign, .65, .975)}
+
+    def _draw_objects(self, snapshot, horizon):
+        camera = snapshot.survivor
+        fx, fy = cos(camera.yaw), sin(camera.yaw)
+        projected = []
+        for obj in snapshot.world_map.objects:
+            if obj.kind == "keycard" and snapshot.has_keycard:
+                continue
+            rx, ry = obj.x - camera.x, obj.y - camera.y
+            depth = rx * fx + ry * fy
+            if depth <= .05:
+                continue  # behind camera / near plane, avoid unbounded sprite scaling
+            across = -rx * fy + ry * fx
+            projected.append((depth, obj.object_id, across, obj))
+        for depth, _, across, obj in sorted(projected, reverse=True):
+            sprite, world_width, world_height = self.sprites[obj.kind]
+            width = max(1, round(self.focal_length * world_width / depth))
+            height = max(1, round(self.focal_length * world_height / depth))
+            left = round(self.width / 2 + self.focal_length * across / depth - width / 2)
+            # Both pictures stand on the floor; card is raised to eye level.
+            base = .35 if obj.kind == "keycard" else 0
+            top = round(horizon + self.focal_length * (.5 - base - world_height) / depth)
+            for column in range(max(0, left), min(self.width, left + width)):
+                if depth >= self.depth[column]:
+                    continue
+                tx = min(sprite.get_width() - 1,
+                         int((column - left) * sprite.get_width() / width))
+                strip = sprite.subsurface((tx, 0, 1, sprite.get_height()))
+                strip = pygame.transform.scale(strip, (1, height))
+                self.frame.blit(strip, (column, top))

@@ -6,9 +6,9 @@ not angular velocity; input adapters must accumulate mouse motion accordingly.
 """
 
 from dataclasses import dataclass
-from math import isfinite
+from math import isfinite, pi
 
-from game.map import WorldMap
+from game.map import MapObject, WorldMap
 
 
 @dataclass(frozen=True)
@@ -17,12 +17,20 @@ class CoreConfig:
     walk_speed: float = 2.5
     run_speed: float = 4.0
     radius: float = 0.2
+    interaction_range: float = 1.25
+    interaction_half_angle: float = pi / 6
+    interaction_seconds: float = 0.6
 
     def __post_init__(self):
         if self.tick_hz != 30:
             raise ValueError("The core contract requires 30 Hz")
         if not all(isfinite(v) and v > 0 for v in (self.walk_speed, self.run_speed, self.radius)):
             raise ValueError("Speeds and radius must be finite and positive")
+        if not all(isfinite(v) and v > 0 for v in
+                   (self.interaction_range, self.interaction_seconds)):
+            raise ValueError("Interaction range and duration must be finite and positive")
+        if not isfinite(self.interaction_half_angle) or not 0 < self.interaction_half_angle <= pi:
+            raise ValueError("Interaction half-angle must be in (0, pi]")
 
 
 @dataclass(frozen=True)
@@ -31,6 +39,7 @@ class SurvivorCommand:
     strafe: float = 0.0  # positive = right
     yaw_delta: float = 0.0
     running: bool = False
+    interact: bool = False
 
     def __post_init__(self):
         if not all(isfinite(v) for v in (self.forward, self.strafe, self.yaw_delta)):
@@ -47,9 +56,22 @@ class SurvivorState:
 
 
 @dataclass(frozen=True)
+class GameEvent:
+    kind: str
+    object_id: str
+    tick: int
+
+
+@dataclass(frozen=True)
 class WorldSnapshot:
     tick: int
     seed: int | None
     survivor: SurvivorState
     world_map: "WorldMap"
     config: CoreConfig
+    has_keycard: bool = False
+    interaction_target: MapObject | None = None
+    interaction_object_id: str | None = None
+    interaction_ticks: int = 0
+    outcome: str | None = None
+    events: tuple[GameEvent, ...] = ()

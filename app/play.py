@@ -1,4 +1,4 @@
-"""Milestone 1B.1 room viewer: python -m app.play."""
+"""Milestone 1C room viewer: python -m app.play."""
 
 import argparse
 import json
@@ -14,7 +14,7 @@ from renderers.raycasting import RaycastingRenderer
 KEYS = {
     pygame.K_w: 'w', pygame.K_s: 's', pygame.K_a: 'a', pygame.K_d: 'd',
     pygame.K_LEFT: 'left', pygame.K_RIGHT: 'right',
-    pygame.K_LSHIFT: 'shift_left', pygame.K_RSHIFT: 'shift_right',
+    pygame.K_LSHIFT: 'shift_left', pygame.K_RSHIFT: 'shift_right', pygame.K_e: 'e',
 }
 
 
@@ -29,7 +29,7 @@ class PlaySession:
         self.sync_mouse()
 
     def sync_mouse(self):
-        grabbed = not self.loop.paused and self.focused
+        grabbed = not self.loop.paused and self.focused and not self.loop.current.outcome
         pygame.event.set_grab(grabbed)
         pygame.mouse.set_visible(not grabbed)
         pygame.mouse.get_rel()  # discard warp/relative deltas on every transition
@@ -48,21 +48,51 @@ class PlaySession:
             elif event.type == pygame.WINDOWFOCUSGAINED:
                 self.focused = True  # explicit Esc is still required
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                if self.focused and not transitioned and not getattr(event, 'repeat', False):
+                if (self.focused and not self.loop.current.outcome and not transitioned
+                        and not getattr(event, 'repeat', False)):
                     self.loop.set_paused(not self.loop.paused)
                     self.sync_mouse()
                     transitioned = True
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 if self.focused and not transitioned and not getattr(event, 'repeat', False):
+                    was_terminal = self.loop.current.outcome is not None
                     self.loop.reset()
+                    if was_terminal:
+                        self.loop.set_paused(False)
                     self.sync_mouse()
                     transitioned = True
-            elif not transitioned and not self.loop.paused and self.focused:
+            elif (not transitioned and not self.loop.paused and self.focused
+                  and not self.loop.current.outcome):
                 if event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.key in KEYS:
                     self.loop.inputs.key(KEYS[event.key], event.type == pygame.KEYDOWN)
                 elif event.type == pygame.MOUSEMOTION:
                     self.loop.inputs.mouse(*event.rel)
         return transitioned
+
+
+    def after_step(self):
+        if self.loop.current.outcome and not self.loop.paused:
+            self.loop.set_paused(True)
+            self.sync_mouse()
+
+
+def hud_labels(loop):
+    snapshot = loop.current
+    if snapshot.outcome:
+        return ["YOU ESCAPED - R to restart", "Mouse released"]
+    status = 'PAUSED - Esc to play' if loop.paused else 'WASD move | Shift run | Hold E interact'
+    labels = [status, 'Mouse look | Arrows turn | Esc pause | R reset',
+              'Keycard: acquired' if snapshot.has_keycard else 'Keycard: not acquired']
+    target = snapshot.interaction_target
+    if target is not None:
+        if target.kind == "exit" and not snapshot.has_keycard:
+            labels.append('Exit - Keycard required')
+        else:
+            duration = snapshot.config.interaction_seconds * snapshot.config.tick_hz
+            progress = min(100, int(100 * snapshot.interaction_ticks / duration))
+            name = "Keycard" if target.kind == "keycard" else "Exit"
+            labels.append(f'Hold E - {name} ({progress}%)')
+    return labels
 
 
 def percentile(values, fraction):
@@ -82,7 +112,7 @@ def main(argv=None):
     pygame.font.init()
     try:
         screen = pygame.display.set_mode((960, 540))
-        pygame.display.set_caption('Alien Survival - Milestone 1B.1')
+        pygame.display.set_caption('Alien Survival - Milestone 1C')
         renderer = RaycastingRenderer()
         font = pygame.font.Font(None, 22)
         loop = FixedStepLoop(GameCore())
@@ -100,11 +130,10 @@ def main(argv=None):
             # Do not apply pre-pause/reset wall time to a newly resumed simulation.
             if not transitioned:
                 loop.advance(elapsed)
+            session.after_step()
             frame = renderer.render(loop.display_snapshot(), pitch=loop.display_pitch())
             pygame.transform.scale(frame, screen.get_size(), screen)
-            status = ('PAUSED - Esc to play' if loop.paused else 'WASD move | Shift run')
-            labels = [status, 'Mouse look (up/down) | Arrows turn | Esc pause | R reset']
-            for line, label in enumerate(labels):
+            for line, label in enumerate(hud_labels(loop)):
                 text = font.render(label, True, (240, 240, 240), (15, 18, 23))
                 screen.blit(text, (12, 12 + line * 24))
             pygame.display.flip()

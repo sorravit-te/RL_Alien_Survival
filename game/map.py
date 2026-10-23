@@ -5,9 +5,26 @@ from math import floor, isfinite
 
 
 @dataclass(frozen=True)
+class MapObject:
+    object_id: str
+    kind: str
+    x: float
+    y: float
+
+    def __post_init__(self):
+        if not isinstance(self.object_id, str) or not self.object_id:
+            raise ValueError("Object needs a nonempty string ID")
+        if self.kind not in ("keycard", "exit"):
+            raise ValueError("Unsupported interaction object")
+        if not all(isfinite(v) for v in (self.x, self.y)):
+            raise ValueError("Object coordinates must be finite")
+
+
+@dataclass(frozen=True)
 class WorldMap:
     rows: tuple[str, ...]
     spawn_points: tuple[tuple[float, float], ...]
+    objects: tuple[MapObject, ...] = ()
 
     def __post_init__(self):
         # Own immutable copies even when a caller supplies lists.
@@ -15,6 +32,11 @@ class WorldMap:
         if any(not isinstance(row, str) for row in self.rows):
             raise TypeError("Map rows must be strings")
         object.__setattr__(self, "spawn_points", tuple(tuple(p) for p in self.spawn_points))
+        object.__setattr__(self, "objects", tuple(self.objects))
+        if any(not isinstance(obj, MapObject) for obj in self.objects):
+            raise TypeError("Map objects must be immutable MapObject values")
+        if len({obj.object_id for obj in self.objects}) != len(self.objects):
+            raise ValueError("Object IDs must be unique")
         if not self.rows or not self.rows[0]:
             raise ValueError("Map must not be empty")
         if any(len(row) != self.width or set(row) - {"#", "."} for row in self.rows):
@@ -23,6 +45,9 @@ class WorldMap:
             raise ValueError("Map needs at least one spawn point")
         if any(len(p) != 2 or not all(isfinite(v) for v in p) for p in self.spawn_points):
             raise ValueError("Invalid spawn point")
+
+        if any(self.blocked(floor(obj.x), floor(obj.y)) for obj in self.objects):
+            raise ValueError("Interaction objects must be on traversable floor")
 
     @property
     def width(self):
@@ -51,7 +76,7 @@ class WorldMap:
 
 
 def small_test_map() -> WorldMap:
-    """Room, tall obstacle and L-shaped corridor; no doors or gameplay objects."""
+    """Room, tall obstacle and L-shaped corridor with a fixed card and exit point."""
     return WorldMap(
         (
             "############",
@@ -65,4 +90,6 @@ def small_test_map() -> WorldMap:
             "############",
         ),
         ((2.5, 2.5), (2.5, 4.5)),
+        (MapObject("keycard", "keycard", 5.5, 2.5),
+         MapObject("exit", "exit", 9.5, 7.5)),
     )

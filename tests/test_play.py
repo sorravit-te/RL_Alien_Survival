@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import replace
-from math import pi
+from math import pi, tan
 
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 
@@ -14,7 +14,7 @@ from app.loop import FixedStepLoop
 from app.play import PlaySession
 from game.core import GameCore
 from game.map import WorldMap
-from game.state import SurvivorCommand, SurvivorState
+from game.state import CoreConfig, SurvivorCommand, SurvivorState
 from renderers.raycasting import RaycastingRenderer, cast_ray
 
 
@@ -449,3 +449,209 @@ def test_pitch_interpolation_synchronizes_on_pause_focus_resume_and_reset(displa
     assert loop.inputs.pitch == 0
     loop.advance(loop.dt / 2)
     assert loop.display_pitch() == 0
+
+
+
+def test_e_input_and_terminal_mouse_release_restart(display, monkeypatch):
+    from app.play import hud_labels
+    from game.map import MapObject
+
+    world = WorldMap(("......",) * 6, ((2.5, 2.5),),
+                     (MapObject("card", "keycard", 3.5, 2.5),
+                      MapObject("exit", "exit", 2.5, 3.5)))
+    loop = FixedStepLoop(GameCore(world))
+    session = PlaySession(loop)
+    session.focused = True
+    grabs, visibility = [], []
+    monkeypatch.setattr(pygame.event, 'set_grab', grabs.append)
+    monkeypatch.setattr(pygame.mouse, 'set_visible', visibility.append)
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    assert any('Keycard (0%)' in label for label in hud_labels(loop))
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
+    for _ in range(9):
+        loop.advance(loop.dt)
+    assert any('(50%)' in label for label in hud_labels(loop))
+    for _ in range(9):
+        loop.advance(loop.dt)
+    assert loop.current.has_keycard
+    session.events([event(pygame.KEYUP, key=pygame.K_e)])
+    loop.inputs.mouse(0, -40)
+    # Core target direction comes from yaw, not camera pitch.
+    loop.inputs.mouse((pi / 2) / loop.inputs.mouse_sensitivity)
+    loop.advance(loop.dt)
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
+    for _ in range(18):
+        loop.advance(loop.dt)
+    session.after_step()
+    assert loop.current.outcome == 'escaped'
+    assert loop.paused
+    assert grabs[-1] is False and visibility[-1] is True
+    assert 'YOU ESCAPED' in hud_labels(loop)[0]
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    assert loop.paused
+    session.events([event(pygame.KEYDOWN, key=pygame.K_r)])
+    assert not loop.paused
+    assert grabs[-1] is True and visibility[-1] is False
+    assert loop.current.outcome is None
+    assert not loop.current.has_keycard
+    assert loop.current.interaction_ticks == 0
+    assert loop.display_pitch() == 0
+    assert loop.inputs.consume(loop.dt) == SurvivorCommand()
+
+
+def test_locked_exit_hint_and_occluded_object_no_hint(display):
+    from app.play import hud_labels
+    from game.map import MapObject
+
+    core = GameCore(WorldMap(("......",) * 6, ((2.5, 2.5),),
+                            (MapObject("exit", "exit", 3.5, 2.5),)))
+    loop = FixedStepLoop(core)
+    assert 'Exit - Keycard required' in hud_labels(loop)
+    core = GameCore(WorldMap(("...#..",) * 6, ((2.5, 2.5),),
+                            (MapObject("exit", "exit", 4.5, 2.5),)),
+                    CoreConfig(interaction_range=3))
+    assert not any('Exit -' in label for label in hud_labels(FixedStepLoop(core)))
+
+
+def test_sprite_wall_occlusion_and_pitch_shift(display, tmp_path):
+    from game.map import MapObject
+
+    path = tmp_path / 'plain.png'
+    texture = pygame.Surface((16, 16))
+    texture.fill((100, 100, 100))
+    pygame.image.save(texture, path)
+    renderer = RaycastingRenderer(path)
+    rows = tuple('....#...' if y == 4 else '........' for y in range(8))
+    hidden = GameCore(WorldMap(rows, ((2.5, 4.5),),
+                               (MapObject('card', 'keycard', 5.5, 4.5),)),
+                      CoreConfig(interaction_range=5)).snapshot()
+    empty = replace(hidden, world_map=replace(hidden.world_map, objects=()))
+    baseline = pygame.image.tobytes(renderer.render(empty), 'RGB')
+    assert pygame.image.tobytes(renderer.render(hidden), 'RGB') == baseline
+    assert hidden.interaction_target is None
+    # A wide sign straddles a wall edge: only unobstructed columns may change.
+    partial = replace(hidden, world_map=replace(hidden.world_map,
+                      objects=(MapObject('exit', 'exit', 5.2, 3.7),)))
+    base = renderer.render(empty).copy()
+    shown = renderer.render(partial).copy()
+    changed = [x for x in range(320) if any(
+        shown.get_at((x,y)) != base.get_at((x,y)) for y in range(180))]
+    assert changed
+    assert all(renderer.depth[x] > 2.7 for x in changed)
+    # The unblocked projection has more visible columns than the occluded one.
+    open_world = replace(partial.world_map, rows=('........',) * 8)
+    unblocked = replace(partial, world_map=open_world)
+    unblocked_base = renderer.render(replace(unblocked,
+                              world_map=replace(open_world, objects=()))).copy()
+    unblocked_frame = renderer.render(unblocked).copy()
+    full_changed = [x for x in range(320) if any(
+        unblocked_frame.get_at((x,y)) != unblocked_base.get_at((x,y)) for y in range(180))]
+    assert len(full_changed) > len(changed)
+    # Sprite and wall share precisely the same horizon shift.
+    positions = []
+    for pitch in (0, .1, -.1):
+        no_object = renderer.render(replace(unblocked,
+                    world_map=replace(open_world, objects=())), pitch=pitch).copy()
+        objects = renderer.render(unblocked, pitch=pitch).copy()
+        ys = [y for y in range(180) for x in range(320)
+              if objects.get_at((x,y)) != no_object.get_at((x,y))]
+        positions.append(min(ys))
+    offset = round(renderer.focal_length * tan(.1))
+    assert positions[1] - positions[0] == offset
+    assert positions[2] - positions[0] == -offset
+
+
+
+def test_e_release_and_repress_between_ticks_still_cancels_progress():
+    from game.map import MapObject
+
+    loop = FixedStepLoop(GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),),
+                                  (MapObject('card', 'keycard', 3.5, 2.5),))))
+    loop.inputs.key('e', True)
+    for _ in range(10):
+        loop.advance(loop.dt)
+    assert loop.current.interaction_ticks == 10
+    loop.inputs.key('e', False)
+    loop.inputs.key('e', True)
+    loop.advance(loop.dt)
+    assert loop.current.interaction_ticks == 0
+    for _ in range(17):
+        loop.advance(loop.dt)
+    assert not loop.current.has_keycard
+    loop.advance(loop.dt)
+    assert loop.current.has_keycard
+
+
+def test_collected_sprite_disappears_and_rendering_cannot_change_game(display, tmp_path):
+    from game.map import MapObject
+
+    path = tmp_path / 'wall.png'
+    pygame.image.save(pygame.Surface((16, 16)), path)
+    renderer = RaycastingRenderer(path)
+    core = GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),),
+                            (MapObject('card', 'keycard', 3.5, 2.5),)))
+    before = core.snapshot()
+    visible = pygame.image.tobytes(renderer.render(before), 'RGB')
+    depth = renderer.depth
+    assert core.snapshot() == before
+    for _ in range(18):
+        collected = core.step(SurvivorCommand(interact=True))
+    hidden = pygame.image.tobytes(renderer.render(collected, pitch=.1), 'RGB')
+    no_objects = replace(collected, world_map=replace(collected.world_map, objects=()))
+    assert hidden == pygame.image.tobytes(renderer.render(no_objects, pitch=.1), 'RGB')
+    assert depth == renderer.depth
+    assert visible != pygame.image.tobytes(renderer.render(collected), 'RGB')
+    assert core.snapshot() == collected
+
+
+
+@pytest.mark.parametrize('kind', ['keycard', 'exit'])
+@pytest.mark.parametrize('interruption', ['pause', 'focus'])
+def test_pause_or_focus_cancels_interaction_without_time_before_new_e(display, kind, interruption):
+    from game.map import MapObject
+
+    core = GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),),
+                            (MapObject('card', 'keycard', 3.5, 2.5),
+                             MapObject('exit', 'exit', 2.5, 3.5))))
+    if kind == 'exit':
+        for _ in range(18):
+            core.step(SurvivorCommand(interact=True))
+        core.step(SurvivorCommand(yaw_delta=pi / 2))
+    loop = FixedStepLoop(core)
+    session = PlaySession(loop)
+    session.focused = True
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
+    for _ in range(10):
+        loop.advance(loop.dt)
+    before = core.snapshot()
+    assert before.interaction_ticks == 10
+    assert before.interaction_object_id == ('card' if kind == 'keycard' else 'exit')
+    if interruption == 'pause':
+        session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    else:
+        session.events([event(pygame.WINDOWFOCUSLOST)])
+    assert loop.paused
+    cancelled = replace(before, interaction_object_id=None, interaction_ticks=0)
+    assert core.snapshot() == cancelled
+    assert loop.current == cancelled
+    assert loop.advance(100) == 0
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
+    assert core.snapshot() == cancelled
+    if interruption == 'focus':
+        session.events([event(pygame.WINDOWFOCUSGAINED)])
+        assert loop.paused
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    assert not loop.paused
+    # Fresh E arrives before any physics tick: the old progress is already gone.
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
+    assert core.snapshot() == cancelled
+    for _ in range(17):
+        loop.advance(loop.dt)
+        assert loop.current.events == ()
+    assert loop.current.interaction_ticks == 17
+    assert loop.current.has_keycard == (kind == 'exit')
+    assert loop.current.outcome is None
+    loop.advance(loop.dt)
+    assert [e.kind for e in loop.current.events] == [
+        'keycard_collected' if kind == 'keycard' else 'escaped']
