@@ -4,6 +4,7 @@ from dataclasses import replace
 from math import floor, pi
 
 from app.input import InputState
+from game.motion import segment_has_clearance
 
 
 class FixedStepLoop:
@@ -91,4 +92,14 @@ class FixedStepLoop:
             x, y = after.x, after.y
         turn = (after.yaw - before.yaw + pi) % (2 * pi) - pi
         camera = replace(after, x=x, y=y, yaw=(before.yaw + turn * alpha) % (2 * pi))
-        return replace(self.current, survivor=camera)
+        alien=self.current.alien
+        prior=self.previous.alien
+        if alien is not None and prior is not None:
+            ax=prior.x+(alien.x-prior.x)*alpha
+            ay=prior.y+(alien.y-prior.y)*alpha
+            if not segment_has_clearance(world,(prior.x,prior.y),(alien.x,alien.y),
+                                         self.current.config.alien_radius):
+                ax,ay=alien.x,alien.y
+            turn=(alien.yaw-prior.yaw+pi)%(2*pi)-pi
+            alien=replace(alien,x=ax,y=ay,yaw=(prior.yaw+turn*alpha)%(2*pi))
+        return replace(self.current, survivor=camera, alien=alien)

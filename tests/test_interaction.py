@@ -99,7 +99,7 @@ def test_same_small_map_has_reachable_fixed_card_and_exit_and_headless_replay():
     assert first == second
     assert first["outcome"] == "escaped"
     assert [e["kind"] for e in first["events"]] == ["keycard_collected", "escaped"]
-    core = GameCore()
+    core = GameCore(config=CoreConfig(alien_enabled=False))
     initial = core.reset(1)
     for command in replay_commands():
         core.step(command)

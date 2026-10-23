@@ -1,11 +1,24 @@
 """Fixed-tick headless movement. No wall clock, window or asset dependencies."""
 
-from math import ceil, cos, floor, hypot, pi, sin, sqrt
+from dataclasses import replace
+from math import atan2, ceil, cos, hypot, pi, sin
 from random import Random
 
-from game.interaction import select_target
+from ai.controller import ControllerState, choose_target
+from ai.navigation import Navigator
+from game.capture import capture_fraction
+from game.interaction import segment_clear, select_target
 from game.map import WorldMap, small_test_map
-from game.state import CoreConfig, GameEvent, SurvivorCommand, SurvivorState, WorldSnapshot
+from game.motion import sweep_axis
+from game.perception import PerceptionSnapshot, update_perception
+from game.state import (
+    AlienState,
+    CoreConfig,
+    GameEvent,
+    SurvivorCommand,
+    SurvivorState,
+    WorldSnapshot,
+)
 
 
 class GameCore:
@@ -15,6 +28,24 @@ class GameCore:
         for x, y in self.world_map.spawn_points:
             if self.world_map.overlaps(x, y, self.config.radius):
                 raise ValueError("Spawn does not have character clearance")
+        if self.config.alien_enabled and self.world_map.alien_spawn is not None:
+            ax, ay, _ = self.world_map.alien_spawn
+            if self.world_map.overlaps(ax, ay, self.config.alien_radius):
+                raise ValueError("Alien spawn does not have character clearance")
+            for x, y in self.world_map.spawn_points:
+                distance = hypot(ax - x, ay - y)
+                contact = (
+                    self.config.radius + self.config.alien_radius + self.config.capture_padding
+                )
+                if distance < self.config.minimum_spawn_distance or (
+                    distance <= contact and segment_clear(self.world_map, x, y, ax, ay)
+                ):
+                    raise ValueError("Alien spawn is too close to Survivor spawn")
+            if any(
+                self.world_map.overlaps(*p, self.config.alien_radius)
+                for p in self.world_map.patrol_waypoints
+            ):
+                raise ValueError("Patrol waypoint lacks Alien clearance")
         self.reset(0)
 
     def reset(self, seed: int | None = None) -> WorldSnapshot:
@@ -26,14 +57,37 @@ class GameCore:
         self._has_keycard = False
         self._outcome = None
         self._events = ()
+        self._alien = (
+            AlienState(*self.world_map.alien_spawn)
+            if self.config.alien_enabled and self.world_map.alien_spawn is not None
+            else None
+        )
+        self._perception = PerceptionSnapshot()
+        self._controller = ControllerState()
+        self._navigator = Navigator()
         return self.snapshot()
 
     def snapshot(self) -> WorldSnapshot:
-        target = None if self._outcome else select_target(
-            self.world_map, self._survivor, self.config, self._has_keycard)
+        target = (
+            None
+            if self._outcome
+            else select_target(self.world_map, self._survivor, self.config, self._has_keycard)
+        )
         return WorldSnapshot(
-            self._tick, self._seed, self._survivor, self.world_map, self.config,
-            self._has_keycard, target, self._outcome, self._events,
+            self._tick,
+            self._seed,
+            self._survivor,
+            self.world_map,
+            self.config,
+            self._has_keycard,
+            target,
+            self._outcome,
+            self._events,
+            self._alien,
+            self._perception,
+            self._controller.target,
+            self._controller.source,
+            self._navigator.path,
         )
 
     def step(self, command: SurvivorCommand) -> WorldSnapshot:
@@ -41,28 +95,119 @@ class GameCore:
         self._events = ()  # events belong to this step, including post-terminal calls
         if self._outcome is not None:
             return self.snapshot()
+        # Both commands use pre-tick state. Sensor memory is sampled before movement.
+        alien_delta = self._alien_displacement()
         yaw = (self._survivor.yaw + command.yaw_delta) % (2 * pi)
-        forward, strafe = command.forward, command.strafe
-        scale = max(1.0, hypot(forward, strafe))
+        scale = max(1.0, hypot(command.forward, command.strafe))
         speed = self.config.run_speed if command.running else self.config.walk_speed
         distance = speed / self.config.tick_hz / scale
-        dx = (cos(yaw) * forward - sin(yaw) * strafe) * distance
-        dy = (sin(yaw) * forward + cos(yaw) * strafe) * distance
-        x, y = self._survivor.x, self._survivor.y
-        # Small axis sweeps allow wall sliding without diagonal corner cutting.
-        count = max(1, ceil(hypot(dx, dy) / (self.config.radius / 4)))
-        for _ in range(count):
-            x = self._sweep_axis(x, y, dx / count, horizontal=True)
-            y = self._sweep_axis(y, x, dy / count, horizontal=False)
-        self._survivor = SurvivorState(x, y, yaw)
+        survivor_delta = (
+            (cos(yaw) * command.forward - sin(yaw) * command.strafe) * distance,
+            (sin(yaw) * command.forward + cos(yaw) * command.strafe) * distance,
+        )
+        captured = self._move_both(survivor_delta, alien_delta, yaw)
         self._tick += 1
-        self._interact(command)
+        if captured:
+            self._outcome = "captured"
+            self._events = (GameEvent("captured", "alien", self._tick),)
+        else:
+            # E resolves at the end of the tick; any earlier/simultaneous capture wins.
+            self._interact(command)
         return self.snapshot()
+
+    def _alien_displacement(self):
+        if self._alien is None:
+            return (0.0, 0.0)
+        self._perception = update_perception(
+            self.world_map, self._alien, self._survivor, self._perception, self.config
+        )
+        age = self._perception.last_seen_age_ticks
+        chasing = age is not None and age <= ceil(
+            self.config.chase_hold_seconds * self.config.tick_hz
+        )
+        self._alien = replace(self._alien, speed_mode="chase" if chasing else "search")
+        period = max(1, ceil(self.config.alien_decision_seconds * self.config.tick_hz - 1e-12))
+        if self._tick % period == 0:
+            self._controller = choose_target(
+                self._alien,
+                self._perception,
+                self.world_map.patrol_waypoints,
+                self._controller,
+                self.config.target_arrival_distance,
+            )
+            self._navigator.set_target(
+                self.world_map,
+                (self._alien.x, self._alien.y),
+                self._controller.target,
+                self.config.alien_radius,
+            )
+        speed = self.config.alien_chase_speed if chasing else self.config.alien_search_speed
+        return self._navigator.displacement(
+            (self._alien.x, self._alien.y), speed / self.config.tick_hz
+        )
+
+    def _move_both(self, survivor_delta, alien_delta, yaw):
+        s = (self._survivor.x, self._survivor.y)
+        a = (self._alien.x, self._alien.y) if self._alien else None
+        original_a = a
+        radius = min(self.config.radius, self.config.alien_radius) if a else self.config.radius
+        count = max(1, ceil(max(hypot(*survivor_delta), hypot(*alien_delta)) / (radius / 4)))
+        captured = False
+        for _ in range(count):
+            # Within each bounded substep: simultaneous X sweeps, then simultaneous Y sweeps.
+            for horizontal in (True, False):
+                axis = 0 if horizontal else 1
+                other = 1 - axis
+                next_s = list(s)
+                next_s[axis] = sweep_axis(
+                    self.world_map,
+                    self.config.radius,
+                    s[axis],
+                    s[other],
+                    survivor_delta[axis] / count,
+                    horizontal=horizontal,
+                )
+                next_s = tuple(next_s)
+                if a is not None:
+                    next_a = list(a)
+                    next_a[axis] = sweep_axis(
+                        self.world_map,
+                        self.config.alien_radius,
+                        a[axis],
+                        a[other],
+                        alien_delta[axis] / count,
+                        horizontal=horizontal,
+                    )
+                    next_a = tuple(next_a)
+                    limit = (
+                        self.config.radius + self.config.alien_radius + self.config.capture_padding
+                    )
+                    t = capture_fraction(self.world_map, s, next_s, a, next_a, limit)
+                    if t is not None:
+                        s = tuple(s[i] + t * (next_s[i] - s[i]) for i in (0, 1))
+                        a = tuple(a[i] + t * (next_a[i] - a[i]) for i in (0, 1))
+                        captured = True
+                        break
+                    a = next_a
+                s = next_s
+            if captured:
+                break
+        self._survivor = SurvivorState(*s, yaw)
+        if a is not None:
+            dx, dy = a[0] - original_a[0], a[1] - original_a[1]
+            facing = atan2(dy, dx) % (2 * pi) if hypot(dx, dy) > 1e-12 else self._alien.yaw
+            self._alien = replace(self._alien, x=a[0], y=a[1], yaw=facing)
+        return captured
 
     def _interact(self, command):
         target = select_target(self.world_map, self._survivor, self.config, self._has_keycard)
-        eligible = (command.interact and command.forward == 0 and command.strafe == 0
-                    and target is not None and (target.kind != "exit" or self._has_keycard))
+        eligible = (
+            command.interact
+            and command.forward == 0
+            and command.strafe == 0
+            and target is not None
+            and (target.kind != "exit" or self._has_keycard)
+        )
         if not eligible:
             return
         if target.kind == "keycard":
@@ -72,28 +217,3 @@ class GameCore:
             self._outcome = "escaped"
             kind = "escaped"
         self._events = (GameEvent(kind, target.object_id, self._tick),)
-
-    def _sweep_axis(self, position, other, delta, *, horizontal):
-        """Clamp the entire axis segment against rounded, circle-expanded tiles."""
-        radius = self.config.radius
-        extent = self.world_map.width if horizontal else self.world_map.height
-        target = min(max(position + delta, radius), extent - radius)
-        if delta == 0:
-            return target
-        for across in range(floor(other - radius), floor(other + radius) + 1):
-            gap = abs(other - min(max(other, across), across + 1))
-            if gap >= radius:
-                continue
-            padding = sqrt(max(0.0, radius * radius - gap * gap))
-            for along in range(
-                floor(min(position, target) - radius), floor(max(position, target) + radius) + 1
-            ):
-                cx, cy = (along, across) if horizontal else (across, along)
-                if not self.world_map.blocked(cx, cy):
-                    continue
-                lower, upper = along - padding, along + 1 + padding
-                if delta > 0 and position <= lower + 1e-12 and target > lower:
-                    target = lower
-                elif delta < 0 and position >= upper - 1e-12 and target < upper:
-                    target = upper
-        return target

@@ -10,6 +10,14 @@ WALL_TEXTURE = Path(__file__).resolve().parents[1] / 'assets/stradex/prepared/wa
 
 
 @dataclass(frozen=True)
+class SpriteObject:
+    object_id: str
+    kind: str
+    x: float
+    y: float
+
+
+@dataclass(frozen=True)
 class RayHit:
     distance: float  # parameter along ray; perpendicular depth for camera-plane rays
     cell_x: int
@@ -107,13 +115,24 @@ class RaycastingRenderer:
         pygame.draw.rect(exit_sign, (220, 255, 235), (29, 26, 7, 38))
         pygame.draw.polygon(exit_sign, (220, 255, 235), [(17, 38), (32, 20), (47, 38)])
         pygame.draw.rect(exit_sign, (80, 240, 165), (12, 78, 40, 5))
-        return {"keycard": (card, .50, .3125), "exit": (exit_sign, .65, .975)}
+        alien = pygame.Surface((64,96), pygame.SRCALPHA)
+        pygame.draw.ellipse(alien,(110,50,135),(8,4,48,52))
+        pygame.draw.polygon(alien,(85,35,110),[(18,40),(46,40),(60,88),(4,88)])
+        pygame.draw.ellipse(alien,(165,255,90),(16,24,12,7))
+        pygame.draw.ellipse(alien,(165,255,90),(36,24,12,7))
+        pygame.draw.rect(alien,(45,18,60),(17,84,10,12))
+        pygame.draw.rect(alien,(45,18,60),(37,84,10,12))
+        return {"keycard": (card, .50, .3125), "exit": (exit_sign, .65, .975),
+                "alien": (alien, .48, .9)}
 
     def _draw_objects(self, snapshot, horizon):
         camera = snapshot.survivor
         fx, fy = cos(camera.yaw), sin(camera.yaw)
         projected = []
-        for obj in snapshot.world_map.objects:
+        objects=list(snapshot.world_map.objects)
+        if snapshot.alien is not None:
+            objects.append(SpriteObject("alien","alien",snapshot.alien.x,snapshot.alien.y))
+        for obj in objects:
             if obj.kind == "keycard" and snapshot.has_keycard:
                 continue
             rx, ry = obj.x - camera.x, obj.y - camera.y
@@ -122,7 +141,7 @@ class RaycastingRenderer:
                 continue  # behind camera / near plane, avoid unbounded sprite scaling
             across = -rx * fy + ry * fx
             projected.append((depth, obj.object_id, across, obj))
-        for depth, _, across, obj in sorted(projected, reverse=True):
+        for depth, _, across, obj in sorted(projected, key=lambda p: (p[0],p[1]), reverse=True):
             sprite, world_width, world_height = self.sprites[obj.kind]
             width = max(1, round(self.focal_length * world_width / depth))
             height = max(1, round(self.focal_length * world_height / depth))

@@ -45,7 +45,7 @@ def test_rotation_applies_before_movement_and_strafe_does_not_turn():
 
 
 def test_replay_and_reset():
-    core = GameCore()
+    core = GameCore(config=CoreConfig(alien_enabled=False))
     initial = core.reset(123)
     commands = [SurvivorCommand(1, 1, 0.03, True), SurvivorCommand(-1, 0, -0.02)] * 150
     first = [core.step(c) for c in commands]
@@ -55,7 +55,7 @@ def test_replay_and_reset():
 
 
 def test_snapshots_are_immutable_and_old_snapshots_stay_unchanged():
-    core = GameCore()
+    core = GameCore(config=CoreConfig(alien_enabled=False))
     before = core.snapshot()
     with pytest.raises(FrozenInstanceError):
         before.survivor.x = 99
@@ -182,7 +182,7 @@ def test_swept_collision_other_directions(yaw, spawn, axis, expected):
 def test_many_commands_never_overlap_authored_geometry():
     from random import Random
 
-    core = GameCore()
+    core = GameCore(config=CoreConfig(alien_enabled=False))
     rng = Random(12)
     for _ in range(3000):
         command = SurvivorCommand(

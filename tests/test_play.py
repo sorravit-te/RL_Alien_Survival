@@ -81,7 +81,7 @@ def test_missing_texture_explains_filename_and_preparation(tmp_path):
 
 def test_mouse_accumulates_until_tick_then_consumed_once():
     inputs = InputState(mouse_sensitivity=.01)
-    loop = FixedStepLoop(GameCore(), inputs)
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)), inputs)
     inputs.mouse(12)
     assert loop.advance(.01) == 0
     inputs.mouse(-2)
@@ -104,7 +104,7 @@ def test_opposite_keys_shift_and_fixed_rate_arrow_turn():
 
 def test_fixed_tick_result_independent_of_render_schedule():
     def run(deltas):
-        loop = FixedStepLoop(GameCore())
+        loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
         loop.inputs.key('w', True)
         loop.inputs.key('right', True)
         for elapsed in deltas:
@@ -116,7 +116,7 @@ def test_fixed_tick_result_independent_of_render_schedule():
 
 
 def test_slow_frame_has_bounded_catchup_and_no_endless_backlog():
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     assert loop.advance(10) == 5
     assert 0 <= loop.accumulator < loop.dt
     assert loop.dropped_seconds > 9.8
@@ -124,7 +124,7 @@ def test_slow_frame_has_bounded_catchup_and_no_endless_backlog():
 
 
 def test_pause_reset_clear_inputs_interpolation_and_time():
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     initial = loop.current
     loop.inputs.key('w', True)
     loop.advance(.05)
@@ -145,7 +145,7 @@ def test_pause_reset_clear_inputs_interpolation_and_time():
 
 
 def test_interpolation_yaw_uses_short_arc():
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     loop.previous = replace(loop.current, survivor=replace(loop.current.survivor, yaw=2*pi-.1))
     loop.current = replace(loop.current, survivor=replace(loop.current.survivor, yaw=.1))
     loop.accumulator = loop.dt / 2
@@ -170,7 +170,7 @@ def event(kind, **attributes):
 
 
 def test_window_pause_focus_reset_and_stale_batch_events(display):
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     session = PlaySession(loop)
     session.focused = True
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE),
@@ -202,7 +202,7 @@ def test_window_pause_focus_reset_and_stale_batch_events(display):
 
 
 def test_input_loop_reaches_corridor_end_and_slides_on_walls():
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     loop.core.reset(1)  # spawn (2.5, 2.5)
     loop.synchronize()
     # East in upper room, south beside the tall obstacle, east into corridor, south.
@@ -261,7 +261,7 @@ def test_pitch_direction_limit_and_separate_sensitivity(dy, expected):
 
 def test_both_mouse_axes_wait_for_tick_and_are_not_reused_in_catchup():
     inputs = InputState(mouse_sensitivity=.01, vertical_sensitivity=.01)
-    loop = FixedStepLoop(GameCore(), inputs)
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)), inputs)
     inputs.mouse(12, -12)
     assert loop.advance(.01) == 0
     assert inputs.pitch == 0
@@ -276,7 +276,7 @@ def test_both_mouse_axes_wait_for_tick_and_are_not_reused_in_catchup():
 
 def test_pitch_is_independent_of_render_frequency():
     def simulate(frames):
-        loop = FixedStepLoop(GameCore())
+        loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
         for _ in range(frames):
             loop.inputs.mouse(30 / frames, -60 / frames)
             loop.advance(1 / frames)
@@ -289,7 +289,7 @@ def test_pitch_is_independent_of_render_frequency():
 
 
 def test_pitch_does_not_change_core_movement_or_collision():
-    level, pitched = FixedStepLoop(GameCore()), FixedStepLoop(GameCore())
+    level, pitched = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False))), FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     for i in range(120):
         for loop in (level, pitched):
             loop.inputs.key('w', True)
@@ -302,7 +302,7 @@ def test_pitch_does_not_change_core_movement_or_collision():
 
 
 def test_pitch_preserved_on_pause_focus_resume_but_reset_clears_it(display):
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     session = PlaySession(loop)
     session.focused = True
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
@@ -367,7 +367,7 @@ def test_pitch_projection_fully_repaints_extremes_and_preserves_depth(display, t
 
 @pytest.mark.parametrize('alpha', [0, .25, .5, .75, .999])
 def test_display_pitch_interpolates_with_same_alpha_as_yaw(alpha):
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     loop.inputs.mouse(40, -40)
     loop.advance(loop.dt)
     loop.advance(alpha * loop.dt)
@@ -385,7 +385,7 @@ def test_display_pitch_interpolates_with_same_alpha_as_yaw(alpha):
 
 
 def test_pitch_interpolation_settles_next_tick_without_smoothing_tail_or_delta_reuse():
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     loop.inputs.mouse(0, -40)
     loop.advance(loop.dt * 1.5)
     assert loop.display_pitch() == pytest.approx(.06)
@@ -398,7 +398,7 @@ def test_pitch_interpolation_settles_next_tick_without_smoothing_tail_or_delta_r
 
 
 def test_interpolated_pitch_stays_in_bounds_across_both_limits():
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     loop.inputs.mouse(0, -10000)
     loop.advance(loop.dt)
     assert loop.current_pitch == loop.inputs.pitch_limit
@@ -414,7 +414,7 @@ def test_interpolated_pitch_stays_in_bounds_across_both_limits():
 
 
 def test_pitch_interpolation_synchronizes_on_pause_focus_resume_and_reset(display):
-    loop = FixedStepLoop(GameCore())
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
     session = PlaySession(loop)
     session.focused = True
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
@@ -674,3 +674,106 @@ def test_reset_discards_queued_e_and_no_press_does_not_collect():
     assert loop.inputs.pending_interactions == 0
     loop.advance(loop.dt)
     assert not loop.current.has_keycard and not loop.current.events
+
+
+
+def test_alien_sprite_full_partial_occlusion_and_pitch(display,tmp_path):
+    from game.state import AlienState
+
+    texture=pygame.Surface((16,16))
+    texture.fill((100,100,100))
+    path=tmp_path/'plain.png'
+    pygame.image.save(texture,path)
+    renderer=RaycastingRenderer(path)
+    rows=tuple('....#...' if y==4 else '........' for y in range(8))
+    core=GameCore(WorldMap(rows,((2.5,4.5),)))
+    empty=core.snapshot()
+    base=renderer.render(empty).copy()
+    hidden=replace(empty,alien=AlienState(5.5,4.5))
+    assert pygame.image.tobytes(renderer.render(hidden),'RGB')==pygame.image.tobytes(base,'RGB')
+    partial=replace(empty,alien=AlienState(5.2,3.7))
+    frame=renderer.render(partial).copy()
+    changed=[x for x in range(320) if any(frame.get_at((x,y))!=base.get_at((x,y)) for y in range(180))]
+    assert changed and all(renderer.depth[x]>2.7 for x in changed)
+    open_world=replace(empty.world_map,rows=('........',)*8)
+    clear=replace(empty,world_map=open_world,alien=AlienState(5.5,4.5))
+    tops=[]
+    for pitch in (0,.1,-.1):
+        background=renderer.render(replace(clear,alien=None),pitch=pitch).copy()
+        alien=renderer.render(clear,pitch=pitch).copy()
+        tops.append(min(y for y in range(180) for x in range(320)
+                        if alien.get_at((x,y))!=background.get_at((x,y))))
+    offset=round(renderer.focal_length*tan(.1))
+    assert tops[1]-tops[0]==offset and tops[2]-tops[0]==-offset
+    assert core.snapshot()==empty
+
+
+def test_near_card_occludes_far_alien_and_near_alien_occludes_card(display,tmp_path):
+    from game.map import MapObject
+    from game.state import AlienState
+
+    path=tmp_path/'plain.png'
+    pygame.image.save(pygame.Surface((16,16)),path)
+    renderer=RaycastingRenderer(path)
+    core=GameCore(WorldMap(('.'*10,)*8,((2.5,4.5),),
+                            (MapObject('card','keycard',3.5,4.5),)))
+    snapshot=core.snapshot()
+    card=renderer.render(snapshot).copy()
+    combined=renderer.render(replace(snapshot,alien=AlienState(6.5,4.5))).copy()
+    assert all(combined.get_at((160,y))==card.get_at((160,y)) for y in range(75,110))
+    near_alien=replace(snapshot,world_map=replace(snapshot.world_map,objects=()),
+                       alien=AlienState(3.5,4.5))
+    alien=renderer.render(near_alien).copy()
+    far_card=replace(near_alien,world_map=replace(snapshot.world_map,
+                           objects=(MapObject('card','keycard',6.5,4.5),)))
+    combined=renderer.render(far_card).copy()
+    assert all(combined.get_at((160,y))==alien.get_at((160,y)) for y in range(85,100))
+
+
+def test_alien_pause_focus_freezes_everything_and_caught_restart_resets(display,monkeypatch):
+    from app.play import hud_labels
+    from game.perception import PerceptionSnapshot
+
+    world=WorldMap(('.'*12,)*8,((2.5,2.5),),alien_spawn=(6.5,2.5,pi),
+                   patrol_waypoints=((2.5,2.5),))
+    loop=FixedStepLoop(GameCore(world,CoreConfig(run_speed=120,alien_search_speed=120)))
+    initial=loop.current
+    session=PlaySession(loop)
+    session.focused=True
+    session.events([event(pygame.KEYDOWN,key=pygame.K_ESCAPE)])
+    loop.inputs.mouse(0,-20)
+    loop.inputs.key('e',True)
+    session.events([event(pygame.WINDOWFOCUSLOST)])
+    assert loop.advance(100)==0 and loop.current==initial
+    assert loop.inputs.pending_interactions==0
+    session.events([event(pygame.WINDOWFOCUSGAINED)])
+    assert loop.paused
+    session.events([event(pygame.KEYDOWN,key=pygame.K_ESCAPE)])
+    loop.inputs.key('w',True)
+    loop.inputs.key('shift_left',True)
+    grabs=[]
+    monkeypatch.setattr(pygame.event,'set_grab',grabs.append)
+    loop.advance(loop.dt)
+    session.after_step()
+    assert loop.current.outcome=='captured' and loop.paused and grabs[-1] is False
+    assert 'YOU WERE CAUGHT' in hud_labels(loop)[0]
+    assert 'Heuristic test controller - NOT RL' in hud_labels(loop)
+    frozen=loop.current
+    assert loop.advance(100)==0 and loop.current==frozen
+    session.events([event(pygame.KEYDOWN,key=pygame.K_r)])
+    assert loop.current==initial and not loop.paused
+    assert loop.current.perception==PerceptionSnapshot()
+    assert loop.current.alien_target is None and loop.current.navigation_path==()
+    assert loop.display_pitch()==0 and loop.inputs.consume(loop.dt)==SurvivorCommand()
+
+
+def test_alien_display_interpolation_is_read_only_and_safe():
+    world=WorldMap(('.'*16,)*16,((2.5,2.5),),alien_spawn=(10.5,10.5,0),
+                   patrol_waypoints=((12.5,10.5),))
+    loop=FixedStepLoop(GameCore(world))
+    loop.advance(loop.dt*1.5)
+    current=loop.core.snapshot()
+    rendered=loop.display_snapshot()
+    assert rendered.alien.x==(loop.previous.alien.x+current.alien.x)/2
+    assert not world.overlaps(rendered.alien.x,rendered.alien.y,.2)
+    assert loop.core.snapshot()==current

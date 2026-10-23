@@ -5,7 +5,7 @@ from dataclasses import asdict
 from math import pi
 
 from game.core import GameCore
-from game.state import SurvivorCommand
+from game.state import CoreConfig, SurvivorCommand
 
 
 def replay_commands():
@@ -25,7 +25,7 @@ def replay_commands():
 
 
 def run_replay():
-    core = GameCore()
+    core = GameCore(config=CoreConfig(alien_enabled=False))
     core.reset(1)
     records, events = [], []
     for command in replay_commands():
@@ -38,7 +38,7 @@ def run_replay():
     if snapshot.outcome != "escaped":
         raise RuntimeError("Headless route failed to escape")
     return {"mode": "headless fixed-tick replay (not keyboard input)", "seed": 1,
-            "interaction_mode": "single_press",
+            "interaction_mode": "single_press", "alien_enabled": False,
             "outcome": snapshot.outcome, "events": events, "steps": records}
 
 

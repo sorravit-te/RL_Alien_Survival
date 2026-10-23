@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from math import isfinite, pi
 
 from game.map import MapObject, WorldMap
+from game.perception import PerceptionSnapshot
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,19 @@ class CoreConfig:
     radius: float = 0.2
     interaction_range: float = 1.25
     interaction_half_angle: float = pi / 6
+    alien_enabled: bool = True
+    alien_radius: float = 0.2
+    alien_search_speed: float = 2.2
+    alien_chase_speed: float = 4.4
+    alien_fov: float = 2 * pi / 3
+    alien_sight_range: float = 8.0
+    alien_near_range: float = 1.0
+    sight_confirmation_seconds: float = 0.2
+    chase_hold_seconds: float = 2.0
+    alien_decision_seconds: float = 0.5
+    target_arrival_distance: float = 0.15
+    capture_padding: float = 0.0  # contact distance = both radii + this explicit padding
+    minimum_spawn_distance: float = 2.0
 
     def __post_init__(self):
         if self.tick_hz != 30:
@@ -29,6 +43,27 @@ class CoreConfig:
             raise ValueError("Interaction range must be finite and positive")
         if not isfinite(self.interaction_half_angle) or not 0 < self.interaction_half_angle <= pi:
             raise ValueError("Interaction half-angle must be in (0, pi]")
+        values = (
+            self.alien_radius,
+            self.alien_search_speed,
+            self.alien_chase_speed,
+            self.alien_sight_range,
+            self.alien_near_range,
+            self.sight_confirmation_seconds,
+            self.chase_hold_seconds,
+            self.alien_decision_seconds,
+            self.target_arrival_distance,
+        )
+        if not all(isfinite(v) and v > 0 for v in values):
+            raise ValueError("Alien distances, speeds and times must be finite and positive")
+        if not isfinite(self.alien_fov) or not 0 < self.alien_fov <= 2 * pi:
+            raise ValueError("Alien FOV must be in (0, 2*pi]")
+        if self.alien_near_range > self.alien_sight_range:
+            raise ValueError("Near sensor range cannot exceed sight range")
+        if not all(
+            isfinite(v) and v >= 0 for v in (self.capture_padding, self.minimum_spawn_distance)
+        ):
+            raise ValueError("Capture padding and spawn distance must be finite and nonnegative")
 
 
 @dataclass(frozen=True)
@@ -54,6 +89,14 @@ class SurvivorState:
 
 
 @dataclass(frozen=True)
+class AlienState:
+    x: float
+    y: float
+    yaw: float = 0.0
+    speed_mode: str = "search"
+
+
+@dataclass(frozen=True)
 class GameEvent:
     kind: str
     object_id: str
@@ -71,3 +114,8 @@ class WorldSnapshot:
     interaction_target: MapObject | None = None
     outcome: str | None = None
     events: tuple[GameEvent, ...] = ()
+    alien: AlienState | None = None
+    perception: PerceptionSnapshot = PerceptionSnapshot()
+    alien_target: tuple[float, float] | None = None
+    alien_target_source: str = "patrol"
+    navigation_path: tuple[tuple[float, float], ...] = ()

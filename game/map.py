@@ -1,7 +1,7 @@
 """Single immutable geometry source for collision and future rendering."""
 
 from dataclasses import dataclass
-from math import floor, isfinite
+from math import floor, isfinite, pi
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,8 @@ class WorldMap:
     rows: tuple[str, ...]
     spawn_points: tuple[tuple[float, float], ...]
     objects: tuple[MapObject, ...] = ()
+    alien_spawn: tuple[float, float, float] | None = None
+    patrol_waypoints: tuple[tuple[float, float], ...] = ()
 
     def __post_init__(self):
         # Own immutable copies even when a caller supplies lists.
@@ -37,6 +39,13 @@ class WorldMap:
             raise TypeError("Map objects must be immutable MapObject values")
         if len({obj.object_id for obj in self.objects}) != len(self.objects):
             raise ValueError("Object IDs must be unique")
+        if self.alien_spawn is not None:
+            object.__setattr__(self, "alien_spawn", tuple(self.alien_spawn))
+            if len(self.alien_spawn) != 3 or not all(isfinite(v) for v in self.alien_spawn):
+                raise ValueError("Alien spawn must contain finite x/y/yaw")
+        object.__setattr__(self, "patrol_waypoints", tuple(tuple(p) for p in self.patrol_waypoints))
+        if any(len(p) != 2 or not all(isfinite(v) for v in p) for p in self.patrol_waypoints):
+            raise ValueError("Patrol waypoint must contain finite x/y")
         if not self.rows or not self.rows[0]:
             raise ValueError("Map must not be empty")
         if any(len(row) != self.width or set(row) - {"#", "."} for row in self.rows):
@@ -90,6 +99,7 @@ def small_test_map() -> WorldMap:
             "############",
         ),
         ((2.5, 2.5), (2.5, 4.5)),
-        (MapObject("keycard", "keycard", 5.5, 2.5),
-         MapObject("exit", "exit", 9.5, 7.5)),
+        (MapObject("keycard", "keycard", 5.5, 2.5), MapObject("exit", "exit", 9.5, 7.5)),
+        alien_spawn=(9.5, 7.5, -pi / 2),
+        patrol_waypoints=((9.5, 7.5), (9.5, 4.5), (5.5, 4.5), (5.5, 2.5), (2.5, 2.5), (2.5, 5.5)),
     )

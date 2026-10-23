@@ -1,4 +1,4 @@
-"""Milestone 1C room viewer: python -m app.play."""
+"""Milestone 2A room viewer: python -m app.play."""
 
 import argparse
 import json
@@ -80,10 +80,14 @@ class PlaySession:
 def hud_labels(loop):
     snapshot = loop.current
     if snapshot.outcome:
-        return ["YOU ESCAPED - R to restart", "Mouse released"]
+        result="YOU ESCAPED" if snapshot.outcome=="escaped" else "YOU WERE CAUGHT"
+        return [f"{result} - R to restart", "Mouse released",
+                "Heuristic test controller - NOT RL"]
     status = 'PAUSED - Esc to play' if loop.paused else 'WASD move | Shift run | Press E interact'
     labels = [status, 'Mouse look | Arrows turn | Esc pause | R reset',
-              'Keycard: acquired' if snapshot.has_keycard else 'Keycard: not acquired']
+              'Keycard: acquired' if snapshot.has_keycard else 'Keycard: not acquired',
+              'Heuristic test controller - NOT RL' if snapshot.alien is not None
+              else 'Alien disabled (isolated fixture)']
     target = snapshot.interaction_target
     if target is not None:
         if target.kind == "exit" and not snapshot.has_keycard:
@@ -111,7 +115,7 @@ def main(argv=None):
     pygame.font.init()
     try:
         screen = pygame.display.set_mode((960, 540))
-        pygame.display.set_caption('Alien Survival - Milestone 1C')
+        pygame.display.set_caption('Alien Survival - Milestone 2A')
         renderer = RaycastingRenderer()
         font = pygame.font.Font(None, 22)
         loop = FixedStepLoop(GameCore())
