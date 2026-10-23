@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Alien RL: Debug setup check",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "tools.check_setup",
+      "args": ["--rl-smoke"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

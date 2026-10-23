@@ -1,0 +1,8 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.exclude": [".venv", "Flat", "90s Style", "Materials", "assets"],
+  "files.exclude": {"**/__pycache__": true, ".pytest_cache": true, ".ruff_cache": true},
+  "search.exclude": {".venv": true, "Flat": true, "90s Style": true, "Materials": true, "assets/stradex": true},
+  "files.encoding": "utf8"
+}

@@ -1,0 +1,61 @@
+# Python and local development
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+/configs/assets.local.json
+
+# Purchased Stradex originals and derived textures must not enter a public repo.
+/Flat/
+/90s Style/
+/Materials/
+/*engine preview*.png
+/GZDoom engine preview.png
+/assets/stradex/
+
+# Generated experiments and machine-specific reports
+/models/
+/experiments/
+/logs/
+/output/
+/tmp/
+
+# Local project instructions
+/AGENTS.md
+/agent.md
+
+# Local project specification
+/plan.md
+
+# Python build and test artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+.tox/
+.nox/
+.mypy_cache/
+.pytype/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Training output written outside experiments/
+/runs/
+/checkpoints/
+
+# Editor backups and operating-system metadata
+/.history/
+.vscode/*.local.json
+*.log
+*.tmp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

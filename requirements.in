@@ -1,0 +1,11 @@
+# Stable releases only. Exact tested Windows/Python 3.12 versions are in requirements.lock.txt.
+# Install CPU PyTorch from its official wheel index first; see tools/bootstrap.ps1.
+torch>=2.8,<3
+pygame>=2.6,<3
+gymnasium>=1.0,<2
+stable-baselines3>=2.7,<3
+sb3-contrib>=2.7,<3
+numpy>=1.26,<3
+Pillow>=11,<13
+pytest>=8,<10
+ruff>=0.12,<1
