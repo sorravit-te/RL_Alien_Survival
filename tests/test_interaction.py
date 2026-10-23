@@ -1,4 +1,4 @@
-"""Core-only 1C contract; no rendering/asset dependencies."""
+"""Core 1C instant-press contract, independent of graphics and assets."""
 
 from dataclasses import FrozenInstanceError, replace
 from math import pi
@@ -18,79 +18,11 @@ def scene(objects=None, spawn=(2.5, 2.5), rows=None, config=None):
     return GameCore(WorldMap(rows or ("......",) * 6, (spawn,), objects), config)
 
 
-def hold(core, count=18, **kwargs):
-    snapshots = [core.step(SurvivorCommand(interact=True, **kwargs)) for _ in range(count)]
+def press(core, count=1):
+    # Each True command is one explicit bot press, not a held keyboard state.
+    snapshots = [core.step(SurvivorCommand(interact=True)) for _ in range(count)]
     return snapshots[-1], tuple(e for s in snapshots for e in s.events)
 
-
-def test_collect_requires_full_duration_and_emits_only_once():
-    core = scene()
-    before = core.snapshot()
-    pending, events = hold(core, 17)
-    assert not pending.has_keycard
-    assert pending.interaction_ticks == 17
-    assert events == ()
-    collected, events = hold(core, 1)
-    assert collected.has_keycard
-    assert [(e.kind, e.object_id, e.tick) for e in events] == [("keycard_collected", "card", 18)]
-    assert collected.interaction_ticks == 0
-    assert collected.interaction_target is None
-    assert hold(core, 60)[1] == ()
-    assert not before.has_keycard
-
-
-def test_exit_requires_card_and_full_duration_then_freezes_and_reset_restores():
-    core = scene()
-    core.step(SurvivorCommand(yaw_delta=pi / 2))
-    locked, events = hold(core, 60)
-    assert locked.interaction_target.kind == "exit"
-    assert locked.interaction_ticks == 0
-    assert locked.outcome is None
-    assert events == ()
-    core.step(SurvivorCommand(yaw_delta=-pi / 2))
-    hold(core)
-    core.step(SurvivorCommand(yaw_delta=pi / 2))
-    pending, _ = hold(core, 17)
-    assert pending.outcome is None
-    escaped, events = hold(core, 1)
-    assert escaped.outcome == "escaped"
-    assert [e.kind for e in events] == ["escaped"]
-    for _ in range(30):
-        stopped = core.step(SurvivorCommand(1, 1, pi, True, True))
-        assert stopped == replace(escaped, events=())
-    assert core.reset(0) == scene().snapshot()
-    assert not core.snapshot().has_keycard
-
-
-@pytest.mark.parametrize("cancel", [SurvivorCommand(), SurvivorCommand(forward=1, interact=True),
-                                    SurvivorCommand(strafe=1, interact=True),
-                                    SurvivorCommand(yaw_delta=pi, interact=True)])
-def test_releasing_moving_or_turning_away_cancels_and_restarts(cancel):
-    core = scene()
-    hold(core, 10)
-    cancelled = core.step(cancel)
-    assert cancelled.interaction_ticks == 0
-    assert cancelled.interaction_object_id is None
-    if cancel.yaw_delta:
-        core.step(SurvivorCommand(yaw_delta=-pi))
-    pending, events = hold(core, 17)
-    assert not pending.has_keycard
-    assert events == ()
-    assert hold(core, 1)[0].has_keycard
-
-
-def test_switching_targets_never_transfers_progress():
-    core = scene((MapObject("a", "keycard", 3.5, 2.5),
-                  MapObject("b", "keycard", 2.5, 3.5)))
-    hold(core, 10)
-    switched = core.step(SurvivorCommand(yaw_delta=pi / 2, interact=True))
-    assert switched.interaction_object_id == "b"
-    assert switched.interaction_ticks == 1
-    pending, _ = hold(core, 16)
-    assert not pending.has_keycard
-    collected, events = hold(core, 1)
-    assert collected.has_keycard
-    assert events[0].object_id == "b"
 
 
 @pytest.mark.parametrize("spawn,obj,rows", [
@@ -105,35 +37,22 @@ def test_invalid_range_angle_and_object_placement(spawn, obj, rows):
             scene(objects, spawn, rows)
     else:
         core = scene(objects, spawn, rows)
-        final, events = hold(core, 30)
+        final, events = press(core, 30)
         assert not final.has_keycard
         assert final.interaction_target is None
         assert not events
+
 
 
 def test_wall_blocks_nearby_interaction_and_yaw_independent_of_rendering():
     rows = ("......", "..#...", "..#...", "......")
     objects = (MapObject("card", "keycard", 3.1, 1.5),)
     core = scene(objects, (1.75, 1.5), rows, CoreConfig(interaction_range=2))
-    final, events = hold(core, 30)
+    final, events = press(core, 30)
     assert not final.has_keycard
     assert final.interaction_target is None
-    assert final.interaction_ticks == 0
     assert not events
 
-
-def test_losing_range_or_wall_visibility_cancels_progress():
-    objects = (MapObject("card", "keycard", 3.5, 1.5),)
-    core = scene(objects, (3.5, 2.5), ("......", "..#...", "..#...", "......"),
-                 CoreConfig(interaction_range=1.1))
-    core.step(SurvivorCommand(yaw_delta=-pi / 2))
-    hold(core, 10)
-    # Actual movement invalidates progress even if the object remains in range.
-    snap = core.step(SurvivorCommand(forward=-1, interact=True))
-    assert snap.interaction_ticks == 0
-    for _ in range(4):
-        snap = core.step(SurvivorCommand(forward=-1))
-    assert snap.interaction_target is None
 
 
 def test_deterministic_target_priority_angle_then_distance_then_id():
@@ -153,22 +72,6 @@ def test_deterministic_target_priority_angle_then_distance_then_id():
     assert select_target(world, survivor, config, False).object_id == "near"
 
 
-@pytest.mark.parametrize("kwargs", [{"interaction_range": 0}, {"interaction_seconds": 0},
-                                    {"interaction_half_angle": 0},
-                                    {"interaction_half_angle": 4},
-                                    {"interaction_range": float("inf")},
-                                    {"interaction_seconds": float("nan")}])
-def test_interaction_config_validation(kwargs):
-    with pytest.raises(ValueError):
-        CoreConfig(**kwargs)
-
-
-def test_configurable_duration_range_and_angle():
-    core = scene(config=CoreConfig(interaction_range=1, interaction_half_angle=.1,
-                                  interaction_seconds=.1))
-    assert not hold(core, 2)[0].has_keycard
-    assert hold(core, 1)[0].has_keycard
-
 
 def test_objects_and_events_are_immutable_and_copied_from_input():
     objects = [MapObject("card", "keycard", 3.5, 2.5)]
@@ -179,12 +82,13 @@ def test_objects_and_events_are_immutable_and_copied_from_input():
         before.world_map.objects[0].x = 0
     with pytest.raises(FrozenInstanceError):
         before.has_keycard = True
-    after, events = hold(core)
+    after, events = press(core)
     with pytest.raises(FrozenInstanceError):
         events[0].kind = "changed"
     assert not before.has_keycard
     assert after.has_keycard
     assert replace(after, has_keycard=False) != core.snapshot()
+
 
 
 def test_same_small_map_has_reachable_fixed_card_and_exit_and_headless_replay():
@@ -204,19 +108,6 @@ def test_same_small_map_has_reachable_fixed_card_and_exit_and_headless_replay():
 
 
 
-def test_no_timeout_win_and_blocked_walk_input_still_cancels_interaction():
-    rows = ("......", "......", "..#...", "......", "......")
-    core = scene((MapObject("card", "keycard", 3.5, 1.8),), (2.5, 1.8), rows)
-    for _ in range(600):
-        assert core.step(SurvivorCommand()).outcome is None
-    hold(core, 10)
-    before = core.snapshot().survivor
-    # Strafe into the touching wall: no displacement, but walking intent cancels E.
-    cancelled = core.step(SurvivorCommand(strafe=1, interact=True))
-    assert cancelled.survivor == before
-    assert cancelled.interaction_ticks == 0
-
-
 def test_line_of_sight_rejects_corner_touch():
     from game.interaction import segment_clear
 
@@ -226,18 +117,105 @@ def test_line_of_sight_rejects_corner_touch():
 
 
 
-@pytest.mark.parametrize('kind', ['keycard', 'exit'])
-def test_explicit_interaction_cancel_is_idempotent_and_does_not_step_world(kind):
+def test_card_is_immediate_and_never_repeats_after_collection():
     core = scene()
+    initial = core.snapshot()
+    picked = core.step(SurvivorCommand(interact=True))
+    assert picked.tick == 1
+    assert picked.has_keycard
+    assert [(e.kind, e.object_id, e.tick) for e in picked.events] == [
+        ('keycard_collected', 'card', 1)]
+    assert not initial.has_keycard
+    assert picked.interaction_target is None
+    for _ in range(30):
+        assert core.step(SurvivorCommand(interact=True)).events == ()
+
+
+def test_exit_requires_card_and_new_press_then_terminal_freezes_and_resets():
+    core = scene()
+    core.step(SurvivorCommand(yaw_delta=pi / 2))
+    denied = core.step(SurvivorCommand(interact=True))
+    assert denied.outcome is None
+    assert denied.events == ()
+    assert denied.interaction_target.kind == 'exit'
+    core.step(SurvivorCommand(yaw_delta=-pi / 2, interact=True))
+    escaped = core.step(SurvivorCommand(yaw_delta=pi / 2, interact=True))
+    assert escaped.outcome == 'escaped'
+    assert [e.kind for e in escaped.events] == ['escaped']
+    for _ in range(30):
+        assert core.step(SurvivorCommand(1, 1, pi, True, True)) == replace(escaped, events=())
+    assert core.reset(0) == scene().snapshot()
+
+
+def test_one_press_cannot_collect_card_and_open_exit_but_two_bot_presses_can():
+    core = scene((MapObject('a', 'keycard', 3.5, 2.5),
+                  MapObject('z', 'exit', 3.5, 2.5)))
+    picked = core.step(SurvivorCommand(interact=True))
+    assert picked.has_keycard and picked.outcome is None
+    assert len(picked.events) == 1
+    for _ in range(5):
+        idle = core.step(SurvivorCommand())
+        assert idle.outcome is None and idle.events == ()
+    escaped = core.step(SurvivorCommand(interact=True))
+    assert escaped.outcome == 'escaped' and len(escaped.events) == 1
+
+
+def test_failed_press_is_not_deferred_until_target_is_eligible():
+    core = scene()
+    failed = core.step(SurvivorCommand(yaw_delta=pi, interact=True))
+    assert not failed.has_keycard
+    restored = core.step(SurvivorCommand(yaw_delta=-pi))
+    assert restored.interaction_target.kind == 'keycard'
+    assert not restored.has_keycard and not restored.events
+    assert core.step(SurvivorCommand(interact=True)).has_keycard
+
+
+@pytest.mark.parametrize('command', [SurvivorCommand(forward=1, interact=True),
+                                    SurvivorCommand(strafe=1, interact=True)])
+def test_movement_restriction_is_unchanged(command):
+    core = scene()
+    assert not core.step(command).has_keycard
+    assert not core.step(SurvivorCommand()).has_keycard
+    assert core.step(SurvivorCommand(interact=True)).has_keycard
+
+
+@pytest.mark.parametrize('kwargs', [{'interaction_range': 0}, {'interaction_half_angle': 0},
+                                    {'interaction_half_angle': 4},
+                                    {'interaction_range': float('inf')}])
+def test_interaction_config_validation(kwargs):
+    with pytest.raises(ValueError):
+        CoreConfig(**kwargs)
+
+
+def test_configurable_range_and_angle_still_gate_instant_press():
+    core = scene(config=CoreConfig(interaction_range=.9, interaction_half_angle=.1))
+    assert not core.step(SurvivorCommand(interact=True)).has_keycard
+    core = scene(config=CoreConfig(interaction_range=1, interaction_half_angle=.1))
+    assert core.step(SurvivorCommand(interact=True)).has_keycard
+
+
+def test_no_timeout_win_and_obsolete_progress_fields_are_removed():
+    core = scene()
+    for _ in range(600):
+        assert core.step(SurvivorCommand()).outcome is None
+    assert not hasattr(core.snapshot(), 'interaction_ticks')
+    assert not hasattr(core.snapshot(), 'interaction_object_id')
+    assert not hasattr(core.config, 'interaction_seconds')
+
+
+
+@pytest.mark.parametrize('kind', ['keycard', 'exit'])
+def test_human_tap_and_bot_press_have_identical_command_and_core_semantics(kind):
+    from app.input import InputState
+
+    human, bot = scene(), scene()
     if kind == 'exit':
-        hold(core)
-        core.step(SurvivorCommand(yaw_delta=pi / 2))
-    hold(core, 10)
-    before = core.snapshot()
-    expected = replace(before, interaction_object_id=None, interaction_ticks=0)
-    assert core.cancel_interaction() == expected
-    assert core.cancel_interaction() == expected
-    assert core.snapshot() == expected
-    assert hold(core, 17)[1] == ()
-    assert [e.kind for e in hold(core, 1)[1]] == [
-        'keycard_collected' if kind == 'keycard' else 'escaped']
+        for core in (human, bot):
+            core.step(SurvivorCommand(interact=True))
+            core.step(SurvivorCommand(yaw_delta=pi / 2))
+    inputs = InputState()
+    inputs.key('e', True)
+    inputs.key('e', False)
+    command = inputs.consume(1 / 30)
+    assert command == SurvivorCommand(interact=True)
+    assert human.step(command) == bot.step(SurvivorCommand(interact=True))

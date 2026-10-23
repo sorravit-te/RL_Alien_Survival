@@ -24,8 +24,6 @@ class FixedStepLoop:
         self.previous_pitch = self.current_pitch = self.inputs.pitch
 
     def set_paused(self, paused):
-        if paused:
-            self.core.cancel_interaction()
         self.paused = paused
         self.synchronize()
 
@@ -50,6 +48,7 @@ class FixedStepLoop:
             self.accumulator = max(0.0, self.accumulator - self.dt)
             count += 1
             if self.current.outcome is not None:
+                self.inputs.clear()
                 self.accumulator = 0.0
                 self.previous = self.current
                 self.previous_pitch = self.current_pitch

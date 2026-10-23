@@ -64,7 +64,8 @@ class PlaySession:
             elif (not transitioned and not self.loop.paused and self.focused
                   and not self.loop.current.outcome):
                 if event.type in (pygame.KEYDOWN, pygame.KEYUP) and event.key in KEYS:
-                    self.loop.inputs.key(KEYS[event.key], event.type == pygame.KEYDOWN)
+                    self.loop.inputs.key(KEYS[event.key], event.type == pygame.KEYDOWN,
+                                         repeat=getattr(event, 'repeat', False))
                 elif event.type == pygame.MOUSEMOTION:
                     self.loop.inputs.mouse(*event.rel)
         return transitioned
@@ -80,7 +81,7 @@ def hud_labels(loop):
     snapshot = loop.current
     if snapshot.outcome:
         return ["YOU ESCAPED - R to restart", "Mouse released"]
-    status = 'PAUSED - Esc to play' if loop.paused else 'WASD move | Shift run | Hold E interact'
+    status = 'PAUSED - Esc to play' if loop.paused else 'WASD move | Shift run | Press E interact'
     labels = [status, 'Mouse look | Arrows turn | Esc pause | R reset',
               'Keycard: acquired' if snapshot.has_keycard else 'Keycard: not acquired']
     target = snapshot.interaction_target
@@ -88,10 +89,8 @@ def hud_labels(loop):
         if target.kind == "exit" and not snapshot.has_keycard:
             labels.append('Exit - Keycard required')
         else:
-            duration = snapshot.config.interaction_seconds * snapshot.config.tick_hz
-            progress = min(100, int(100 * snapshot.interaction_ticks / duration))
             name = "Keycard" if target.kind == "keycard" else "Exit"
-            labels.append(f'Hold E - {name} ({progress}%)')
+            labels.append(f'Press E - {name}')
     return labels
 
 

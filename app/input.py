@@ -18,11 +18,14 @@ class InputState:
     def clear(self):
         self.keys = set()
         self.mouse_dx = self.mouse_dy = 0.0
-        self.interact_released = False
+        self.pending_interactions = 0
 
-    def key(self, name, down):
-        if name == 'e' and not down:
-            self.interact_released = True
+    def key(self, name, down, repeat=False):
+        if name == 'e' and down:
+            if repeat:
+                return
+            if name not in self.keys:
+                self.pending_interactions += 1
         if down:
             self.keys.add(name)
         else:
@@ -38,8 +41,9 @@ class InputState:
             self.pitch_limit, self.pitch - self.mouse_dy * self.vertical_sensitivity))
         self.mouse_dx = self.mouse_dy = 0.0
         yaw += (('right' in self.keys) - ('left' in self.keys)) * self.turn_speed * dt
-        interact = 'e' in self.keys and not self.interact_released
-        self.interact_released = False
+        interact = self.pending_interactions > 0
+        if interact:
+            self.pending_interactions -= 1
         return SurvivorCommand(
             forward=('w' in self.keys) - ('s' in self.keys),
             strafe=('d' in self.keys) - ('a' in self.keys),

@@ -12,13 +12,13 @@ def replay_commands():
     route = []
     for command, ticks in [
         (SurvivorCommand(forward=1), 24),
-        (SurvivorCommand(interact=True), 18),
+        (SurvivorCommand(interact=True), 1),
         (SurvivorCommand(forward=1), 12),
         (SurvivorCommand(strafe=1), 24),
         (SurvivorCommand(forward=1), 48),
         (SurvivorCommand(strafe=1), 24),
         (SurvivorCommand(yaw_delta=pi / 2), 1),
-        (SurvivorCommand(interact=True), 18),
+        (SurvivorCommand(interact=True), 1),
     ]:
         route.extend([command] * ticks)
     return tuple(route)
@@ -34,11 +34,11 @@ def run_replay():
         records.append({"command": asdict(command), "tick": snapshot.tick,
                         "survivor": asdict(snapshot.survivor),
                         "has_keycard": snapshot.has_keycard,
-                        "progress_ticks": snapshot.interaction_ticks,
                         "outcome": snapshot.outcome})
     if snapshot.outcome != "escaped":
         raise RuntimeError("Headless route failed to escape")
     return {"mode": "headless fixed-tick replay (not keyboard input)", "seed": 1,
+            "interaction_mode": "single_press",
             "outcome": snapshot.outcome, "events": events, "steps": records}
 
 

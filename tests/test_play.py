@@ -456,9 +456,9 @@ def test_e_input_and_terminal_mouse_release_restart(display, monkeypatch):
     from app.play import hud_labels
     from game.map import MapObject
 
-    world = WorldMap(("......",) * 6, ((2.5, 2.5),),
-                     (MapObject("card", "keycard", 3.5, 2.5),
-                      MapObject("exit", "exit", 2.5, 3.5)))
+    world = WorldMap(('......',) * 6, ((2.5, 2.5),),
+                     (MapObject('card', 'keycard', 3.5, 2.5),
+                      MapObject('exit', 'exit', 2.5, 3.5)))
     loop = FixedStepLoop(GameCore(world))
     session = PlaySession(loop)
     session.focused = True
@@ -466,25 +466,23 @@ def test_e_input_and_terminal_mouse_release_restart(display, monkeypatch):
     monkeypatch.setattr(pygame.event, 'set_grab', grabs.append)
     monkeypatch.setattr(pygame.mouse, 'set_visible', visibility.append)
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
-    assert any('Keycard (0%)' in label for label in hud_labels(loop))
-    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
-    for _ in range(9):
-        loop.advance(loop.dt)
-    assert any('(50%)' in label for label in hud_labels(loop))
-    for _ in range(9):
-        loop.advance(loop.dt)
+    assert 'Press E - Keycard' in hud_labels(loop)
+    assert all('Hold E' not in text and '%' not in text for text in hud_labels(loop))
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e),
+                    event(pygame.KEYUP, key=pygame.K_e)])
+    loop.advance(loop.dt)
     assert loop.current.has_keycard
-    session.events([event(pygame.KEYUP, key=pygame.K_e)])
     loop.inputs.mouse(0, -40)
-    # Core target direction comes from yaw, not camera pitch.
     loop.inputs.mouse((pi / 2) / loop.inputs.mouse_sensitivity)
     loop.advance(loop.dt)
-    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
-    for _ in range(18):
-        loop.advance(loop.dt)
+    # Two fresh presses queued, but the first completes the game and clears the rest.
+    for _ in range(2):
+        session.events([event(pygame.KEYDOWN, key=pygame.K_e),
+                        event(pygame.KEYUP, key=pygame.K_e)])
+    loop.advance(loop.dt)
+    assert loop.inputs.pending_interactions == 0
     session.after_step()
-    assert loop.current.outcome == 'escaped'
-    assert loop.paused
+    assert loop.current.outcome == 'escaped' and loop.paused
     assert grabs[-1] is False and visibility[-1] is True
     assert 'YOU ESCAPED' in hud_labels(loop)[0]
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
@@ -492,9 +490,7 @@ def test_e_input_and_terminal_mouse_release_restart(display, monkeypatch):
     session.events([event(pygame.KEYDOWN, key=pygame.K_r)])
     assert not loop.paused
     assert grabs[-1] is True and visibility[-1] is False
-    assert loop.current.outcome is None
-    assert not loop.current.has_keycard
-    assert loop.current.interaction_ticks == 0
+    assert loop.current.outcome is None and not loop.current.has_keycard
     assert loop.display_pitch() == 0
     assert loop.inputs.consume(loop.dt) == SurvivorCommand()
 
@@ -562,24 +558,16 @@ def test_sprite_wall_occlusion_and_pitch_shift(display, tmp_path):
 
 
 
-def test_e_release_and_repress_between_ticks_still_cancels_progress():
-    from game.map import MapObject
-
-    loop = FixedStepLoop(GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),),
-                                  (MapObject('card', 'keycard', 3.5, 2.5),))))
-    loop.inputs.key('e', True)
-    for _ in range(10):
-        loop.advance(loop.dt)
-    assert loop.current.interaction_ticks == 10
-    loop.inputs.key('e', False)
-    loop.inputs.key('e', True)
-    loop.advance(loop.dt)
-    assert loop.current.interaction_ticks == 0
-    for _ in range(17):
-        loop.advance(loop.dt)
-    assert not loop.current.has_keycard
-    loop.advance(loop.dt)
-    assert loop.current.has_keycard
+def test_press_release_between_ticks_is_buffered_once_and_repeat_is_ignored():
+    inputs = InputState()
+    inputs.key('e', True)
+    inputs.key('e', True)  # duplicate down even without a repeat flag
+    inputs.key('e', True, repeat=True)
+    inputs.key('e', False)
+    assert inputs.consume(1 / 30).interact
+    assert not inputs.consume(1 / 30).interact
+    inputs.key('e', True, repeat=True)  # repeat after transition clear must not enqueue
+    assert not inputs.consume(1 / 30).interact
 
 
 def test_collected_sprite_disappears_and_rendering_cannot_change_game(display, tmp_path):
@@ -594,8 +582,7 @@ def test_collected_sprite_disappears_and_rendering_cannot_change_game(display, t
     visible = pygame.image.tobytes(renderer.render(before), 'RGB')
     depth = renderer.depth
     assert core.snapshot() == before
-    for _ in range(18):
-        collected = core.step(SurvivorCommand(interact=True))
+    collected = core.step(SurvivorCommand(interact=True))
     hidden = pygame.image.tobytes(renderer.render(collected, pitch=.1), 'RGB')
     no_objects = replace(collected, world_map=replace(collected.world_map, objects=()))
     assert hidden == pygame.image.tobytes(renderer.render(no_objects, pitch=.1), 'RGB')
@@ -607,51 +594,83 @@ def test_collected_sprite_disappears_and_rendering_cannot_change_game(display, t
 
 @pytest.mark.parametrize('kind', ['keycard', 'exit'])
 @pytest.mark.parametrize('interruption', ['pause', 'focus'])
-def test_pause_or_focus_cancels_interaction_without_time_before_new_e(display, kind, interruption):
+def test_pause_or_focus_discards_queued_e_without_time_before_new_press(display, kind, interruption):
     from game.map import MapObject
 
     core = GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),),
                             (MapObject('card', 'keycard', 3.5, 2.5),
                              MapObject('exit', 'exit', 2.5, 3.5))))
     if kind == 'exit':
-        for _ in range(18):
-            core.step(SurvivorCommand(interact=True))
+        core.step(SurvivorCommand(interact=True))
         core.step(SurvivorCommand(yaw_delta=pi / 2))
     loop = FixedStepLoop(core)
     session = PlaySession(loop)
     session.focused = True
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
-    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
-    for _ in range(10):
-        loop.advance(loop.dt)
     before = core.snapshot()
-    assert before.interaction_ticks == 10
-    assert before.interaction_object_id == ('card' if kind == 'keycard' else 'exit')
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
+    assert loop.inputs.pending_interactions == 1
     if interruption == 'pause':
         session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
     else:
         session.events([event(pygame.WINDOWFOCUSLOST)])
-    assert loop.paused
-    cancelled = replace(before, interaction_object_id=None, interaction_ticks=0)
-    assert core.snapshot() == cancelled
-    assert loop.current == cancelled
-    assert loop.advance(100) == 0
+    assert loop.paused and loop.inputs.pending_interactions == 0
+    assert loop.advance(100) == 0 and core.snapshot() == before
     session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
-    assert core.snapshot() == cancelled
     if interruption == 'focus':
         session.events([event(pygame.WINDOWFOCUSGAINED)])
         assert loop.paused
     session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
-    assert not loop.paused
-    # Fresh E arrives before any physics tick: the old progress is already gone.
-    session.events([event(pygame.KEYDOWN, key=pygame.K_e)])
-    assert core.snapshot() == cancelled
-    for _ in range(17):
-        loop.advance(loop.dt)
-        assert loop.current.events == ()
-    assert loop.current.interaction_ticks == 17
+    session.events([event(pygame.KEYDOWN, key=pygame.K_e, repeat=True)])
+    loop.advance(loop.dt)
     assert loop.current.has_keycard == (kind == 'exit')
-    assert loop.current.outcome is None
+    assert loop.current.outcome is None and loop.current.events == ()
+    session.events([event(pygame.KEYUP, key=pygame.K_e),
+                    event(pygame.KEYDOWN, key=pygame.K_e)])
     loop.advance(loop.dt)
     assert [e.kind for e in loop.current.events] == [
         'keycard_collected' if kind == 'keycard' else 'escaped']
+
+
+
+@pytest.mark.parametrize('count', [1, 2, 3])
+def test_multiple_taps_between_ticks_preserve_one_pulse_per_press(count):
+    inputs = InputState()
+    for _ in range(count):
+        inputs.key('e', True)
+        inputs.key('e', False)
+    assert [inputs.consume(1 / 30).interact for _ in range(count + 2)] == [True]*count+[False]*2
+
+
+def test_holding_e_cannot_chain_card_and_exit_during_catchup(display):
+    from game.map import MapObject
+
+    world = WorldMap(('......',)*6, ((2.5,2.5),),
+                     (MapObject('a','keycard',3.5,2.5), MapObject('z','exit',3.5,2.5)))
+    loop = FixedStepLoop(GameCore(world))
+    session = PlaySession(loop)
+    session.focused = True
+    session.events([event(pygame.KEYDOWN,key=pygame.K_ESCAPE)])
+    session.events([event(pygame.KEYDOWN,key=pygame.K_e)])
+    loop.advance(loop.dt * 3)
+    assert loop.current.has_keycard and loop.current.outcome is None
+    session.events([event(pygame.KEYDOWN,key=pygame.K_e,repeat=True)])
+    loop.advance(loop.dt)
+    assert loop.current.outcome is None
+    session.events([event(pygame.KEYUP,key=pygame.K_e),event(pygame.KEYDOWN,key=pygame.K_e)])
+    loop.advance(loop.dt)
+    assert loop.current.outcome == 'escaped'
+
+
+def test_reset_discards_queued_e_and_no_press_does_not_collect():
+    from game.map import MapObject
+
+    loop=FixedStepLoop(GameCore(WorldMap(('......',)*6,((2.5,2.5),),
+                                       (MapObject('card','keycard',3.5,2.5),))))
+    loop.inputs.key('e',True)
+    loop.inputs.key('e',False)
+    assert loop.inputs.pending_interactions == 1
+    loop.reset()
+    assert loop.inputs.pending_interactions == 0
+    loop.advance(loop.dt)
+    assert not loop.current.has_keycard and not loop.current.events
