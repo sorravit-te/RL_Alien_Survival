@@ -8,6 +8,7 @@ __pycache__/
 .env.*
 !.env.example
 /configs/assets.local.json
+/configs/materials.local.json
 
 # Purchased Stradex originals and derived textures must not enter a public repo.
 /Flat/
