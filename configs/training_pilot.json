@@ -1,5 +1,5 @@
 {
-  "name": "2c_cpu_pilot_v1",
+  "name": "cpu_training_pilot_v1",
   "training_seed": 20261024,
   "manifest_seed": 20261024,
   "manifest_counts": {

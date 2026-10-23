@@ -1,4 +1,4 @@
-"""1B geometry, input, scheduler and window-event regressions (dummy SDL)."""
+"""Raycasting geometry, input, scheduler and window-event regressions (dummy SDL)."""
 
 import os
 from dataclasses import replace

@@ -1,4 +1,4 @@
-"""Check the real2B adapter and seeded masked-random rollouts. Never trains a model."""
+"""Check the headless RL adapter and seeded masked-random rollouts. Never trains a model."""
 
 import argparse
 import hashlib
@@ -146,7 +146,9 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=int, default=12)
     parser.add_argument("--seed", type=int, default=20261024)
     parser.add_argument("--cap-seconds", type=float, default=600)
-    parser.add_argument("--output", type=Path, default=ROOT / "experiments/2b/integration.json")
+    parser.add_argument(
+        "--output", type=Path, default=ROOT / "experiments/rl_adapter/integration.json"
+    )
     args = parser.parse_args()
     report = validate(args.episodes, args.seed, args.cap_seconds)
     args.output.parent.mkdir(parents=True, exist_ok=True)

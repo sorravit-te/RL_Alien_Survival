@@ -1,4 +1,4 @@
-"""2C CPU pilot: prepare -> baselines -> pilot. Each phase runs explicitly once."""
+"""CPU training pilot: prepare -> baselines -> pilot. Each phase runs explicitly once."""
 
 import argparse
 import csv
@@ -338,9 +338,9 @@ def pilot(run):
             "training_episodes": sum(callback.counts.values()),
             "training_outcomes": callback.counts,
             "limitations": [
-                "Single training seed; pilot, not a completed RL milestone.",
+                "Single training seed; pilot results do not establish generalization.",
                 "Fixed layout/card/exit, two real spawns. Numeric seed holdout is not layout generalization.",
-                "Heuristic is catalog-adapted at the 2B observation boundary, not literal internal 2A sensing.",
+                "Heuristic selects from the action catalog using the latest completed perception; internal game sensing occurs on the next physics tick.",
                 "Weights/reward alone do not prove learning; baseline ceilings may limit this task.",
             ],
         }
@@ -348,7 +348,7 @@ def pilot(run):
         plot_curves(run, baseline, test)
         print(
             f"PILOT COMPLETE actual_steps={model.num_timesteps} best_steps={callback.best_steps} "
-            f"train_wall={training_seconds:.2f}s; see results.json. STOP before 2D.",
+            f"train_wall={training_seconds:.2f}s; see results.json. App integration is a separate step.",
             flush=True,
         )
         return result
@@ -361,7 +361,7 @@ def pilot(run):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--phase", choices=("prepare", "baselines", "pilot"), required=True)
-    parser.add_argument("--config", type=Path, default=Path("configs/rl_pilot_2c.json"))
+    parser.add_argument("--config", type=Path, default=Path("configs/training_pilot.json"))
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.phase == "prepare":

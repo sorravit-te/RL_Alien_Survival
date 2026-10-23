@@ -1,1 +1,1 @@
-"""Headless Alien RL adapter; no training or model is provided by Milestone 2B."""
+"""Headless Alien RL environment, masked policy training and evaluation."""

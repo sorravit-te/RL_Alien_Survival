@@ -1,4 +1,4 @@
-"""Behavioral acceptance tests for the headless 1A contract."""
+"""Behavioral acceptance tests for headless movement, collision and snapshots."""
 
 import subprocess
 import sys

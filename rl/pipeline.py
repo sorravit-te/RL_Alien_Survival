@@ -1,4 +1,4 @@
-"""2C reproducible manifests, metadata, logging and training-only episode wrapper."""
+"""Reproducible training manifests, checkpoint metadata, logging and episode wrapper."""
 
 import contextlib
 import hashlib
@@ -21,6 +21,8 @@ from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, VERSION
 from rl.env import AlienEnv
 
 ROOT = Path(__file__).resolve().parents[1]
+# New checkpoints use this format; loading requires an exact match.
+CHECKPOINT_FORMAT = "alien-maskable-checkpoint-v1"
 
 
 def read_json(path):
@@ -79,7 +81,7 @@ def source_state():
 def map_identity():
     world = small_test_map()
     return {
-        "name": "small_test_map_1c_2a",
+        "name": "small_test_map_v1",
         "sha256": digest(asdict(world)),
         "spawn_points": world.spawn_points,
         "card_exit_fixed": True,
@@ -176,7 +178,7 @@ def save_checkpoint(
     path.parent.mkdir(parents=True, exist_ok=True)
     model.save(str(path))
     metadata = {
-        "format": "alien-maskable-checkpoint-2c-v1",
+        "format": CHECKPOINT_FORMAT,
         "role": role,
         "runtime": {
             "device": "cpu",
@@ -222,7 +224,7 @@ def load_checkpoint(path, config, fingerprint, env=None):
             make_manifest(config["manifest_seed"], config["manifest_counts"])
         ),
         "dependencies": dependencies(),
-        "format": "alien-maskable-checkpoint-2c-v1",
+        "format": CHECKPOINT_FORMAT,
     }
     for name, value in expected.items():
         if metadata.get(name) != value:

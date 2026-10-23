@@ -18,7 +18,12 @@ from rl.pipeline import load_checkpoint, make_env, parameter_hash, read_run, wri
 
 
 class HeuristicSelector:
-    """2A selector at the 2B decision boundary, not the newer internal sensing tick."""
+    """Adapt patrol/chase rules to masked target actions using only allowed knowledge.
+
+    Select every 15 physics ticks using the latest completed perception sample.
+    The internal game controller samples on the next physics tick, so its sensor
+    timing differs even though both use the same target-selection rules.
+    """
 
     def __init__(self, arrival_distance):
         self.state = ControllerState()

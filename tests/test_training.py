@@ -14,6 +14,7 @@ from game.map import MapObject, WorldMap
 from rl.env import AlienEnv
 from rl.evaluate import HeuristicSelector, evaluate, frozen_evaluation, paired_catch_difference
 from rl.pipeline import (
+    CHECKPOINT_FORMAT,
     ManifestEnv,
     digest,
     load_checkpoint,
@@ -32,7 +33,7 @@ from rl.train import baselines, pilot
 
 @pytest.fixture
 def config():
-    result = read_json(Path(__file__).resolve().parents[1] / "configs/rl_pilot_2c.json")
+    result = read_json(Path(__file__).resolve().parents[1] / "configs/training_pilot.json")
     result.update(
         manifest_counts={"train": 4, "validation": 2, "test": 2},
         requested_steps=32,
@@ -102,6 +103,9 @@ def test_frozen_config_manifest_and_source_rejected(tmp_path, config, monkeypatc
     "field,value",
     [
         ("contract_version", "bad"),
+        # Synthetic retired identifiers must be rejected; archived files stay untouched.
+        ("contract_version", "alien-vector-2b-v1"),
+        ("format", "alien-maskable-checkpoint-2c-v1"),
         ("observation_shape", [351]),
         ("action_n", 31),
         ("config_sha256", "bad"),
@@ -121,6 +125,33 @@ def test_checkpoint_metadata_mismatch_has_no_fallback(tmp_path, config, field, v
         write_json(path.with_suffix(".metadata.json"), meta)
         with pytest.raises(ValueError, match="metadata mismatch"):
             load_checkpoint(path, config, source)
+    finally:
+        env.close()
+
+
+def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path, config):
+    from rl.contract import VERSION
+    from rl.pipeline import map_identity
+
+    assert VERSION == "alien-vector-v1"
+    assert CHECKPOINT_FORMAT == "alien-maskable-checkpoint-v1"
+    assert map_identity()["name"] == "small_test_map_v1"
+    manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])
+    assert manifest["map"]["name"] == "small_test_map_v1"
+    env = AlienEnv(max_episode_seconds=1)
+    try:
+        model = new_model(config, env)
+        source = source_state()
+        path = tmp_path / "model.zip"
+        metadata = save_checkpoint(path, model, config, source, role="test")
+        assert metadata["format"] == CHECKPOINT_FORMAT
+        assert metadata["contract_version"] == VERSION
+        assert metadata["manifest_sha256"] == digest(manifest)
+        assert metadata["map"]["name"] == "small_test_map_v1"
+        loaded, checked = load_checkpoint(path, config, source)
+        assert digest(checked) == digest(metadata)
+        assert loaded.num_timesteps == model.num_timesteps == 0
+        assert parameter_hash(loaded) == parameter_hash(model)
     finally:
         env.close()
 

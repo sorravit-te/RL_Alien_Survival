@@ -1,4 +1,4 @@
-"""Milestone 2A room viewer: python -m app.play."""
+"""First-person room viewer with a heuristic Alien controller: python -m app.play."""
 
 import argparse
 import json
@@ -110,12 +110,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.fps_limit < 0 or args.benchmark_seconds < 0:
         parser.error('Limits must be nonnegative')
-    # Initialize only graphics/font; there is no audio system in 1B.
+    # Initialize only graphics/font; the game currently has no audio system.
     pygame.display.init()
     pygame.font.init()
     try:
         screen = pygame.display.set_mode((960, 540))
-        pygame.display.set_caption('Alien Survival - Milestone 2A')
+        pygame.display.set_caption('Alien Survival - Heuristic Test')
         renderer = RaycastingRenderer()
         font = pygame.font.Font(None, 22)
         loop = FixedStepLoop(GameCore())

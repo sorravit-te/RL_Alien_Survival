@@ -1,4 +1,4 @@
-"""Core 1C instant-press contract, independent of graphics and assets."""
+"""Core instant-press interaction contract, independent of graphics and assets."""
 
 from dataclasses import FrozenInstanceError, replace
 from math import pi

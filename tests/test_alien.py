@@ -1,4 +1,4 @@
-"""2A headless sensing, memory, path, continuous capture and lifecycle contracts."""
+"""Headless sensing, memory, path, continuous capture and lifecycle contracts."""
 
 from dataclasses import FrozenInstanceError, replace
 from math import cos, hypot, pi, sin

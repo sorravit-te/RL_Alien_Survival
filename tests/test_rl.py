@@ -1,4 +1,4 @@
-"""2B policy boundary, external targets, bot knowledge and Gym API regressions."""
+"""Policy boundary, external targets, bot knowledge and Gym API regressions."""
 
 import subprocess
 import sys

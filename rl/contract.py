@@ -1,4 +1,4 @@
-"""Frozen 2B contract. Change VERSION for any ordering/shape/normalization change.
+"""Frozen vector observation and target-action contract. Change VERSION for any ordering/shape/normalization change.
 
 Actions0..19 static waypoints,20 confirmed visible snapshot,21 last-seen,
 22 sound,23 Director,24..29 lockers,30 wait,31 guard departure. Unimplemented
@@ -9,7 +9,8 @@ No unconfirmed sight confidence/count is exposed. An unreachable observed floor
 point may have no path; navigation never substitutes a heuristic target.
 """
 
-VERSION = "alien-vector-2b-v1"
+# Schema identifier for new runs; archived checkpoints retain their recorded version.
+VERSION = "alien-vector-v1"
 ACTION_COUNT = 32
 WAIT = 30
 DECISION_TICKS = 15

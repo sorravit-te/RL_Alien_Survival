@@ -1,4 +1,4 @@
-"""Deterministic, asset-free 1C headless completion: python -m tools.replay_escape."""
+"""Deterministic, asset-free keycard and escape replay: python -m tools.replay_escape."""
 
 import json
 from dataclasses import asdict

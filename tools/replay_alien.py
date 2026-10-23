@@ -1,4 +1,4 @@
-"""Deterministic 2A headless evidence; heuristic controller, not RL."""
+"""Deterministic sensing, pursuit and capture replay; heuristic controller, not RL."""
 
 import argparse
 import json
