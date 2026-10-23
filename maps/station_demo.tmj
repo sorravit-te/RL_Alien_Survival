@@ -1,0 +1,289 @@
+{
+  "compressionlevel": -1,
+  "height": 12,
+  "width": 16,
+  "infinite": false,
+  "orientation": "orthogonal",
+  "renderorder": "right-down",
+  "tiledversion": "1.11.2",
+  "tileheight": 32,
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.10",
+  "nextlayerid": 3,
+  "nextobjectid": 100,
+  "layers": [
+    {
+      "id": 1,
+      "name": "Walls",
+      "type": "objectgroup",
+      "opacity": 1,
+      "visible": true,
+      "draworder": "topdown",
+      "objects": [
+        {
+          "id": 1,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 0,
+          "y": 0,
+          "width": 512,
+          "height": 32,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "wall"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 0,
+          "y": 352,
+          "width": 512,
+          "height": 32,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "wall"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 0,
+          "y": 32,
+          "width": 32,
+          "height": 320,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "wall"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 480,
+          "y": 32,
+          "width": 32,
+          "height": 320,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "wall"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 32,
+          "y": 128,
+          "width": 160,
+          "height": 32,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "lab"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 224,
+          "y": 128,
+          "width": 32,
+          "height": 96,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "wall"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 320,
+          "y": 128,
+          "width": 160,
+          "height": 32,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "crew"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 128,
+          "y": 256,
+          "width": 128,
+          "height": 32,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "wall"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "",
+          "type": "",
+          "visible": true,
+          "x": 320,
+          "y": 256,
+          "width": 160,
+          "height": 32,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "material",
+              "type": "string",
+              "value": "crew"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Entities",
+      "type": "objectgroup",
+      "opacity": 1,
+      "visible": true,
+      "draworder": "topdown",
+      "objects": [
+        {
+          "id": 10,
+          "name": "survivor_spawn",
+          "point": true,
+          "visible": true,
+          "x": 80,
+          "y": 80,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": []
+        },
+        {
+          "id": 11,
+          "name": "alien_spawn",
+          "point": true,
+          "visible": true,
+          "x": 400,
+          "y": 304,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": [
+            {
+              "name": "yaw_degrees",
+              "type": "float",
+              "value": 180
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "name": "keycard",
+          "point": true,
+          "visible": true,
+          "x": 144,
+          "y": 80,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": []
+        },
+        {
+          "id": 13,
+          "name": "exit",
+          "point": true,
+          "visible": true,
+          "x": 432,
+          "y": 80,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": []
+        },
+        {
+          "id": 14,
+          "name": "waypoint",
+          "point": true,
+          "visible": true,
+          "x": 112,
+          "y": 112,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": []
+        },
+        {
+          "id": 15,
+          "name": "waypoint",
+          "point": true,
+          "visible": true,
+          "x": 272,
+          "y": 240,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": []
+        },
+        {
+          "id": 16,
+          "name": "waypoint",
+          "point": true,
+          "visible": true,
+          "x": 400,
+          "y": 304,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "properties": []
+        }
+      ]
+    }
+  ]
+}
