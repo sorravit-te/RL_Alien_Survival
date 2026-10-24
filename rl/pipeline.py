@@ -19,6 +19,7 @@ from sb3_contrib import MaskablePPO
 from game.map import small_test_map
 from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, VERSION
 from rl.env import AlienEnv
+from rl.evasive_survivor import EvasionConfig
 
 ROOT = Path(__file__).resolve().parents[1]
 # New checkpoints use this format; loading requires an exact match.
@@ -123,7 +124,12 @@ def make_manifest(seed, counts):
 
 
 def make_env(config):
-    return AlienEnv(max_episode_seconds=config["max_episode_seconds"], bot_kind=config["bot_kind"])
+    settings = config.get("survivor_threat_settings")
+    return AlienEnv(
+        max_episode_seconds=config["max_episode_seconds"],
+        bot_kind=config["bot_kind"],
+        evasion_settings=EvasionConfig(**settings) if settings is not None else None,
+    )
 
 
 class ManifestEnv(gym.Wrapper):
@@ -242,8 +248,14 @@ def load_checkpoint(path, config, fingerprint, env=None):
 
 
 def prepare_run(run_dir, config):
-    if config["n_envs"] != 1 or config["bot_kind"] != "explorer":
-        raise ValueError("This pilot supports one real Explorer training environment")
+    if config["n_envs"] != 1 or config["bot_kind"] not in ("explorer", "evasive_explorer"):
+        raise ValueError(
+            "Training requires one environment and an explicitly supported mission bot"
+        )
+    if config.get("evaluation_protocol"):
+        raise ValueError(
+            "Sampled-primary protocol is review-only; integrate validation selection before training"
+        )
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=False)
     manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])

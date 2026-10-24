@@ -18,16 +18,25 @@ from game.map import small_test_map
 from game.state import CoreConfig
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
 from rl.contract import ACTION_COUNT, DECISION_TICKS, OBSERVATION_SIZE, VERSION, WAIT, WORLD_SCALE
+from rl.evasive_survivor import EvasiveExplorerBot, observe_threat
 from rl.observations import build_observation
 from rl.rewards import RewardTracker
 from rl.survivor_bots import ExplorerBot, StationaryDebugBot, observe_survivor
+
+BOT_KINDS = ("explorer", "evasive_explorer", "stationary_debug")
 
 
 class AlienEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(
-        self, world_map=None, config=None, *, max_episode_seconds=600, bot_kind="explorer"
+        self,
+        world_map=None,
+        config=None,
+        *,
+        max_episode_seconds=600,
+        bot_kind="explorer",
+        evasion_settings=None,
     ):
         self.world = world_map if world_map is not None else small_test_map()
         self.config = config if config is not None else CoreConfig()
@@ -44,10 +53,15 @@ class AlienEnv(gym.Env):
         for point in self.world.patrol_waypoints:
             if not find_path(self.world, start, point, self.config.alien_radius):
                 raise ValueError("Static policy waypoint is unreachable")
-        if bot_kind not in ("explorer", "stationary_debug"):
+        if bot_kind not in BOT_KINDS:
             raise ValueError("Unknown bot kind")
+        self.bot_kind = bot_kind
+        if evasion_settings is not None and bot_kind != "evasive_explorer":
+            raise ValueError("Evasion settings require evasive_explorer")
         self.bot = (
-            ExplorerBot(self.world.rows, self.config)
+            EvasiveExplorerBot(self.world.rows, self.config, evasion_settings)
+            if bot_kind == "evasive_explorer"
+            else ExplorerBot(self.world.rows, self.config)
             if bot_kind == "explorer"
             else StationaryDebugBot()
         )
@@ -139,9 +153,15 @@ class AlienEnv(gym.Env):
         ticks = 0
         snapshot = self.core.snapshot()
         while ticks < DECISION_TICKS and self.elapsed_ticks < self.cap_ticks:
-            # Both sides decide from the same pre-tick state. Bot sees no Alien action/state.
+            # Both sides decide from the same pre-tick state. Only the threat sensor reads Alien truth.
             before = self.core.snapshot()
-            view = observe_survivor(self.world, before.survivor, before.has_keycard)
+            view = (
+                observe_threat(
+                    self.world, before.survivor, before.has_keycard, before.alien, self.bot.settings
+                )
+                if self.bot_kind == "evasive_explorer"
+                else observe_survivor(self.world, before.survivor, before.has_keycard)
+            )
             command = self.bot.command(view)
             snapshot = self.core.step(command)
             ticks += 1
@@ -171,6 +191,7 @@ class AlienEnv(gym.Env):
             "outcome": snapshot.outcome if terminated else "unresolved" if truncated else None,
             "elapsed_ticks": self.elapsed_ticks,
             "step_ticks": ticks,
+            "truncation_reason": "external_time_cap" if truncated else None,
             "action_masks": self.action_masks(),
         }
         return (
