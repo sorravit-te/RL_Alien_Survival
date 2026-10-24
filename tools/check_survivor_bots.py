@@ -26,52 +26,9 @@ from rl.pipeline import (
 
 
 def validate_protocol(training, evaluation):
-    if (
-        training["bot_kind"] != "evasive_explorer"
-        or training["evaluation_protocol"] != "configs/sampled_policy_evaluation.json"
-    ):
-        raise ValueError("Explicit evasive bot and sampled protocol are required")
-    EvasionConfig(**training["survivor_threat_settings"])
-    if (
-        evaluation["primary_inference"] != "sampled_masked_policy"
-        or evaluation["secondary_inference"] != "deterministic_argmax_diagnostic"
-    ):
-        raise ValueError("Sampled inference must be primary, argmax secondary")
-    seeds = evaluation["sampling_repeat_seeds"]
-    if (
-        len(seeds) != 3
-        or len(set(seeds)) != 3
-        or any(not isinstance(s, int) or s < 0 for s in seeds)
-    ):
-        raise ValueError("Exactly3 distinct sampling repeat seeds required")
-    expected = {
-        "random_valid_mask": ("uniform_valid", 3),
-        "untrained_sampled": ("sampled_masked", 3),
-        "untrained_deterministic": ("argmax_masked", 1),
-        "heuristic": ("scripted_catalog", 1),
-        "wait": ("constant_wait", 1),
-        "trained_sampled": ("sampled_masked", 3),
-        "trained_deterministic": ("argmax_masked", 1),
-    }
-    if (
-        len(evaluation["controllers"]) != len(expected)
-        or {c["name"]: (c["inference"], c["repeats"]) for c in evaluation["controllers"]}
-        != expected
-    ):
-        raise ValueError("Controller/inference/repeat specification mismatch")
-    if evaluation["selection"] != {
-        "split": "validation",
-        "primary": "case_mean_sampled_catch_rate",
-        "tie_1": "min_sampled_unresolved_rate",
-        "tie_2": "earliest_trained_checkpoint",
-        "exclude": "test outcomes and untrained baseline cannot select trained best",
-    }:
-        raise ValueError("Validation-primary selection rules changed")
-    if (
-        training["manifest_seed"] != evaluation["manifest_seed"]
-        or training["manifest_counts"] != evaluation["manifest_counts"]
-    ):
-        raise ValueError("Training and evaluation manifests disagree")
+    from rl.evaluation_protocol import validate_protocol as validate_evaluation
+
+    validate_evaluation(training, evaluation)
     smoke = evaluation["smoke"]
     if (
         smoke["cases"] != 20

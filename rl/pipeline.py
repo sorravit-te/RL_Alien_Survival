@@ -178,8 +178,19 @@ def parameter_hash(model):
 
 
 def save_checkpoint(
-    path, model, config, fingerprint, *, role, elapsed_seconds=0.0, validation=None
+    path,
+    model,
+    config,
+    fingerprint,
+    *,
+    role,
+    elapsed_seconds=0.0,
+    validation=None,
+    evaluation_context=None,
 ):
+    from rl.evaluation_protocol import frozen_protocol
+
+    protocol = frozen_protocol(config)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     model.save(str(path))
@@ -213,11 +224,21 @@ def save_checkpoint(
         "checkpoint_sha256": file_hash(path),
         "policy_sha256": parameter_hash(model),
     }
+    if protocol is not None:
+        metadata["evaluation_identity"] = config["frozen_evaluation"]
+        metadata["evaluated_at_decision_steps"] = int(model.num_timesteps) if validation else None
+        metadata["evaluated_at_optimizer_update_epochs"] = (
+            int(model._n_updates) if validation else None
+        )
+        metadata["evaluation_context"] = evaluation_context
     write_json(path.with_suffix(".metadata.json"), metadata)
     return metadata
 
 
 def load_checkpoint(path, config, fingerprint, env=None):
+    from rl.evaluation_protocol import frozen_protocol
+
+    protocol = frozen_protocol(config)
     path = Path(path)
     metadata = read_json(path.with_suffix(".metadata.json"))
     expected = {
@@ -232,6 +253,8 @@ def load_checkpoint(path, config, fingerprint, env=None):
         "dependencies": dependencies(),
         "format": CHECKPOINT_FORMAT,
     }
+    if protocol is not None:
+        expected["evaluation_identity"] = config["frozen_evaluation"]
     for name, value in expected.items():
         if metadata.get(name) != value:
             raise ValueError(f"Checkpoint metadata mismatch: {name}")
@@ -244,6 +267,22 @@ def load_checkpoint(path, config, fingerprint, env=None):
     model = MaskablePPO.load(str(path), env=env, device="cpu")
     if parameter_hash(model) != metadata["policy_sha256"]:
         raise ValueError("Loaded policy parameter hash mismatch")
+    if protocol is not None:
+        if (
+            int(model.num_timesteps) != metadata["actual_steps"]
+            or int(model._n_updates) != metadata["optimizer_update_epochs"]
+        ):
+            raise ValueError("Checkpoint decision/optimizer counters mismatch")
+        if metadata["validation"] is not None and (
+            metadata.get("evaluated_at_decision_steps") != int(model.num_timesteps)
+            or metadata.get("evaluated_at_optimizer_update_epochs") != int(model._n_updates)
+            or metadata.get("evaluation_context")
+            not in (
+                "rollout_callback_before_current_rollout_optimizer_update",
+                "after_learning_optimizer_update",
+            )
+        ):
+            raise ValueError("Checkpoint evaluation timing mismatch")
     return model, metadata
 
 
@@ -252,25 +291,62 @@ def prepare_run(run_dir, config):
         raise ValueError(
             "Training requires one environment and an explicitly supported mission bot"
         )
-    if config.get("evaluation_protocol"):
-        raise ValueError(
-            "Sampled-primary protocol is review-only; integrate validation selection before training"
-        )
+    from copy import deepcopy
+
+    from rl.evaluation_protocol import evaluation_budget, sampling_schedule, validate_protocol
+
+    config = deepcopy(config)
+    protocol_bytes = None
+    if "evaluation_protocol" in config:
+        if not config["evaluation_protocol"]:
+            raise ValueError("Remove evaluation_protocol for explicit legacy deterministic mode")
+        protocol_bytes = (ROOT / config["evaluation_protocol"]).read_bytes()
+        protocol = json.loads(protocol_bytes)
+        validate_protocol(config, protocol)
+    else:
+        protocol = None
+    manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])
+    if protocol is not None:
+        schedule = sampling_schedule(protocol, manifest)
+        budget = evaluation_budget(config)
+        config["frozen_evaluation"] = {
+            "protocol": protocol,
+            "protocol_sha256": digest(protocol),
+            "protocol_file_sha256": hashlib.sha256(protocol_bytes).hexdigest(),
+            "schedule_sha256": digest(schedule),
+            "budget_sha256": digest(budget),
+        }
+    # Fail before creating any run if bot/settings cannot be constructed.
+    env = make_env(config)
+    env.close()
+    fingerprint = source_state()
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=False)
-    manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])
-    fingerprint = source_state()
     write_json(run_dir / "config.json", config)
     write_json(run_dir / "manifest.json", manifest)
-    write_json(
-        run_dir / "run_identity.json",
-        {
-            "source": fingerprint,
-            "config_sha256": digest(config),
-            "manifest_sha256": digest(manifest),
-            "dependencies": dependencies(),
-        },
-    )
+    identity = {
+        "source": fingerprint,
+        "config_sha256": digest(config),
+        "manifest_sha256": digest(manifest),
+        "dependencies": dependencies(),
+        "evaluation_mode": "sampled_primary_argmax_secondary"
+        if protocol
+        else "legacy_deterministic_argmax",
+    }
+    if protocol is not None:
+        (run_dir / "evaluation_protocol.json").write_bytes(protocol_bytes)
+        write_json(run_dir / "sampling_schedule.json", schedule)
+        write_json(run_dir / "evaluation_budget.json", budget)
+        identity["evaluation_files"] = {
+            name: file_hash(run_dir / name)
+            for name in (
+                "evaluation_protocol.json",
+                "sampling_schedule.json",
+                "evaluation_budget.json",
+            )
+        }
+        identity["readiness"] = "integrated; prepare does not authorize learning"
+    write_json(run_dir / "run_identity.json", identity)
     return manifest, fingerprint
 
 
@@ -288,6 +364,29 @@ def read_run(run_dir):
         raise ValueError("Source changed after run preparation")
     if dependencies() != identity["dependencies"]:
         raise ValueError("Dependencies changed after run preparation")
+    from rl.evaluation_protocol import evaluation_budget, frozen_protocol, sampling_schedule
+
+    protocol = frozen_protocol(config)
+    if protocol is not None:
+        expected_files = {
+            "evaluation_protocol.json",
+            "sampling_schedule.json",
+            "evaluation_budget.json",
+        }
+        files = identity.get("evaluation_files", {})
+        if set(files) != expected_files or any(
+            file_hash(run_dir / n) != h for n, h in files.items()
+        ):
+            raise ValueError("Frozen evaluation files changed")
+        frozen = config["frozen_evaluation"]
+        if (
+            read_json(run_dir / "evaluation_protocol.json") != protocol
+            or file_hash(run_dir / "evaluation_protocol.json") != frozen["protocol_file_sha256"]
+            or read_json(run_dir / "sampling_schedule.json")
+            != sampling_schedule(protocol, manifest)
+            or read_json(run_dir / "evaluation_budget.json") != evaluation_budget(config)
+        ):
+            raise ValueError("Frozen evaluation schedule/protocol/budget changed")
     return config, manifest, identity["source"]
 
 

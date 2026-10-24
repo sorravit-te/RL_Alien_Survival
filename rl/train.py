@@ -13,9 +13,12 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.monitor import Monitor
 
-from rl.evaluate import evaluate, paired_catch_difference
+from rl.evaluate import evaluate, evaluate_suite, frozen_evaluation, paired_catch_difference
+from rl.evaluation_protocol import trained_score
 from rl.pipeline import (
     ManifestEnv,
+    digest,
+    file_hash,
     live_log,
     load_checkpoint,
     new_model,
@@ -44,14 +47,24 @@ def baselines(run):
         model = new_model(config, env)
         save_checkpoint(run / "checkpoints/untrained.zip", model, config, source, role="untrained")
         results = {}
-        for kind in CONTROLLERS:
-            results[kind], _ = evaluate(
-                kind,
+        if config.get("evaluation_protocol"):
+            results, _ = evaluate_suite(
                 config,
                 manifest["splits"]["validation"],
-                run / f"validation/baseline_{kind}.csv",
-                model=model if kind == "untrained" else None,
+                run / "validation/baselines",
+                schedule=read_json(run / "sampling_schedule.json")["validation"],
+                models={"untrained": model},
+                stage="baseline",
             )
+        else:
+            for kind in CONTROLLERS:
+                results[kind], _ = evaluate(
+                    kind,
+                    config,
+                    manifest["splits"]["validation"],
+                    run / f"validation/baseline_{kind}.csv",
+                    model=model if kind == "untrained" else None,
+                )
         write_json(run / "baseline_summary.json", results)
         print("BASELINES COMPLETE. Review ceiling diagnostics before invoking pilot.", flush=True)
         return results
@@ -87,17 +100,31 @@ class PilotCallback(BaseCallback):
         )
         self.episodes.writeheader()
         self.curve_handle = (run / "validation_curve.csv").open("w", newline="", encoding="utf-8")
+        self.sampled = bool(config.get("evaluation_protocol"))
         self.curve = csv.DictWriter(
             self.curve_handle,
-            fieldnames=[
-                "steps",
-                "elapsed_seconds",
-                "episodes",
-                "captured",
-                "escaped",
-                "unresolved",
-                "mean_return",
-            ],
+            fieldnames=(
+                [
+                    "steps",
+                    "optimizer_update_epochs",
+                    "evaluation_context",
+                    "elapsed_seconds",
+                    "sampled_primary_case_mean_catch_rate",
+                    "sampled_primary_case_mean_unresolved_rate",
+                    "sampled_primary_case_mean_return",
+                    "argmax_secondary_case_mean_catch_rate",
+                ]
+                if self.sampled
+                else [
+                    "steps",
+                    "elapsed_seconds",
+                    "episodes",
+                    "captured",
+                    "escaped",
+                    "unresolved",
+                    "mean_return",
+                ]
+            ),
         )
         self.curve.writeheader()
 
@@ -105,6 +132,8 @@ class PilotCallback(BaseCallback):
         return perf_counter() - self.started
 
     def validate_checkpoint(self, path, role):
+        if self.sampled:
+            return self._validate_sampled_checkpoint(path, role)
         elapsed = self.elapsed()
         summary, rows = evaluate(
             "trained",
@@ -151,6 +180,76 @@ class PilotCallback(BaseCallback):
                 validation=summary,
             )
             print(f"SELECTION best trained checkpoint = {self.best_steps} steps", flush=True)
+        return summary
+
+    def _validate_sampled_checkpoint(self, path, role):
+        config, _, _ = read_run(self.run)  # Recheck frozen files before evaluation.
+        if config != self.config:
+            raise ValueError("Callback frozen config changed")
+        context = (
+            "rollout_callback_before_current_rollout_optimizer_update"
+            if role == "interval"
+            else "after_learning_optimizer_update"
+        )
+        steps, epochs = int(self.model.num_timesteps), int(self.model._n_updates)
+        summary, rows = evaluate_suite(
+            self.config,
+            self.cases,
+            self.run / f"validation/step_{steps:08d}_epochs_{epochs:06d}_{role}",
+            schedule=read_json(self.run / "sampling_schedule.json")["validation"],
+            models={"trained": self.model},
+            stage="trained",
+        )
+        save_checkpoint(
+            path,
+            self.model,
+            self.config,
+            self.source,
+            role=role,
+            elapsed_seconds=self.elapsed(),
+            validation=summary,
+            evaluation_context=context,
+        )
+        primary, secondary = summary["trained_sampled"], summary["trained_deterministic"]
+        self.curve.writerow(
+            {
+                "steps": steps,
+                "optimizer_update_epochs": epochs,
+                "evaluation_context": context,
+                "elapsed_seconds": self.elapsed(),
+                "sampled_primary_case_mean_catch_rate": primary["case_mean_sampled_catch_rate"],
+                "sampled_primary_case_mean_unresolved_rate": primary[
+                    "case_mean_sampled_unresolved_rate"
+                ],
+                "sampled_primary_case_mean_return": primary["case_mean_return"],
+                "argmax_secondary_case_mean_catch_rate": secondary["case_mean_catch_rate"],
+            }
+        )
+        self.curve_handle.flush()
+        for prefix, values in (("sampled_primary", primary), ("argmax_secondary", secondary)):
+            for name in ("case_mean_catch_rate", "case_mean_unresolved_rate", "case_mean_return"):
+                self.logger.record(f"validation/{prefix}_{name}", values[name])
+        self.logger.record("validation/evaluated_optimizer_update_epochs", epochs)
+        self.logger.dump(steps)
+        score = trained_score(summary, steps, epochs)
+        if score is not None and (self.best_score is None or score > self.best_score):
+            self.best_score, self.best_steps = score, steps
+            self.best_rows, self.best_summary = rows, summary
+            save_checkpoint(
+                self.run / "checkpoints/best.zip",
+                self.model,
+                self.config,
+                self.source,
+                role="best_validation",
+                elapsed_seconds=self.elapsed(),
+                validation=summary,
+                evaluation_context=context,
+            )
+            print(
+                f"SELECTION sampled-primary best trained checkpoint: decisions={steps} "
+                f"optimizer_update_epochs={epochs}",
+                flush=True,
+            )
         return summary
 
     def _on_step(self):
@@ -284,6 +383,19 @@ def pilot(run):
         if model.num_timesteps != expected:
             raise RuntimeError("Unexpected rollout step count")
         training_seconds = perf_counter() - started
+        if config.get("evaluation_protocol"):
+            return complete_sampled_pilot(
+                run,
+                config,
+                manifest,
+                source,
+                model,
+                untrained_meta,
+                callback,
+                baseline,
+                started,
+                training_seconds,
+            )
         # Fresh deserialization must reproduce the selected validation trajectories/actions.
         best, best_meta = load_checkpoint(run / "checkpoints/best.zip", config, source)
         reproduced, reproduced_rows = evaluate(
@@ -356,6 +468,126 @@ def pilot(run):
         if callback is not None:
             callback.close()
         env.close()
+
+
+def final_sampled_test(run):
+    """Exclusive, fail-closed final test. A failed claimed test stays partial, never retries."""
+    config, manifest, source = read_run(run)
+    selection = read_json(run / "selection.json")
+    best_path = run / "checkpoints/best.zip"
+    metadata = read_json(best_path.with_suffix(".metadata.json"))
+    replay_dir = run / "validation/best_reloaded"
+    replay_summary = read_json(replay_dir / "summary.json")
+    replay_rows = read_json(replay_dir / "episodes.json")
+    if (
+        selection.get("fresh_load_reproduced_actions_and_episodes") is not True
+        or selection.get("best_checkpoint_sha256") != file_hash(best_path)
+        or selection.get("best_steps") != metadata["actual_steps"]
+        or selection.get("best_optimizer_update_epochs") != metadata["optimizer_update_epochs"]
+        or metadata.get("role") != "best_validation"
+        or selection.get("best_validation") != metadata["validation"]
+        or replay_summary != metadata["validation"]
+        or selection.get("validation_action_rows_sha256") != digest(replay_rows)
+        or selection.get("rule") != config["frozen_evaluation"]["protocol"]["selection"]
+        or trained_score(
+            selection["best_validation"],
+            selection["best_steps"],
+            selection["best_optimizer_update_epochs"],
+        )
+        is None
+    ):
+        raise ValueError("A selected, replay-verified trained checkpoint is required before test")
+    claim_phase(run, "test")
+    write_json(run / "test_status.json", {"status": "started", "retry_allowed": False})
+    try:
+        with frozen_evaluation(None):
+            best, _ = load_checkpoint(best_path, config, source)
+            untrained, _ = load_checkpoint(run / "checkpoints/untrained.zip", config, source)
+            summary, rows = evaluate_suite(
+                config,
+                manifest["splits"]["test"],
+                run / "test/final_sampled",
+                schedule=read_json(run / "sampling_schedule.json")["test"],
+                models={"trained": best, "untrained": untrained},
+                stage="final",
+            )
+        write_json(run / "test_summary.json", summary)
+        write_json(run / "test_status.json", {"status": "complete", "retry_allowed": False})
+        return summary, rows
+    except BaseException as exc:
+        write_json(
+            run / "test_status.json",
+            {"status": "partial", "retry_allowed": False, "error": f"{type(exc).__name__}: {exc}"},
+        )
+        raise
+
+
+def complete_sampled_pilot(
+    run,
+    config,
+    manifest,
+    source,
+    model,
+    untrained_meta,
+    callback,
+    baseline,
+    started,
+    training_seconds,
+):
+    if callback.best_score is None:
+        raise RuntimeError("No optimizer-updated checkpoint eligible for selection; test forbidden")
+    with frozen_evaluation(None):
+        best, metadata = load_checkpoint(run / "checkpoints/best.zip", config, source)
+        reproduced, rows = evaluate_suite(
+            config,
+            manifest["splits"]["validation"],
+            run / "validation/best_reloaded",
+            schedule=read_json(run / "sampling_schedule.json")["validation"],
+            models={"trained": best},
+            stage="trained",
+        )
+    if reproduced != callback.best_summary or rows != callback.best_rows:
+        raise RuntimeError(
+            "Fresh sampled/argmax checkpoint replay did not reproduce actions/outcomes"
+        )
+    write_json(
+        run / "selection.json",
+        {
+            "best_steps": callback.best_steps,
+            "best_optimizer_update_epochs": metadata["optimizer_update_epochs"],
+            "best_checkpoint_sha256": file_hash(run / "checkpoints/best.zip"),
+            "rule": config["frozen_evaluation"]["protocol"]["selection"],
+            "best_validation": reproduced,
+            "validation_action_rows_sha256": digest(rows),
+            "fresh_load_reproduced_actions_and_episodes": True,
+        },
+    )
+    test, _ = final_sampled_test(run)
+    result = {
+        "evaluation_mode": "sampled_primary_argmax_secondary",
+        "requested_steps": config["requested_steps"],
+        "actual_steps": model.num_timesteps,
+        "optimizer_update_epochs": model._n_updates,
+        "training_seconds_including_validation": training_seconds,
+        "total_pilot_seconds": perf_counter() - started,
+        "best_steps": callback.best_steps,
+        "best_optimizer_update_epochs": metadata["optimizer_update_epochs"],
+        "baseline_validation": baseline,
+        "best_validation": reproduced,
+        "test": test,
+        "weights_changed": parameter_hash(model) != untrained_meta["policy_sha256"],
+        "fresh_load_reproduced": True,
+        "training_episodes": sum(callback.counts.values()),
+        "training_outcomes": callback.counts,
+        "limitations": [
+            "Three sampling repeats are not three training seeds.",
+            "One fixed map, two spawns; no layout generalization claim.",
+            "Argmax is secondary and never selects best.",
+        ],
+    }
+    write_json(run / "results.json", result)
+    print("PILOT COMPLETE sampled-primary; review case-cluster results.json", flush=True)
+    return result
 
 
 def main():

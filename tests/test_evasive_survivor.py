@@ -192,7 +192,7 @@ def test_new_bot_seeded_environment_replay_and_wall_safety():
     assert replay() == replay()
 
 
-def test_unknown_bot_and_wrong_settings_rejected_and_review_config_gated(tmp_path):
+def test_unknown_bot_wrong_settings_and_unfrozen_config_rejected(tmp_path):
     with pytest.raises(ValueError, match="Unknown bot"):
         AlienEnv(bot_kind="secret")
     with pytest.raises(ValueError, match="require evasive"):
@@ -201,9 +201,12 @@ def test_unknown_bot_and_wrong_settings_rejected_and_review_config_gated(tmp_pat
     env = make_env(config)
     assert env.bot_kind == "evasive_explorer" and env.bot.settings == EvasionConfig()
     env.close()
-    with pytest.raises(ValueError, match="review-only"):
-        prepare_run(tmp_path / "not_started", config)
-    assert not (tmp_path / "not_started").exists()
+    from rl.evaluation_protocol import frozen_protocol
+
+    with pytest.raises(ValueError, match="frozen protocol"):
+        frozen_protocol(config)
+    prepare_run(tmp_path / "prepared", config)
+    assert (tmp_path / "prepared/evaluation_protocol.json").exists()
     config["evaluation_protocol"] = ""
     config["bot_kind"] = "secret"
     with pytest.raises(ValueError, match="supported mission bot"):
@@ -215,7 +218,7 @@ def test_bot_rejects_world_truth_as_command_input():
         bot().command(GameCore(arena()).snapshot())
 
 
-def test_sampled_protocol_validates_modes_seeds_and_blocks_legacy_training(tmp_path):
+def test_sampled_protocol_validates_modes_seeds_and_keeps_legacy_explicit(tmp_path):
     from copy import deepcopy
 
     from tools.check_survivor_bots import prepare, validate_protocol
@@ -242,7 +245,10 @@ def test_sampled_protocol_validates_modes_seeds_and_blocks_legacy_training(tmp_p
     prepare(output)
     assert read_json(output / "smoke_protocol.json")["episodes"] == 120
     assert len(read_json(output / "future_manifest.json")["splits"]["test"]) == 50
-    assert read_json(output / "evaluation_protocol.json")["status"].startswith("review_only")
+    assert (
+        read_json(output / "evaluation_protocol.json")["status"]
+        == "integrated_pending_runner_review"
+    )
     with pytest.raises(FileExistsError):
         prepare(output)
     supported = {k: v for k, v in training.items() if k != "evaluation_protocol"}

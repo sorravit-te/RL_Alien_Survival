@@ -1,6 +1,6 @@
 {
   "name": "sampled_masked_evaluation_v1",
-  "status": "review_only_not_integrated_with_training_selection",
+  "status": "integrated_pending_runner_review",
   "primary_inference": "sampled_masked_policy",
   "secondary_inference": "deterministic_argmax_diagnostic",
   "manifest_seed": 2026102501,
@@ -72,7 +72,7 @@
     "warning": "3 sampling repeats are not3 training seeds; same fixed map/two spawns does not establish generalization"
   },
   "test_policy": "Never run before trained checkpoint selection; once after selection; no tuning from test",
-  "integration_gate": "Legacy runner evaluates deterministic only; sampled callback/baseline/test integration and tests require review before learning",
+  "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
   "smoke": {
     "name": "survivor_baseline_smoke_v1",
     "manifest_seed": 2026102502,
