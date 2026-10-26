@@ -32,7 +32,12 @@ def find_path(world, start, target, radius):
             while cells[-1] != source:
                 cells.append(parents[cells[-1]])
             points = tuple(center(c) for c in reversed(cells)) + (target,)
-            return tuple(p for i, p in enumerate(points) if i == 0 or p != points[i - 1])
+            path = tuple(p for i, p in enumerate(points) if i == 0 or p != points[i - 1])
+            # Only omit the initial cell-center detour, never smooth the remaining route.
+            # Point LoS is insufficient: the moving circle must clear the same walls.
+            if len(path) > 1 and segment_has_clearance(world, start, path[1], radius):
+                return path[1:]
+            return path
         x, y = node
         for dx, dy in ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)):
             neighbor = (x + dx, y + dy)
