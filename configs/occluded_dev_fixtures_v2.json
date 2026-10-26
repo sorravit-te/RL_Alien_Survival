@@ -1,0 +1,594 @@
+{
+  "format": "occluded-dev-fixtures-v2",
+  "split": "development_only",
+  "episode_cap_ticks": 1800,
+  "total_core_tick_cap": 43200,
+  "execution_cap": 24,
+  "controllers": {
+    "wait": "constant action30",
+    "heuristic": "unchanged rl.scripted_controllers.HeuristicSelector from latest completed allowed sensor every15ticks"
+  },
+  "survivor": "Unchanged EvasiveExplorerBot command/helpers via FixtureMissionBot public exploration-order preference only. No objective truth or hidden Alien inputs.",
+  "layouts": {
+    "small_room_control": {
+      "rows": [
+        "############",
+        "#......#####",
+        "#......#####",
+        "#...#......#",
+        "#...#......#",
+        "#......##..#",
+        "#########..#",
+        "#########..#",
+        "############"
+      ],
+      "objects": [
+        {
+          "object_id": "keycard",
+          "kind": "keycard",
+          "x": 5.5,
+          "y": 2.5
+        },
+        {
+          "object_id": "exit",
+          "kind": "exit",
+          "x": 9.5,
+          "y": 7.5
+        }
+      ],
+      "patrol_waypoints": [
+        [
+          9.5,
+          7.5
+        ],
+        [
+          9.5,
+          4.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          2.5,
+          2.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ]
+    },
+    "opaque_loop_grid": {
+      "rows": [
+        "############",
+        "#..........#",
+        "#.##.##.##.#",
+        "#.##.##.##.#",
+        "#..........#",
+        "#.##.##.##.#",
+        "#.##.##.##.#",
+        "#..........#",
+        "#.##.##.##.#",
+        "#.##.##.##.#",
+        "#..........#",
+        "############"
+      ],
+      "objects": [
+        {
+          "object_id": "keycard",
+          "kind": "keycard",
+          "x": 1.5,
+          "y": 10.5
+        },
+        {
+          "object_id": "exit",
+          "kind": "exit",
+          "x": 10.5,
+          "y": 1.5
+        }
+      ],
+      "patrol_waypoints": [
+        [
+          1.5,
+          4.5
+        ],
+        [
+          10.5,
+          1.5
+        ],
+        [
+          10.5,
+          10.5
+        ],
+        [
+          1.5,
+          10.5
+        ],
+        [
+          4.5,
+          4.5
+        ],
+        [
+          7.5,
+          7.5
+        ]
+      ]
+    }
+  },
+  "cases": [
+    {
+      "case_id": "small_room_control_pair01_branch01",
+      "layout_id": "small_room_control",
+      "survivor_spawn": [
+        2.5,
+        2.5
+      ],
+      "alien_spawn": [
+        6.5,
+        2.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          9.5,
+          4.5
+        ]
+      ],
+      "scenario_seed": 880226001,
+      "bot_seed": 890226001,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "small_room_control_pair01_branch02",
+      "layout_id": "small_room_control",
+      "survivor_spawn": [
+        2.5,
+        2.5
+      ],
+      "alien_spawn": [
+        6.5,
+        2.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          9.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "scenario_seed": 880226002,
+      "bot_seed": 890226002,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "small_room_control_pair02_branch01",
+      "layout_id": "small_room_control",
+      "survivor_spawn": [
+        5.5,
+        5.5
+      ],
+      "alien_spawn": [
+        9.5,
+        4.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          9.5,
+          4.5
+        ]
+      ],
+      "scenario_seed": 880226003,
+      "bot_seed": 890226003,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "small_room_control_pair02_branch02",
+      "layout_id": "small_room_control",
+      "survivor_spawn": [
+        5.5,
+        5.5
+      ],
+      "alien_spawn": [
+        9.5,
+        4.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          9.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "scenario_seed": 880226004,
+      "bot_seed": 890226004,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "small_room_control_pair03_branch01",
+      "layout_id": "small_room_control",
+      "survivor_spawn": [
+        5.5,
+        2.5
+      ],
+      "alien_spawn": [
+        9.5,
+        3.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          9.5,
+          4.5
+        ]
+      ],
+      "scenario_seed": 880226005,
+      "bot_seed": 890226005,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "small_room_control_pair03_branch02",
+      "layout_id": "small_room_control",
+      "survivor_spawn": [
+        5.5,
+        2.5
+      ],
+      "alien_spawn": [
+        9.5,
+        3.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          9.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "scenario_seed": 880226006,
+      "bot_seed": 890226006,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "opaque_loop_grid_pair01_branch01",
+      "layout_id": "opaque_loop_grid",
+      "survivor_spawn": [
+        6.5,
+        4.5
+      ],
+      "alien_spawn": [
+        10.5,
+        4.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          1.5,
+          1.5
+        ],
+        [
+          1.5,
+          7.5
+        ],
+        [
+          7.5,
+          10.5
+        ],
+        [
+          10.5,
+          4.5
+        ],
+        [
+          4.5,
+          4.5
+        ]
+      ],
+      "scenario_seed": 880226007,
+      "bot_seed": 890226007,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "opaque_loop_grid_pair01_branch02",
+      "layout_id": "opaque_loop_grid",
+      "survivor_spawn": [
+        6.5,
+        4.5
+      ],
+      "alien_spawn": [
+        10.5,
+        4.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          4.5,
+          4.5
+        ],
+        [
+          10.5,
+          4.5
+        ],
+        [
+          7.5,
+          10.5
+        ],
+        [
+          1.5,
+          7.5
+        ],
+        [
+          1.5,
+          1.5
+        ]
+      ],
+      "scenario_seed": 880226008,
+      "bot_seed": 890226008,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "opaque_loop_grid_pair02_branch01",
+      "layout_id": "opaque_loop_grid",
+      "survivor_spawn": [
+        4.5,
+        6.5
+      ],
+      "alien_spawn": [
+        4.5,
+        10.5,
+        -1.5707963267948966
+      ],
+      "exploration_anchors": [
+        [
+          1.5,
+          1.5
+        ],
+        [
+          1.5,
+          7.5
+        ],
+        [
+          7.5,
+          10.5
+        ],
+        [
+          10.5,
+          4.5
+        ],
+        [
+          4.5,
+          4.5
+        ]
+      ],
+      "scenario_seed": 880226009,
+      "bot_seed": 890226009,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "opaque_loop_grid_pair02_branch02",
+      "layout_id": "opaque_loop_grid",
+      "survivor_spawn": [
+        4.5,
+        6.5
+      ],
+      "alien_spawn": [
+        4.5,
+        10.5,
+        -1.5707963267948966
+      ],
+      "exploration_anchors": [
+        [
+          4.5,
+          4.5
+        ],
+        [
+          10.5,
+          4.5
+        ],
+        [
+          7.5,
+          10.5
+        ],
+        [
+          1.5,
+          7.5
+        ],
+        [
+          1.5,
+          1.5
+        ]
+      ],
+      "scenario_seed": 880226010,
+      "bot_seed": 890226010,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "opaque_loop_grid_pair03_branch01",
+      "layout_id": "opaque_loop_grid",
+      "survivor_spawn": [
+        3.5,
+        7.5
+      ],
+      "alien_spawn": [
+        7.5,
+        7.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          1.5,
+          1.5
+        ],
+        [
+          1.5,
+          7.5
+        ],
+        [
+          7.5,
+          10.5
+        ],
+        [
+          10.5,
+          4.5
+        ],
+        [
+          4.5,
+          4.5
+        ]
+      ],
+      "scenario_seed": 880226011,
+      "bot_seed": 890226011,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    },
+    {
+      "case_id": "opaque_loop_grid_pair03_branch02",
+      "layout_id": "opaque_loop_grid",
+      "survivor_spawn": [
+        3.5,
+        7.5
+      ],
+      "alien_spawn": [
+        7.5,
+        7.5,
+        3.141592653589793
+      ],
+      "exploration_anchors": [
+        [
+          4.5,
+          4.5
+        ],
+        [
+          10.5,
+          4.5
+        ],
+        [
+          7.5,
+          10.5
+        ],
+        [
+          1.5,
+          7.5
+        ],
+        [
+          1.5,
+          1.5
+        ]
+      ],
+      "scenario_seed": 880226012,
+      "bot_seed": 890226012,
+      "profile": "natural_occlusion_inspection",
+      "intended_alignment": "natural",
+      "rationale": "Valid alternate starting pair and public branch preference; initial visibility/loss is measured, not injected or guaranteed."
+    }
+  ],
+  "metrics": [
+    "C/E/U; no sight/no loss/no card/early capture/timeout retained",
+    "filtered object discovery, pickup, escape",
+    "loss sample/available time/decision opportunity/last-seen geometry",
+    "travel-clue arrival; sweep start/completion; natural reacquisition during travel vs sweep; fresh evidence interruption",
+    "21eligible/chosen; waypoint arrivals/revisits; WAIT duration"
+  ],
+  "acceptance": "Mission demonstrated in realised controls; natural sweep start plus completion OR confirmed reacquisition during sweep, with saved stage evidence. Not every case must sweep. All no-trigger outcomes retained.",
+  "limits": [
+    "No source mechanic/reward/action/observation changes. No policy/model, learning or held-out resets.",
+    "At most24 total attempts including debug/retries; at most1800ticks per attempt and43200 total. No rerun of this batch.",
+    "Two declared layouts, only opaque_loop_grid is new dev geometry; new numeric seeds do not prove unseen layouts or generalization."
+  ]
+}

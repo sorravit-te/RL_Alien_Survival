@@ -1,0 +1,301 @@
+{
+  "format": "lost-sight-dev-fixtures-v1",
+  "split": "development_only",
+  "map": "small_test_map",
+  "episode_cap_ticks": 900,
+  "total_core_tick_cap": 21600,
+  "execution_cap": 24,
+  "controllers": {
+    "wait": "Constant action30 from shared catalogue; normal physics/sensors/capture.",
+    "heuristic": "rl.scripted_controllers.HeuristicSelector, unchanged choose_target, latest completed sensor every15ticks, shared masks and Core primitives."
+  },
+  "survivor": "Existing EvasiveExplorerBot; only initial public exploration order preference differs; discovered mission objects still take priority.",
+  "cases": [
+    {
+      "case_id": "corner_branch_mission_01",
+      "profile": "corner_branch_mission",
+      "scenario_seed": 880126001,
+      "bot_seed": 890126001,
+      "survivor_spawn_index": 0,
+      "exploration_anchors": [
+        [
+          2.5,
+          2.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "corner_branch_mission_02",
+      "profile": "corner_branch_mission",
+      "scenario_seed": 880126002,
+      "bot_seed": 890126002,
+      "survivor_spawn_index": 0,
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          2.5,
+          2.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "corner_branch_mission_03",
+      "profile": "corner_branch_mission",
+      "scenario_seed": 880126003,
+      "bot_seed": 890126003,
+      "survivor_spawn_index": 1,
+      "exploration_anchors": [
+        [
+          2.5,
+          2.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "corner_branch_mission_04",
+      "profile": "corner_branch_mission",
+      "scenario_seed": 880126004,
+      "bot_seed": 890126004,
+      "survivor_spawn_index": 1,
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          2.5,
+          2.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "clue_alignment_control_01",
+      "profile": "clue_alignment_control",
+      "scenario_seed": 880126005,
+      "bot_seed": 890126005,
+      "survivor_spawn_index": 0,
+      "exploration_anchors": [
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          4.5
+        ]
+      ],
+      "intended_alignment": "near_waypoint"
+    },
+    {
+      "case_id": "clue_alignment_control_02",
+      "profile": "clue_alignment_control",
+      "scenario_seed": 880126006,
+      "bot_seed": 890126006,
+      "survivor_spawn_index": 0,
+      "exploration_anchors": [
+        [
+          6.2,
+          2.7
+        ],
+        [
+          6.2,
+          4.5
+        ]
+      ],
+      "intended_alignment": "offset"
+    },
+    {
+      "case_id": "clue_alignment_control_03",
+      "profile": "clue_alignment_control",
+      "scenario_seed": 880126007,
+      "bot_seed": 890126007,
+      "survivor_spawn_index": 1,
+      "exploration_anchors": [
+        [
+          5.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ]
+      ],
+      "intended_alignment": "near_waypoint"
+    },
+    {
+      "case_id": "clue_alignment_control_04",
+      "profile": "clue_alignment_control",
+      "scenario_seed": 880126008,
+      "bot_seed": 890126008,
+      "survivor_spawn_index": 1,
+      "exploration_anchors": [
+        [
+          6.2,
+          4.5
+        ],
+        [
+          6.2,
+          2.7
+        ]
+      ],
+      "intended_alignment": "offset"
+    },
+    {
+      "case_id": "reappearance_revision_mission_01",
+      "profile": "reappearance_revision_mission",
+      "scenario_seed": 880126009,
+      "bot_seed": 890126009,
+      "survivor_spawn_index": 0,
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          5.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          9.5,
+          4.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "reappearance_revision_mission_02",
+      "profile": "reappearance_revision_mission",
+      "scenario_seed": 880126010,
+      "bot_seed": 890126010,
+      "survivor_spawn_index": 0,
+      "exploration_anchors": [
+        [
+          9.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          5.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "reappearance_revision_mission_03",
+      "profile": "reappearance_revision_mission",
+      "scenario_seed": 880126011,
+      "bot_seed": 890126011,
+      "survivor_spawn_index": 1,
+      "exploration_anchors": [
+        [
+          2.5,
+          5.5
+        ],
+        [
+          5.5,
+          5.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          9.5,
+          4.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    },
+    {
+      "case_id": "reappearance_revision_mission_04",
+      "profile": "reappearance_revision_mission",
+      "scenario_seed": 880126012,
+      "bot_seed": 890126012,
+      "survivor_spawn_index": 1,
+      "exploration_anchors": [
+        [
+          9.5,
+          4.5
+        ],
+        [
+          5.5,
+          2.5
+        ],
+        [
+          5.5,
+          5.5
+        ],
+        [
+          2.5,
+          5.5
+        ]
+      ],
+      "intended_alignment": "natural"
+    }
+  ],
+  "limitations": [
+    "No forced sight/loss/reacquisition or21; keep all no-trigger/early-terminal cases.",
+    "New numeric seeds on the same geometry do not imply new maps.",
+    "Fixed existing Survivor spawn per case; scenario seeds are provenance, not independent spawn variation.",
+    "Scripted dev checks, not an RL baseline or learning result."
+  ]
+}
