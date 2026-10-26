@@ -328,4 +328,7 @@ def test_mission_navigation_cache_is_invalidated_after_retreat():
     subject.command(SurvivorThreatView(mission))
     assert not subject.fleeing
     assert subject.explorer.navigator is not old_navigator
-    assert subject.explorer.navigator.target is None and subject.explorer.navigator.path == ()
+    assert subject.explorer.navigator.target == subject.explorer.explore_target
+    assert subject.explorer.navigator.target in subject.explorer.order
+    assert subject.explorer.navigator.path != old_navigator.path
+    assert subject.explorer.scanning == 0

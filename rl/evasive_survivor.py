@@ -342,6 +342,9 @@ class EvasiveExplorerBot:
             self.navigator = Navigator()
             # Retreat changed the mission path's starting position; discard its cached route.
             self.explorer.navigator = Navigator()
+            # Resume a public mission/exploration route instead of paying a pending
+            # stationary scan immediately after retreat. Arrival scans still apply.
+            self.explorer.scanning = 0
         if (
             not self.fleeing
             and self.last_seen is not None
