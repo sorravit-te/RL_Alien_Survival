@@ -8,6 +8,7 @@ not angular velocity; input adapters must accumulate mouse motion accordingly.
 from dataclasses import dataclass
 from math import isfinite, pi
 
+from game.investigation import InvestigationSnapshot
 from game.map import MapObject, WorldMap
 from game.perception import PerceptionSnapshot
 
@@ -30,6 +31,7 @@ class CoreConfig:
     sight_confirmation_seconds: float = 0.2
     chase_hold_seconds: float = 2.0
     alien_decision_seconds: float = 0.5
+    investigation_turn_speed: float = 2 * pi / 3  # rad/s; a 360-degree sweep takes 3s
     target_arrival_distance: float = 0.15
     capture_padding: float = 0.0  # contact distance = both radii + this explicit padding
     minimum_spawn_distance: float = 2.0
@@ -53,6 +55,7 @@ class CoreConfig:
             self.chase_hold_seconds,
             self.alien_decision_seconds,
             self.target_arrival_distance,
+            self.investigation_turn_speed,
         )
         if not all(isfinite(v) and v > 0 for v in values):
             raise ValueError("Alien distances, speeds and times must be finite and positive")
@@ -119,3 +122,4 @@ class WorldSnapshot:
     alien_target: tuple[float, float] | None = None
     alien_target_source: str = "patrol"
     navigation_path: tuple[tuple[float, float], ...] = ()
+    investigation: InvestigationSnapshot = InvestigationSnapshot()

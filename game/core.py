@@ -8,6 +8,7 @@ from ai.controller import ControllerState, choose_target
 from ai.navigation import Navigator
 from game.capture import capture_fraction
 from game.interaction import segment_clear, select_target
+from game.investigation import LastSeenInvestigation
 from game.map import WorldMap, small_test_map
 from game.motion import sweep_axis
 from game.perception import PerceptionSnapshot, update_perception
@@ -74,6 +75,7 @@ class GameCore:
         self._perception = PerceptionSnapshot()
         self._controller = ControllerState()
         self._navigator = Navigator()
+        self._investigation = LastSeenInvestigation(self.config)
         return self.snapshot()
 
     def snapshot(self) -> WorldSnapshot:
@@ -97,18 +99,22 @@ class GameCore:
             self._controller.target,
             self._controller.source,
             self._navigator.path,
+            self._investigation.state,
         )
 
-    def set_alien_target(self, target, *, source="external"):
+    def set_alien_target(self, target, *, source="external", evidence_revision=None):
         """External controller owns a copied target snapshot; None explicitly stops.
 
-        Caller must enforce its knowledge boundary. No hidden Survivor lookup or
-        heuristic fallback occurs here. Unreachable floor targets yield an empty path.
+        Last-seen investigation additionally requires the current confirmed target/revision.
+        Other targets retain the caller-owned knowledge boundary. No hidden Survivor lookup
+        or heuristic fallback occurs here. Unreachable floor targets yield an empty path.
         """
         if self.alien_control != "external":
             raise RuntimeError("External targets require external control mode")
         if self._alien is None:
             raise RuntimeError("No active Alien")
+        if self._outcome is not None:
+            raise RuntimeError("Cannot set Alien target after terminal")
         if not isinstance(source, str) or not source:
             raise ValueError("Target source must be a nonempty string")
         if target is not None:
@@ -117,7 +123,23 @@ class GameCore:
                 raise ValueError("Target must be a finite x/y snapshot")
             if self.world_map.blocked(floor(target[0]), floor(target[1])):
                 raise ValueError("Target must be on floor")
-        self._controller = ControllerState(target, source)
+        self._assign_alien_target(target, source, evidence_revision)
+
+    def _assign_alien_target(self, target, source, evidence_revision=None):
+        if source == "last_seen":
+            if (
+                type(evidence_revision) is not int
+                or evidence_revision <= 0
+                or evidence_revision != self._perception.revision
+                or target != self._perception.last_seen
+            ):
+                raise ValueError(
+                    "Investigation requires the current confirmed clue target/revision"
+                )
+            self._investigation.select(target, evidence_revision)
+        else:
+            self._investigation.cancel()
+        self._controller = replace(self._controller, target=target, source=source)
         self._navigator.set_target(
             self.world_map, (self._alien.x, self._alien.y), target, self.config.alien_radius
         )
@@ -166,13 +188,31 @@ class GameCore:
                 self.world_map.patrol_waypoints,
                 self._controller,
                 self.config.target_arrival_distance,
+                self._investigation.state.investigated_revision,
             )
-            self._navigator.set_target(
-                self.world_map,
-                (self._alien.x, self._alien.y),
+            self._assign_alien_target(
                 self._controller.target,
-                self.config.alien_radius,
+                self._controller.source,
+                self._perception.revision if self._controller.source == "last_seen" else None,
             )
+        # Prune points already reached before checking the path-complete condition.
+        self._navigator.displacement((self._alien.x, self._alien.y), 0.0)
+        state = self._investigation.state
+        arrived = (
+            state.target is not None
+            and not self._navigator.path
+            and hypot(self._alien.x - state.target[0], self._alien.y - state.target[1])
+            <= self.config.target_arrival_distance
+        )
+        turn, hold = self._investigation.advance(self._perception, arrived=arrived)
+        if state.phase != "cancelled" and self._investigation.state.phase == "cancelled":
+            # Reacquisition/new evidence cancels old navigation, retaining chosen target in diagnostics.
+            self._navigator.set_target(
+                self.world_map, (self._alien.x, self._alien.y), None, self.config.alien_radius
+            )
+        if hold:
+            self._alien = replace(self._alien, yaw=(self._alien.yaw + turn) % (2 * pi))
+            return (0.0, 0.0)
         speed = self.config.alien_chase_speed if chasing else self.config.alien_search_speed
         return self._navigator.displacement(
             (self._alien.x, self._alien.y), speed / self.config.tick_hz

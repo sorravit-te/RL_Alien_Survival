@@ -12,6 +12,7 @@ class PerceptionSnapshot:
     confirmation_ticks: int = 0
     last_seen: tuple[float, float] | None = None
     last_seen_age_ticks: int | None = None
+    revision: int | None = None  # increments on confirmed samples only, including same position
 
 
 def update_perception(world, alien, survivor, previous, config):
@@ -34,4 +35,5 @@ def update_perception(world, alien, survivor, previous, config):
         else (
             previous.last_seen_age_ticks + 1 if previous.last_seen_age_ticks is not None else None
         ),
+        (previous.revision or 0) + 1 if visible else previous.revision,
     )

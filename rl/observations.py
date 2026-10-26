@@ -31,7 +31,20 @@ def build_observation(view: AllowedAlienView):
         min(1.0, (view.last_seen_age_seconds or 0.0) / AGE_SCALE_SECONDS),
     ]
     values += [0.0] * 9  # last heard4,Director3,interaction2
-    values += [float(view.navigation_active)] + [0.0] * 9  # navigation/stuck/guard/doors/lockers
+    state = view.investigation
+    target = state.target
+    values += [
+        float(view.navigation_active),
+        float(view.clue_revision is not None and view.clue_revision == state.investigated_revision),
+        float(state.active),
+        float(state.phase == "sweeping"),
+        state.progress,
+        float(target is not None),
+        (target[0] - view.position[0]) / WORLD_SCALE if target is not None else 0.0,
+        (target[1] - view.position[1]) / WORLD_SCALE if target is not None else 0.0,
+        float(state.revision is not None and state.revision == view.clue_revision),
+        float(state.phase == "completed"),
+    ]
     candidates = build_candidates(view)
     for candidate in candidates:
         if not candidate.valid:

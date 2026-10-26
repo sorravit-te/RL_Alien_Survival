@@ -133,7 +133,7 @@ def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path,
     from rl.contract import VERSION
     from rl.pipeline import map_identity
 
-    assert VERSION == "alien-vector-v1"
+    assert VERSION == "alien-vector-v2"
     assert CHECKPOINT_FORMAT == "alien-maskable-checkpoint-v1"
     assert map_identity()["name"] == "small_test_map_v1"
     manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])

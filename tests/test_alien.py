@@ -67,13 +67,13 @@ def test_confirmation_requires_continuous_sensing_and_wall_blocks_near_sensor():
 def test_hidden_positions_cannot_change_memory_targets_or_navigation():
     world = arena()
     alien = AlienState(5.5, 5.5)
-    previous = PerceptionSnapshot(True, 6, (7.5, 5.5), 0)
+    previous = PerceptionSnapshot(True, 6, (7.5, 5.5), 0, revision=1)
     config = CoreConfig()
     memories = [
         update_perception(world, alien, SurvivorState(*p), previous, config)
         for p in ((2.5, 5.5), (3.5, 3.5))
     ]
-    assert memories[0] == memories[1] == PerceptionSnapshot(False, 0, (7.5, 5.5), 1)
+    assert memories[0] == memories[1] == PerceptionSnapshot(False, 0, (7.5, 5.5), 1, revision=1)
     choices = [choose_target(alien, m, ((10.5, 10.5),), ControllerState(), 0.15) for m in memories]
     assert choices[0] == choices[1]
     assert choices[0].source == "last_seen" and choices[0].target == (7.5, 5.5)
@@ -113,7 +113,7 @@ def test_heuristic_selects_only_every_half_second(monkeypatch):
     for _ in range(31):
         core.step(SurvivorCommand())
     assert len(calls) == 3  # pre-ticks 0,15,30
-    assert all(len(args) == 5 for args in calls)  # no survivor/world state argument
+    assert all(len(args) == 6 for args in calls)  # adds only investigated revision, no truth
 
 
 def test_path_detours_and_no_diagonal_corner_cutting():

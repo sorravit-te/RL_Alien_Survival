@@ -130,7 +130,8 @@ def test_preconfirmation_count_is_not_policy_knowledge():
 
 
 def test_confirmed_and_last_seen_candidates_are_snapshots_with_valid_flags():
-    view = AllowedAlienView((5.5, 5.5), 0, True, 20, True, (7.5, 5.5), 0, (), (), True)
+    view = AllowedAlienView((5.5, 5.5), 0, True, 20, True, (7.5, 5.5), 0, (), (), True,
+                            clue_revision=1)
     candidates = build_candidates(view)
     assert candidates[20].valid and candidates[21].valid
     hidden = replace(view, visible=False, last_seen_age_seconds=2)

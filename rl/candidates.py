@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from game.investigation import InvestigationSnapshot
 from rl.contract import ACTION_COUNT, WAIT
 
 
@@ -19,6 +20,8 @@ class AllowedAlienView:
     waypoints: tuple[tuple[float, float], ...]
     visit_ages: tuple[float | None, ...]
     navigation_active: bool
+    clue_revision: int | None = None
+    investigation: InvestigationSnapshot = InvestigationSnapshot()
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,7 @@ class Candidate:
     target: tuple[float, float] | None = None
     clue_age: float = 0.0
     visit_age: float | None = None
+    evidence_revision: int | None = None
 
 
 def build_candidates(view: AllowedAlienView):
@@ -40,8 +44,18 @@ def build_candidates(view: AllowedAlienView):
         slots[index] = Candidate(True, 0, point, 0.0, view.visit_ages[index])
     if view.visible and view.last_seen is not None:
         slots[20] = Candidate(True, 1, view.last_seen)
-    if view.last_seen is not None:
-        slots[21] = Candidate(True, 2, view.last_seen, view.last_seen_age_seconds or 0.0)
+    if (
+        view.last_seen is not None
+        and view.clue_revision is not None
+        and view.clue_revision != view.investigation.investigated_revision
+    ):
+        slots[21] = Candidate(
+            True,
+            2,
+            view.last_seen,
+            view.last_seen_age_seconds or 0.0,
+            evidence_revision=view.clue_revision,
+        )
     slots[WAIT] = Candidate(True, 6)
     return tuple(slots)
 

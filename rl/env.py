@@ -93,6 +93,8 @@ class AlienEnv(gym.Env):
                 for tick in self.visit_ticks
             ),
             bool(snapshot.navigation_path),
+            memory.revision,
+            snapshot.investigation,
         )
 
     def action_masks(self):
@@ -148,6 +150,7 @@ class AlienEnv(gym.Env):
                 if applied == 20
                 else "last_seen"
             ),
+            evidence_revision=chosen.evidence_revision,
         )
         components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
         ticks = 0
