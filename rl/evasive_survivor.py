@@ -78,7 +78,23 @@ def point_segment_distance(point, start, end):
     return hypot(start[0] + t * dx - point[0], start[1] + t * dy - point[1])
 
 
+@dataclass(frozen=True)
+class ExplorationRetryRecord:
+    """Public task history, never a threat position or a danger map."""
+
+    anchor_id: int
+    count: int
+    first_tick: int
+    defer_until: int | None
+
+
 class EvasiveExplorerBot:
+    retry_window_commands = 300
+    retry_defer_commands = 180
+    retry_record_limit = 4
+    retry_anchor_check_limit = 16
+    retry_path_limit = 4
+
     label = "evasive_explorer_scripted"
 
     def __init__(self, rows, config, settings=None):
@@ -90,8 +106,11 @@ class EvasiveExplorerBot:
             <= config.radius + config.alien_radius + config.capture_padding
         ):
             raise ValueError("Threat clearance must exceed physical capture distance")
+        self._retry_anchor_ids = {point: i for i, point in enumerate(self.explorer.points)}
         self.memory_ticks = ceil(self.settings.memory_seconds * config.tick_hz)
         self.hold_ticks = ceil(self.settings.target_hold_seconds * config.tick_hz)
+        # At most one half-turn at the existing turn rate; a ceiling, not an alignment guarantee.
+        self.resume_limit_ticks = max(1, ceil(pi / self.explorer.turn_per_tick - 1e-12))
 
     def reset(self, rng):
         self.explorer.reset(rng)
@@ -99,6 +118,11 @@ class EvasiveExplorerBot:
         self.last_seen_age_ticks = None
         self.fleeing = False
         self.tick = 0
+        self.resume_active = False
+        self.resume_started_tick = self.resume_deadline_tick = None
+        self.resume_entry_reason = None
+        self.resume_end_reason = "reset"
+        self.resume_ended_tick = None
         self.flee_started = 0
         self.last_plan = -self.hold_ticks
         self.escape_target = None
@@ -115,6 +139,29 @@ class EvasiveExplorerBot:
         self.exit_approach_cancellations = 0
         self.exit_approach_steps = 0
         self.exit_motion_audit = None
+        self.retry_records = {}
+        self.retry_pending = self.retry_exit_token = self.retry_attempted_exit = None
+        self.retry_cursor = 0
+        self.retry_phase = None
+        self.retry_last_interruption = self.retry_last_selection = None
+        self._retry_previous_position = self._retry_previous_anchor = None
+        self._retry_entry_candidate = self._retry_public_command_anchor = None
+
+    def _start_resume(self, reason):
+        # Only the FLEE exit calls this. Target changes never restart the clock.
+        if self.resume_active:
+            return
+        self.resume_active = True
+        self.resume_started_tick = self.tick
+        self.resume_deadline_tick = self.tick + self.resume_limit_ticks
+        self.resume_entry_reason = reason
+        self.resume_end_reason = self.resume_ended_tick = None
+
+    def _end_resume(self, reason):
+        if self.resume_active:
+            self.resume_active = False
+            self.resume_end_reason = reason
+            self.resume_ended_tick = self.tick
 
     def _safe_path(self, start, path, threat):
         if not path:
@@ -189,6 +236,7 @@ class EvasiveExplorerBot:
 
     def _begin_flee(self):
         if not self.fleeing:
+            self._end_resume("flee_entered")
             self.fleeing = True
             self.flee_started = self.tick
             self.last_plan = -self.hold_ticks
@@ -310,7 +358,191 @@ class EvasiveExplorerBot:
             yaw_delta=turn,
         )
 
+    def _retry_clear_pending(self):
+        self.retry_pending = None
+        self.retry_exit_token = None
+
+    def _retry_drop(self, anchor_id):
+        record = self.retry_records.pop(anchor_id, None)
+        if record is not None and self.retry_pending == (anchor_id, record.first_tick):
+            self._retry_clear_pending()
+        if (
+            self.retry_last_interruption is not None
+            and self.retry_last_interruption[1] == anchor_id
+        ):
+            self.retry_last_interruption = None
+        if (
+            self.retry_last_selection is not None
+            and self.retry_last_selection["from_anchor"] == anchor_id
+        ):
+            self.retry_last_selection = None
+
+    def _retry_clear(self):
+        self.retry_records.clear()
+        self._retry_clear_pending()
+        self.retry_last_interruption = self.retry_last_selection = None
+        self.retry_cursor = 0
+
+    def _retry_wanted_known(self, mission):
+        wanted = "exit" if mission.has_keycard else "keycard"
+        return any(obj.kind == wanted for obj in self.explorer.known.values())
+
+    def _retry_cleanup(self, mission):
+        # All time/mission invalidation runs before any command early return.
+        if self.retry_phase is not None and self.retry_phase != mission.has_keycard:
+            self._retry_clear()
+        self.retry_phase = mission.has_keycard
+        if self._retry_wanted_known(mission):
+            self._retry_clear()
+        for anchor_id, record in tuple(self.retry_records.items()):
+            expiry = (
+                record.defer_until
+                if record.defer_until is not None
+                else record.first_tick + self.retry_window_commands
+            )
+            point = self.explorer.points[anchor_id]
+            reached = (
+                self.explorer.explore_target == point
+                and hypot(mission.x - point[0], mission.y - point[1]) < 1e-8
+            )
+            if self.tick >= expiry or reached:
+                self._retry_drop(anchor_id)
+        if self.retry_pending is not None:
+            anchor_id, first_tick = self.retry_pending
+            record = self.retry_records.get(anchor_id)
+            if record is None or record.first_tick != first_tick or record.defer_until is None:
+                self._retry_clear_pending()
+
+    def _retry_interrupted_anchor(self, view):
+        mission = view.mission
+        target = self.explorer.explore_target
+        anchor_id = self._retry_anchor_ids.get(target)
+        if (
+            anchor_id is None
+            or anchor_id != self._retry_previous_anchor
+            or self._retry_previous_position is None
+            or self.explorer.scanning
+            or not self.explorer.navigator.path
+            or self._retry_wanted_known(mission)
+            or hypot(mission.x - target[0], mission.y - target[1]) < 1e-8
+            or hypot(
+                mission.x - self._retry_previous_position[0],
+                mission.y - self._retry_previous_position[1],
+            )
+            <= 1e-8
+            or self.last_seen is None
+            or self.last_seen_age_ticks is None
+            or not 0 <= self.last_seen_age_ticks < self.memory_ticks
+        ):
+            return None
+        return anchor_id, "fresh_sight" if view.visible_alien is not None else "remembered_threat"
+
+    def _retry_record_interruption(self, anchor_id, reason):
+        record = self.retry_records.get(anchor_id)
+        # Deferred records cannot be renewed, including repeated fallback encounters.
+        if record is not None and record.defer_until is not None:
+            return
+        if record is None:
+            if len(self.retry_records) >= self.retry_record_limit:
+                oldest = min(self.retry_records.values(), key=lambda r: (r.first_tick, r.anchor_id))
+                self._retry_drop(oldest.anchor_id)
+            record = ExplorationRetryRecord(anchor_id, 1, self.tick, None)
+        else:
+            record = ExplorationRetryRecord(
+                anchor_id, 2, record.first_tick, self.tick + self.retry_defer_commands
+            )
+            self.retry_pending = (anchor_id, record.first_tick)
+            self.retry_exit_token = None
+        self.retry_records[anchor_id] = record
+        self.retry_last_interruption = (self.tick, anchor_id, reason)
+
+    def _retry_reselect(self, mission):
+        if (
+            self.retry_pending is None
+            or self.retry_exit_token is None
+            or self.retry_attempted_exit == self.retry_exit_token
+            or self.explorer.scanning
+        ):
+            return
+        old_id, _ = self.retry_pending
+        target = self.explorer.explore_target
+        if self._retry_anchor_ids.get(target) != old_id:
+            self._retry_clear_pending()
+            return
+        if hypot(mission.x - target[0], mission.y - target[1]) < 1e-8:
+            return  # Explorer's original arrival/scan handler owns this command.
+        self.retry_attempted_exit = self.retry_exit_token
+        inspected = 0
+        # Reserve one of the four searches for the original target's fallback route.
+        # Explorer reuses either this path or the chosen candidate path, never a fifth search.
+        fallback = find_path(
+            self.explorer.geometry, (mission.x, mission.y), target, self.config.radius
+        )
+        self.explorer.navigator = Navigator()
+        self.explorer.navigator.target, self.explorer.navigator.path = target, fallback
+        searches = 1
+        selected_id = None
+        order = self.explorer.order
+        for _ in range(min(self.retry_anchor_check_limit, len(order))):
+            index = self.retry_cursor % len(order)
+            point = order[index]
+            self.retry_cursor = (index + 1) % len(order)
+            inspected += 1
+            anchor_id = self._retry_anchor_ids.get(point)
+            record = self.retry_records.get(anchor_id)
+            if (
+                anchor_id is None
+                or anchor_id == old_id
+                or point in self.explorer.visited
+                or (record is not None and record.defer_until is not None)
+            ):
+                continue
+            searches += 1
+            path = find_path(
+                self.explorer.geometry, (mission.x, mission.y), point, self.config.radius
+            )
+            if path:
+                # Public route only; reuse this exact search, not a fifth path computation.
+                self.explorer.explore_target = point
+                self.explorer.navigator = Navigator()
+                self.explorer.navigator.target, self.explorer.navigator.path = point, path
+                selected_id = anchor_id
+                self._retry_clear_pending()
+                break
+            if searches >= self.retry_path_limit:
+                break
+        self.retry_last_selection = {
+            "tick": self.tick,
+            "from_anchor": old_id,
+            "to_anchor": selected_id,
+            "inspected": inspected,
+            "path_searches": searches,
+            "candidate_searches": searches - 1,
+            "outcome": "selected" if selected_id is not None else "fallback",
+        }
+
     def command(self, view):
+        if not isinstance(view, SurvivorThreatView):
+            raise TypeError("Evasive bot accepts only filtered SurvivorThreatView")
+        self._retry_entry_candidate = None
+        self._retry_public_command_anchor = None
+        command = self._command(view)
+        # Only a genuine direct entry which actually emits retreat can add history.
+        if (
+            self._retry_entry_candidate is not None
+            and command.running
+            and hypot(command.forward, command.strafe) > 1e-12
+        ):
+            self._retry_record_interruption(*self._retry_entry_candidate)
+        self._retry_previous_position = (view.mission.x, view.mission.y)
+        self._retry_previous_anchor = (
+            self._retry_public_command_anchor
+            if not command.running and hypot(command.forward, command.strafe) > 1e-12
+            else None
+        )
+        return command
+
+    def _command(self, view):
         if not isinstance(view, SurvivorThreatView):
             raise TypeError("Evasive bot accepts only filtered SurvivorThreatView")
         self.tick += 1
@@ -321,10 +553,15 @@ class EvasiveExplorerBot:
             self.last_seen_age_ticks += 1
             if self.last_seen_age_ticks >= self.memory_ticks:
                 self.last_seen = self.last_seen_age_ticks = None
+        # Entry command counts as RESUME command1: S..S+limit-1 are active.
+        # Expire BEFORE all interaction/approach early returns on command S+limit.
+        if self.resume_active and self.tick >= self.resume_deadline_tick:
+            self._end_resume("deadline")
         mission = view.mission
         for obj in mission.visible_objects:
             self.explorer.known[obj.object_id] = obj
         position = (mission.x, mission.y)
+        self._retry_cleanup(mission)
         distance = (
             hypot(position[0] - self.last_seen[0], position[1] - self.last_seen[1])
             if self.last_seen is not None
@@ -333,7 +570,8 @@ class EvasiveExplorerBot:
         if self.fleeing and (
             self.last_seen is None
             or (
-                distance >= self.settings.safe_distance
+                view.visible_alien is not None
+                and distance >= self.settings.safe_distance
                 and self.tick - self.flee_started >= self.hold_ticks
             )
         ):
@@ -345,19 +583,39 @@ class EvasiveExplorerBot:
             # Resume a public mission/exploration route instead of paying a pending
             # stationary scan immediately after retreat. Arrival scans still apply.
             self.explorer.scanning = 0
+            self._start_resume("memory_expired" if self.last_seen is None else "visible_separation")
+            if self.retry_pending is not None:
+                self.retry_exit_token = self.flee_entries
         if (
             not self.fleeing
             and self.last_seen is not None
             and distance <= self.settings.enter_distance
         ):
+            self._retry_entry_candidate = self._retry_interrupted_anchor(view)
             self._begin_flee()
         if self._ready_interaction(mission):
+            self._end_resume("interaction_ready")
             return SurvivorCommand(interact=True)
         approach = self._exit_approach(mission)
         if approach is not None:
             return approach
         if not self.fleeing:
-            return self.explorer.command(mission)
+            if not self._retry_wanted_known(mission):
+                self._retry_reselect(mission)
+            command = self.explorer.command(mission, move_while_turning=self.resume_active)
+            reason = self.explorer.last_command_reason
+            if reason == "arrived":
+                for anchor_id in tuple(self.retry_records):
+                    point = self.explorer.points[anchor_id]
+                    if hypot(position[0] - point[0], position[1] - point[1]) < 1e-8:
+                        self._retry_drop(anchor_id)
+            if not self._retry_wanted_known(mission) and self.explorer.navigator.path:
+                self._retry_public_command_anchor = self._retry_anchor_ids.get(
+                    self.explorer.explore_target
+                )
+            if reason in ("aligned", "arrived", "interaction", "no_path", "no_target"):
+                self._end_resume(reason)
+            return command
         self.flee_ticks += 1
         arrived = (
             self.escape_target is not None

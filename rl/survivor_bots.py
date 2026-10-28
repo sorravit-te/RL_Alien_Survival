@@ -7,7 +7,7 @@ uses center visibility (conservative vs a partially visible human sprite).
 """
 
 from dataclasses import dataclass
-from math import atan2, ceil, hypot, pi, radians
+from math import atan2, ceil, cos, hypot, pi, radians, sin
 
 from ai.navigation import Navigator
 from game.interaction import segment_clear
@@ -68,8 +68,11 @@ class ExplorerBot:
         self.explore_target = None
         self.scanning = self.scan_ticks
         self.navigator = Navigator()
+        self.last_command_reason = "reset"
 
-    def command(self, view):
+    def command(self, view, *, move_while_turning=False):
+        """Default commands stay unchanged; RESUME may project walking through yaw."""
+        self.last_command_reason = None
         for obj in view.visible_objects:
             self.known[obj.object_id] = obj
         wanted = "exit" if view.has_keycard else "keycard"
@@ -89,35 +92,60 @@ class ExplorerBot:
                 and abs(angle) <= self.config.interaction_half_angle
                 and segment_clear(self.geometry, view.x, view.y, *target)
             ):
+                self.last_command_reason = "interaction"
                 return SurvivorCommand(interact=True)  # one new press; Core commits it now
             self.scanning = 0
         else:
-            if (
+            # Select once, then apply the same arrival rules to new and existing targets.
+            if self.explore_target is None and not self.scanning:
+                self.explore_target = next((p for p in self.order if p not in self.visited), None)
+                if self.explore_target is None:
+                    if not self.order:
+                        self.last_command_reason = "no_target"
+                        return SurvivorCommand()
+                    self.visited.clear()
+                    self.explore_target = self.order[0]
+            arrived = (
                 self.explore_target is not None
                 and hypot(view.x - self.explore_target[0], view.y - self.explore_target[1]) < 1e-8
-            ):
+            )
+            if arrived:
                 self.visited.add(self.explore_target)
                 self.explore_target = None
                 self.scanning = self.scan_ticks
             if self.scanning:
                 self.scanning -= 1
+                self.last_command_reason = "arrived" if arrived else "scan"
                 return SurvivorCommand(yaw_delta=self.turn_per_tick)
-            if self.explore_target is None:
-                self.explore_target = next((p for p in self.order if p not in self.visited), None)
-                if self.explore_target is None:
-                    self.visited.clear()
-                    self.explore_target = self.order[0]
             target = self.explore_target
         self.navigator.set_target(self.geometry, position, target, self.config.radius)
         dx, dy = self.navigator.displacement(position, self.config.walk_speed / self.config.tick_hz)
         if hypot(dx, dy) < 1e-12:
+            if mission is not None and hypot(target[0] - view.x, target[1] - view.y) < 1e-8:
+                # Navigator can prune a tiny final segment before the yaw requirement is met.
+                # Arrival still ends RESUME; turn toward E without inventing a route failure.
+                self.last_command_reason = "arrived"
+                turn = max(-self.turn_per_tick, min(self.turn_per_tick, angle))
+                return SurvivorCommand(yaw_delta=turn)
+            self.last_command_reason = "no_path"
             if mission is None:
                 self.visited.add(target)
                 self.explore_target = None
             return SurvivorCommand()
         error = (atan2(dy, dx) - view.yaw + pi) % (2 * pi) - pi
         turn = max(-self.turn_per_tick, min(self.turn_per_tick, error))
-        if abs(error) > self.turn_per_tick + 1e-12:
+        aligned = abs(error) <= self.turn_per_tick + 1e-12
+        self.last_command_reason = "aligned" if aligned else "turning"
+        if move_while_turning:
+            # Core rotates first; preserve the navigator's global walk displacement.
+            yaw = view.yaw + turn
+            scale = self.config.tick_hz / self.config.walk_speed
+            return SurvivorCommand(
+                forward=max(-1.0, min(1.0, (dx * cos(yaw) + dy * sin(yaw)) * scale)),
+                strafe=max(-1.0, min(1.0, (-dx * sin(yaw) + dy * cos(yaw)) * scale)),
+                yaw_delta=turn,
+            )
+        if not aligned:
             return SurvivorCommand(yaw_delta=turn)
         distance = hypot(dx, dy)
         return SurvivorCommand(
