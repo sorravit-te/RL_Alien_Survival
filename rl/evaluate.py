@@ -4,6 +4,7 @@ import argparse
 import contextlib
 import csv
 import hashlib
+import json
 import random
 from math import sqrt
 from pathlib import Path
@@ -114,6 +115,8 @@ def evaluate(
         "first_sight",
         "action_sha256",
     ]
+    if config.get("search_metrics"):
+        fields += ["search_metrics"]
     if explicit:
         fields += [
             "controller",
@@ -191,6 +194,8 @@ def evaluate(
                     **components,
                     "action_sha256": actions.hexdigest(),
                 }
+                if config.get("search_metrics"):
+                    row["search_metrics"] = info["search_metrics"]
                 if explicit:
                     row.update(
                         controller=controller_name,
@@ -202,7 +207,12 @@ def evaluate(
                         evaluation_role=evaluation_role,
                     )
                 rows.append(row)
-                writer.writerow(row)
+                csv_row = dict(row)
+                if "search_metrics" in csv_row:
+                    csv_row["search_metrics"] = json.dumps(
+                        csv_row["search_metrics"], sort_keys=True
+                    )
+                writer.writerow(csv_row)
                 handle.flush()
                 if (index + 1) % 10 == 0 or index + 1 == len(cases):
                     s = summarize(rows)
@@ -337,6 +347,14 @@ def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
             )
             rows.extend(repeat_rows)
         summaries[name] = summarize_cases(rows, inference)
+        if config.get("search_metrics"):
+            from rl.search_metrics import summarize_search
+
+            summaries[name]["search"] = summarize_search(rows)
+            for case_summary in summaries[name]["per_case"]:
+                case_summary["search"] = summarize_search(
+                    [r for r in rows if r["id"] == case_summary["id"]]
+                )
         summaries[name]["evaluation_role"] = rows[0]["evaluation_role"]
         all_rows[name] = rows
     write_json(output_dir / "summary.json", summaries)

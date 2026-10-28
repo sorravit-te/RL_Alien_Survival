@@ -347,6 +347,18 @@ def plot_curves(run, baseline, test):
     plt.close(fig)
 
 
+def validate_fresh_start(config, metadata):
+    """Fresh pilot must originate from this run's compatible, unoptimized baseline."""
+    if config.get("fresh_run") and (
+        metadata.get("role") != "untrained"
+        or metadata.get("actual_steps") != 0
+        or metadata.get("optimizer_update_epochs") != 0
+        or metadata.get("training_seed") != config["training_seed"]
+        or metadata.get("config_sha256") != digest(config)
+    ):
+        raise ValueError("Fresh run requires its own zero-step, zero-update untrained policy")
+
+
 def pilot(run):
     config, manifest, source = read_run(run)
     baseline = read_json(run / "baseline_summary.json")
@@ -363,6 +375,7 @@ def pilot(run):
         model, untrained_meta = load_checkpoint(
             run / "checkpoints/untrained.zip", config, source, env
         )
+        validate_fresh_start(config, untrained_meta)
         model.set_logger(configure(str(run / "tensorboard"), ["csv", "tensorboard"]))
         callback = PilotCallback(run, config, manifest["splits"]["validation"], source)
         expected = (
@@ -562,7 +575,11 @@ def complete_sampled_pilot(
             "fresh_load_reproduced_actions_and_episodes": True,
         },
     )
-    test, _ = final_sampled_test(run)
+    # New scene pilots stop before held-out runtime unless separately invoked.
+    if config.get("defer_final_test", False):
+        test = None
+    else:
+        test, _ = final_sampled_test(run)
     result = {
         "evaluation_mode": "sampled_primary_argmax_secondary",
         "requested_steps": config["requested_steps"],
@@ -575,6 +592,7 @@ def complete_sampled_pilot(
         "baseline_validation": baseline,
         "best_validation": reproduced,
         "test": test,
+        "test_status": "deferred_pending_separate_authorization" if test is None else "complete",
         "weights_changed": parameter_hash(model) != untrained_meta["policy_sha256"],
         "fresh_load_reproduced": True,
         "training_episodes": sum(callback.counts.values()),
@@ -592,7 +610,9 @@ def complete_sampled_pilot(
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--phase", choices=("prepare", "baselines", "pilot"), required=True)
+    parser.add_argument(
+        "--phase", choices=("prepare", "baselines", "pilot", "final-test"), required=True
+    )
     parser.add_argument("--config", type=Path, default=Path("configs/training_pilot.json"))
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
@@ -602,7 +622,9 @@ def main():
         return
     with live_log(args.run_dir / "run.log"):
         try:
-            (baselines if args.phase == "baselines" else pilot)(args.run_dir)
+            {"baselines": baselines, "pilot": pilot, "final-test": final_sampled_test}[args.phase](
+                args.run_dir
+            )
         except Exception:
             import traceback
 

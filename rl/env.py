@@ -14,7 +14,7 @@ from gymnasium import spaces
 
 from ai.navigation import find_path
 from game.core import GameCore
-from game.map import small_test_map
+from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
 from rl.contract import ACTION_COUNT, DECISION_TICKS, OBSERVATION_SIZE, VERSION, WAIT, WORLD_SCALE
@@ -37,8 +37,21 @@ class AlienEnv(gym.Env):
         max_episode_seconds=600,
         bot_kind="explorer",
         evasion_settings=None,
+        scenario=None,
+        search_metrics=False,
     ):
-        self.world = world_map if world_map is not None else small_test_map()
+        if world_map is not None and scenario is not None:
+            raise ValueError("Use a named scenario or a custom world, never both")
+        if type(search_metrics) is not bool:
+            raise ValueError("search_metrics must be boolean")
+        self.scenario = DEFAULT_SCENARIO if world_map is None and scenario is None else scenario
+        self.search_metrics = search_metrics
+        self.metrics = None
+        self.world = (
+            world_map
+            if world_map is not None
+            else (scenario_map() if scenario is None else scenario_map(scenario))
+        )
         self.config = config if config is not None else CoreConfig()
         if not isfinite(max_episode_seconds) or max_episode_seconds <= 0:
             raise ValueError("Episode cap must be finite and positive")
@@ -116,6 +129,10 @@ class AlienEnv(gym.Env):
         self.reward_tracker = RewardTracker()
         self.last_action = WAIT
         self.visit_ticks = [None] * len(self.world.patrol_waypoints)
+        if self.search_metrics:
+            from rl.search_metrics import SearchMetrics
+
+            self.metrics = SearchMetrics()
         self.elapsed_ticks = 0
         self._done = False
         return build_observation(self._allowed_view()), {
@@ -139,6 +156,7 @@ class AlienEnv(gym.Env):
         applied = WAIT if invalid else action
         self.last_action = applied
         chosen = candidates[applied]
+        before_selection = self.core.snapshot() if self.metrics is not None else None
         self.core.set_alien_target(
             chosen.target,
             source=(
@@ -152,6 +170,10 @@ class AlienEnv(gym.Env):
             ),
             evidence_revision=chosen.evidence_revision,
         )
+        if self.metrics is not None:
+            self.metrics.decision(
+                before_selection, self.core.snapshot(), candidates[21].valid, applied
+            )
         components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
         ticks = 0
         snapshot = self.core.snapshot()
@@ -167,6 +189,8 @@ class AlienEnv(gym.Env):
             )
             command = self.bot.command(view)
             snapshot = self.core.step(command)
+            if self.metrics is not None:
+                self.metrics.tick(before, snapshot)
             ticks += 1
             self.elapsed_ticks += 1
             for name, value in self.reward_tracker.collect(
@@ -197,6 +221,8 @@ class AlienEnv(gym.Env):
             "truncation_reason": "external_time_cap" if truncated else None,
             "action_masks": self.action_masks(),
         }
+        if self.metrics is not None and self._done:
+            info["search_metrics"] = self.metrics.finish(snapshot)
         return (
             build_observation(self._allowed_view()),
             float(sum(components.values())),

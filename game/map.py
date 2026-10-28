@@ -103,3 +103,47 @@ def small_test_map() -> WorldMap:
         alien_spawn=(9.5, 7.5, -pi / 2),
         patrol_waypoints=((9.5, 7.5), (9.5, 4.5), (5.5, 4.5), (5.5, 2.5), (2.5, 2.5), (2.5, 5.5)),
     )
+
+
+DEFAULT_SCENARIO = "small_test_map_v1"
+SCENARIOS = (DEFAULT_SCENARIO, "occluded_loop_dev_v1")
+
+
+def scenario_map(name=DEFAULT_SCENARIO) -> WorldMap:
+    """Explicit opt-in scene factory; the playable default remains small_test_map."""
+    if name == DEFAULT_SCENARIO:
+        return small_test_map()
+    if name != "occluded_loop_dev_v1":
+        raise ValueError(f"Unknown scenario: {name!r}")
+    # Reviewed fixed DEV world. Keep object/order/waypoint identity exact.
+    return WorldMap(
+        (
+            "################",
+            "#..............#",
+            "#..............#",
+            "#..............#",
+            "#....######....#",
+            "#....######....#",
+            "#....######....#",
+            "#....######....#",
+            "#....######....#",
+            "#....######....#",
+            "#....######....#",
+            "#..............#",
+            "#........##....#",
+            "#........##....#",
+            "#........##....#",
+            "################",
+        ),
+        ((2.5, 11.5), (2.5, 13.5)),
+        (MapObject("keycard", "keycard", 2.5, 2.5), MapObject("exit", "exit", 13.5, 13.5)),
+        alien_spawn=(13.5, 2.5, pi),
+        patrol_waypoints=(
+            (2.5, 2.5),
+            (2.5, 13.5),
+            (13.5, 13.5),
+            (13.5, 2.5),
+            (4.5, 11.5),
+            (11.5, 11.5),
+        ),
+    )

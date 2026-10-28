@@ -36,6 +36,17 @@ def positive_integer(value):
 
 def validate_protocol(training, evaluation):
     try:
+        if "scenario" in training or "scenario" in evaluation:
+            from game.map import DEFAULT_SCENARIO
+            from rl.pipeline import configured_map_identity
+
+            scenario = training.get("scenario", DEFAULT_SCENARIO)
+            identity = configured_map_identity(training)
+            if (
+                evaluation.get("scenario") != scenario
+                or evaluation.get("scenario_sha256") != identity["sha256"]
+            ):
+                raise ValueError("Training and evaluation scenario mismatch")
         if (
             training["bot_kind"] != "evasive_explorer"
             or type(training["n_envs"]) is not int
@@ -160,6 +171,7 @@ def evaluation_budget(config):
 
 
 def frozen_protocol(config):
+    from game.map import DEFAULT_SCENARIO
     from rl.pipeline import digest, make_manifest
 
     if not config.get("evaluation_protocol"):
@@ -169,7 +181,9 @@ def frozen_protocol(config):
         raise ValueError("Sampled evaluation requires a prepared frozen protocol")
     protocol = frozen["protocol"]
     validate_protocol(config, protocol)
-    manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])
+    manifest = make_manifest(
+        config["manifest_seed"], config["manifest_counts"], config.get("scenario", DEFAULT_SCENARIO)
+    )
     if (
         digest(protocol) != frozen["protocol_sha256"]
         or digest(sampling_schedule(protocol, manifest)) != frozen["schedule_sha256"]

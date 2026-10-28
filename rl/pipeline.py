@@ -16,7 +16,8 @@ import numpy as np
 import torch
 from sb3_contrib import MaskablePPO
 
-from game.map import small_test_map
+from game.map import DEFAULT_SCENARIO, scenario_map
+from game.state import CoreConfig
 from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, VERSION
 from rl.env import AlienEnv
 from rl.evasive_survivor import EvasionConfig
@@ -79,10 +80,10 @@ def source_state():
     return {"revision": revision, "source_sha256": source_hash, "dirty_status": dirty}
 
 
-def map_identity():
-    world = small_test_map()
+def map_identity(scenario=DEFAULT_SCENARIO):
+    world = scenario_map(scenario)
     return {
-        "name": "small_test_map_v1",
+        "name": scenario,
         "sha256": digest(asdict(world)),
         "spawn_points": world.spawn_points,
         "card_exit_fixed": True,
@@ -90,7 +91,14 @@ def map_identity():
     }
 
 
-def make_manifest(seed, counts):
+def configured_map_identity(config):
+    identity = map_identity(config.get("scenario", DEFAULT_SCENARIO))
+    if "scenario" in config and config.get("scenario_sha256") != identity["sha256"]:
+        raise ValueError("Configured scenario full-world hash mismatch")
+    return identity
+
+
+def make_manifest(seed, counts, scenario=DEFAULT_SCENARIO):
     rng = np.random.default_rng(seed)
     used = set()
 
@@ -117,18 +125,62 @@ def make_manifest(seed, counts):
         ]
     return {
         "seed": seed,
-        "map": map_identity(),
+        "map": map_identity(scenario),
         "splits": splits,
         "warning": "Disjoint numeric seeds, same fixed layout/card/exit and two spawns.",
     }
 
 
+def read_json_value(value):
+    return json.loads(json.dumps(value))
+
+
+def validate_environment_config(config):
+    """Static readiness only; runtime navigation/actors require a separately approved smoke."""
+    from math import isfinite
+
+    from ai.navigation import find_path
+
+    configured_map_identity(config)
+    world = scenario_map(config.get("scenario", DEFAULT_SCENARIO))
+    core = CoreConfig()
+    cap = config["max_episode_seconds"]
+    if isinstance(cap, bool) or not isfinite(cap) or cap <= 0:
+        raise ValueError("Episode cap must be finite and positive")
+    if config["bot_kind"] not in ("explorer", "evasive_explorer"):
+        raise ValueError("Training requires a mission bot")
+    if type(config.get("search_metrics", False)) is not bool:
+        raise ValueError("search_metrics must be boolean")
+    for flag in ("fresh_run", "defer_final_test"):
+        if flag in config and type(config[flag]) is not bool:
+            raise ValueError(f"{flag} must be boolean")
+    settings = config.get("survivor_threat_settings")
+    if settings is not None:
+        if config["bot_kind"] != "evasive_explorer":
+            raise ValueError("Evasion settings require evasive_explorer")
+        EvasionConfig(**settings)
+    if max(world.width, world.height) > 40 or len(world.patrol_waypoints) > 20:
+        raise ValueError("World exceeds observation contract")
+    if world.alien_spawn is None:
+        raise ValueError("Scenario requires Alien spawn")
+    for point in (*world.spawn_points, world.alien_spawn[:2], *world.patrol_waypoints):
+        if world.overlaps(*point, core.alien_radius):
+            raise ValueError("Scenario lacks body clearance")
+    for point in world.patrol_waypoints:
+        if not find_path(world, world.alien_spawn[:2], point, core.alien_radius):
+            raise ValueError("Static policy waypoint is unreachable")
+    return map_identity(config.get("scenario", DEFAULT_SCENARIO))
+
+
 def make_env(config):
+    configured_map_identity(config)
     settings = config.get("survivor_threat_settings")
     return AlienEnv(
         max_episode_seconds=config["max_episode_seconds"],
         bot_kind=config["bot_kind"],
         evasion_settings=EvasionConfig(**settings) if settings is not None else None,
+        scenario=config.get("scenario", DEFAULT_SCENARIO),
+        search_metrics=config.get("search_metrics", False),
     )
 
 
@@ -190,6 +242,7 @@ def save_checkpoint(
 ):
     from rl.evaluation_protocol import frozen_protocol
 
+    configured_map_identity(config)
     protocol = frozen_protocol(config)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -207,12 +260,16 @@ def save_checkpoint(
         "config_sha256": digest(config),
         "config": config,
         "manifest_sha256": digest(
-            make_manifest(config["manifest_seed"], config["manifest_counts"])
+            make_manifest(
+                config["manifest_seed"],
+                config["manifest_counts"],
+                config.get("scenario", DEFAULT_SCENARIO),
+            )
         ),
         "contract_version": VERSION,
         "observation_shape": [OBSERVATION_SIZE],
         "action_n": ACTION_COUNT,
-        "map": map_identity(),
+        "map": configured_map_identity(config),
         "dependencies": dependencies(),
         "training_seed": config["training_seed"],
         "bot_kind": config["bot_kind"],
@@ -238,6 +295,7 @@ def save_checkpoint(
 def load_checkpoint(path, config, fingerprint, env=None):
     from rl.evaluation_protocol import frozen_protocol
 
+    configured_map_identity(config)
     protocol = frozen_protocol(config)
     path = Path(path)
     metadata = read_json(path.with_suffix(".metadata.json"))
@@ -248,7 +306,11 @@ def load_checkpoint(path, config, fingerprint, env=None):
         "config_sha256": digest(config),
         "config": config,
         "manifest_sha256": digest(
-            make_manifest(config["manifest_seed"], config["manifest_counts"])
+            make_manifest(
+                config["manifest_seed"],
+                config["manifest_counts"],
+                config.get("scenario", DEFAULT_SCENARIO),
+            )
         ),
         "dependencies": dependencies(),
         "format": CHECKPOINT_FORMAT,
@@ -260,8 +322,14 @@ def load_checkpoint(path, config, fingerprint, env=None):
             raise ValueError(f"Checkpoint metadata mismatch: {name}")
     if metadata["source"]["source_sha256"] != fingerprint["source_sha256"]:
         raise ValueError("Checkpoint metadata mismatch: source")
-    if metadata["map"]["sha256"] != map_identity()["sha256"]:
+    if digest(metadata.get("map")) != digest(configured_map_identity(config)):
         raise ValueError("Checkpoint metadata mismatch: map")
+    if env is not None:
+        actual_env = env.unwrapped
+        if digest(asdict(actual_env.world)) != metadata["map"][
+            "sha256"
+        ] or actual_env.scenario != config.get("scenario", DEFAULT_SCENARIO):
+            raise ValueError("Checkpoint metadata mismatch: environment scenario")
     if file_hash(path) != metadata["checkpoint_sha256"]:
         raise ValueError("Checkpoint file hash mismatch")
     model = MaskablePPO.load(str(path), env=env, device="cpu")
@@ -305,7 +373,9 @@ def prepare_run(run_dir, config):
         validate_protocol(config, protocol)
     else:
         protocol = None
-    manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])
+    manifest = make_manifest(
+        config["manifest_seed"], config["manifest_counts"], config.get("scenario", DEFAULT_SCENARIO)
+    )
     if protocol is not None:
         schedule = sampling_schedule(protocol, manifest)
         budget = evaluation_budget(config)
@@ -316,9 +386,8 @@ def prepare_run(run_dir, config):
             "schedule_sha256": digest(schedule),
             "budget_sha256": digest(budget),
         }
-    # Fail before creating any run if bot/settings cannot be constructed.
-    env = make_env(config)
-    env.close()
+    # Preparation is static: no Core construction/reset/rollout or policy creation.
+    validate_environment_config(config)
     fingerprint = source_state()
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=False)
@@ -360,6 +429,12 @@ def read_run(run_dir):
         or digest(manifest) != identity["manifest_sha256"]
     ):
         raise ValueError("Frozen run config/manifest changed")
+    configured_map_identity(config)
+    expected_manifest = make_manifest(
+        config["manifest_seed"], config["manifest_counts"], config.get("scenario", DEFAULT_SCENARIO)
+    )
+    if manifest != read_json_value(expected_manifest):
+        raise ValueError("Frozen manifest/scenario identity mismatch")
     if source_state()["source_sha256"] != identity["source"]["source_sha256"]:
         raise ValueError("Source changed after run preparation")
     if dependencies() != identity["dependencies"]:
