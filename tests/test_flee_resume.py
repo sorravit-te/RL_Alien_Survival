@@ -1,6 +1,6 @@
 """Flee-to-mission handoff regressions: filtered inputs, no Core scenarios."""
 
-from math import pi
+from math import hypot, pi
 
 import numpy as np
 import pytest
@@ -49,7 +49,7 @@ def retreating():
     return subject
 
 
-@pytest.mark.parametrize("reason", ["safe_distance", "memory_expiry"])
+@pytest.mark.parametrize("reason", ["visible_separation", "memory_expiry"])
 @pytest.mark.parametrize("pending_scan", [90, 30, 0])
 def test_exit_replans_public_route_without_pending_stationary_scan(reason, pending_scan):
     subject = retreating()
@@ -57,21 +57,27 @@ def test_exit_replans_public_route_without_pending_stationary_scan(reason, pendi
     subject.explorer.scanning = pending_scan
     if reason == "memory_expiry":
         subject.last_seen_age_ticks = 59
-    command = subject.command(SurvivorThreatView(SurvivorView(2.5, 5.5, pi, False, ())))
+    view = SurvivorView(2.5, 5.5, 0 if reason == "visible_separation" else pi, False, ())
+    visible = (9.5, 5.5) if reason == "visible_separation" else None
+    command = subject.command(SurvivorThreatView(view, visible))
     assert not subject.fleeing and subject.escape_target is None
     assert subject.explorer.scanning == 0
     assert subject.explorer.navigator is not old and subject.explorer.navigator.path != old.path
     assert subject.explorer.explore_target == subject.explorer.navigator.target == (1.5, 5.5)
-    assert command.forward > 0 and not command.running and not command.interact
+    assert (
+        hypot(command.forward, command.strafe) > 0 and not command.running and not command.interact
+    )
     assert subject.explorer.known == {}
-    if reason == "safe_distance":
-        assert subject.last_seen == (9.5, 5.5) and subject.last_seen_age_ticks == 33
+    if reason == "visible_separation":
+        assert subject.last_seen == (9.5, 5.5) and subject.last_seen_age_ticks == 0
+        assert subject.resume_entry_reason == "visible_separation"
     else:
         assert subject.last_seen is subject.last_seen_age_ticks is None
 
 
 def test_arrival_scan_remains_enabled_after_resume():
     subject = retreating()
+    subject.last_seen_age_ticks = 59
     subject.command(SurvivorThreatView(SurvivorView(2.5, 5.5, pi, False, ())))
     # Synthetic own-state at the public waypoint; no movement simulation.
     command = subject.command(SurvivorThreatView(SurvivorView(1.5, 5.5, pi, False, ())))
@@ -99,6 +105,7 @@ def test_new_visible_threat_refreshes_memory_and_keeps_retreat():
 
 def test_discovered_interaction_still_takes_priority_after_exit():
     subject = retreating()
+    subject.last_seen_age_ticks = 59
     card = MapObject("visible_card", "keycard", 1.9, 5.5)
     command = subject.command(SurvivorThreatView(SurvivorView(2.5, 5.5, pi, False, (card,))))
     assert not subject.fleeing and subject.explorer.scanning == 0
@@ -124,6 +131,8 @@ def test_hidden_world_changes_cannot_refresh_memory_or_alter_resume():
     assert subjects[0].last_seen == subjects[1].last_seen == (9.5, 5.5)
     assert subjects[0].last_seen_age_ticks == subjects[1].last_seen_age_ticks == 33
     assert not subjects[0].explorer.known and not subjects[1].explorer.known
+    assert subjects[0].fleeing and subjects[1].fleeing
+    assert not subjects[0].resume_active and not subjects[1].resume_active
 
 
 def test_no_threat_still_matches_original_explorer_initial_scan():
