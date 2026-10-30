@@ -45,6 +45,9 @@ dist/
 htmlcov/
 coverage.xml
 
+# Local Claude Code settings and hooks
+/.claude/
+
 # Training output written outside experiments/
 /runs/
 /checkpoints/
