@@ -44,7 +44,7 @@
       "id": "run",
       "type": "promptString",
       "description": "Run folder inside experiments/",
-      "default": "pursuit_tracking_pilot_v2"
+      "default": "waypoint_commitment_pilot_v1"
     }
   ]
 }
