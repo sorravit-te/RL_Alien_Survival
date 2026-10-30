@@ -6,9 +6,9 @@ pre-motion pose used by that tick's sole native sensor. Only wall-only losses
 """
 
 from copy import deepcopy
-from math import atan2, hypot, pi
+from math import atan2, hypot
 
-from game.interaction import segment_clear
+from game.interaction import angle_difference, segment_clear
 from rl.search_control_metrics import SearchControlMetrics
 
 VERSION = "wall-search-metrics-v3-pursuit-tracking"
@@ -26,7 +26,7 @@ def wall_only_loss(before):
     a, s, c = before.alien, before.survivor, before.config
     dx, dy = s.x - a.x, s.y - a.y
     distance = hypot(dx, dy)
-    angle = abs((atan2(dy, dx) - a.yaw + pi) % (2 * pi) - pi) if distance else 0
+    angle = abs(angle_difference(atan2(dy, dx), a.yaw)) if distance else 0
     in_sensor = distance <= c.alien_near_range or (
         distance <= c.alien_sight_range and angle <= c.alien_fov / 2
     )

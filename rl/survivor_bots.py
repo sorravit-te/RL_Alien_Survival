@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from math import atan2, ceil, cos, hypot, pi, radians, sin
 
 from ai.navigation import Navigator
-from game.interaction import segment_clear
+from game.interaction import angle_difference, segment_clear
 from game.map import WorldMap
 from game.state import SurvivorCommand
 
@@ -24,13 +24,25 @@ class SurvivorView:
     visible_objects: tuple
 
 
+def move_command(dx, dy, yaw, turn, config, *, running=False):
+    """Command for world displacement (dx, dy); Core rotates first, then moves in that frame."""
+    yaw += turn
+    scale = config.tick_hz / (config.run_speed if running else config.walk_speed)
+    return SurvivorCommand(
+        forward=max(-1.0, min(1.0, (dx * cos(yaw) + dy * sin(yaw)) * scale)),
+        strafe=max(-1.0, min(1.0, (-dx * sin(yaw) + dy * cos(yaw)) * scale)),
+        yaw_delta=turn,
+        running=running,
+    )
+
+
 def observe_survivor(world, survivor, has_keycard):
     visible = []
     for obj in world.objects:
         if obj.kind == "keycard" and has_keycard:
             continue
         dx, dy = obj.x - survivor.x, obj.y - survivor.y
-        angle = abs((atan2(dy, dx) - survivor.yaw + pi) % (2 * pi) - pi) if hypot(dx, dy) else 0
+        angle = abs(angle_difference(atan2(dy, dx), survivor.yaw)) if hypot(dx, dy) else 0
         if angle <= radians(75) / 2 and segment_clear(world, survivor.x, survivor.y, obj.x, obj.y):
             visible.append(obj)
     return SurvivorView(
@@ -86,7 +98,7 @@ class ExplorerBot:
         if mission is not None:
             target = (mission.x, mission.y)
             dx, dy = mission.x - view.x, mission.y - view.y
-            angle = (atan2(dy, dx) - view.yaw + pi) % (2 * pi) - pi if hypot(dx, dy) else 0.0
+            angle = angle_difference(atan2(dy, dx), view.yaw) if hypot(dx, dy) else 0.0
             if (
                 hypot(dx, dy) <= self.config.interaction_range
                 and abs(angle) <= self.config.interaction_half_angle
@@ -132,19 +144,13 @@ class ExplorerBot:
                 self.visited.add(target)
                 self.explore_target = None
             return SurvivorCommand()
-        error = (atan2(dy, dx) - view.yaw + pi) % (2 * pi) - pi
+        error = angle_difference(atan2(dy, dx), view.yaw)
         turn = max(-self.turn_per_tick, min(self.turn_per_tick, error))
         aligned = abs(error) <= self.turn_per_tick + 1e-12
         self.last_command_reason = "aligned" if aligned else "turning"
         if move_while_turning:
-            # Core rotates first; preserve the navigator's global walk displacement.
-            yaw = view.yaw + turn
-            scale = self.config.tick_hz / self.config.walk_speed
-            return SurvivorCommand(
-                forward=max(-1.0, min(1.0, (dx * cos(yaw) + dy * sin(yaw)) * scale)),
-                strafe=max(-1.0, min(1.0, (-dx * sin(yaw) + dy * cos(yaw)) * scale)),
-                yaw_delta=turn,
-            )
+            # Preserve the navigator's global walk displacement while turning.
+            return move_command(dx, dy, view.yaw, turn, self.config)
         if not aligned:
             return SurvivorCommand(yaw_delta=turn)
         distance = hypot(dx, dy)

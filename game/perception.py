@@ -1,9 +1,9 @@
 """Privileged sensing boundary. Only confirmed snapshots leave this module."""
 
 from dataclasses import dataclass
-from math import atan2, ceil, hypot, pi
+from math import atan2, ceil, hypot
 
-from game.interaction import segment_clear
+from game.interaction import angle_difference, segment_clear
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class PerceptionSnapshot:
 def update_perception(world, alien, survivor, previous, config):
     dx, dy = survivor.x - alien.x, survivor.y - alien.y
     distance = hypot(dx, dy)
-    angle = abs((atan2(dy, dx) - alien.yaw + pi) % (2 * pi) - pi) if distance else 0
+    angle = abs(angle_difference(atan2(dy, dx), alien.yaw)) if distance else 0
     in_sensor = distance <= config.alien_near_range or (
         distance <= config.alien_sight_range and angle <= config.alien_fov / 2
     )

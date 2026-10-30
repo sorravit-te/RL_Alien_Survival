@@ -3,6 +3,11 @@
 from math import atan2, floor, hypot, pi
 
 
+def angle_difference(a, b):
+    """Signed a - b wrapped into [-pi, pi)."""
+    return (a - b + pi) % (2 * pi) - pi
+
+
 def segment_clear(world, x0, y0, x1, y1):
     """Closed segment vs solid tile boxes; touching a solid corner is occluded."""
     dx, dy = x1 - x0, y1 - y0
@@ -33,7 +38,7 @@ def select_target(world, survivor, config, has_keycard):
         distance = hypot(dx, dy)
         if distance > config.interaction_range:
             continue
-        angle = abs((atan2(dy, dx) - survivor.yaw + pi) % (2 * pi) - pi) if distance else 0
+        angle = abs(angle_difference(atan2(dy, dx), survivor.yaw)) if distance else 0
         if angle > config.interaction_half_angle:
             continue
         if segment_clear(world, survivor.x, survivor.y, obj.x, obj.y):

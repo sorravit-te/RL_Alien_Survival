@@ -4,11 +4,11 @@ import json
 from dataclasses import asdict
 from datetime import datetime, timezone
 from hashlib import sha256
-from math import atan2, pi
+from math import atan2
 from pathlib import Path
 from time import perf_counter
 
-from game.interaction import segment_clear
+from game.interaction import angle_difference, segment_clear
 from game.state import SurvivorCommand
 
 EXPERIMENTS_ROOT = Path(__file__).resolve().parents[1] / "experiments"
@@ -226,7 +226,7 @@ class GameplayRecorder:
     def _geometry(snapshot):
         alien, survivor = snapshot.alien, snapshot.survivor
         bearing = abs(
-            (atan2(survivor.y - alien.y, survivor.x - alien.x) - alien.yaw + pi) % (2 * pi) - pi
+            angle_difference(atan2(survivor.y - alien.y, survivor.x - alien.x), alien.yaw)
         )
         return {
             "line_of_sight": segment_clear(

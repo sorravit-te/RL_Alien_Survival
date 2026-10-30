@@ -4,6 +4,7 @@ from dataclasses import replace
 from math import floor, pi
 
 from app.input import InputState
+from game.interaction import angle_difference
 from game.motion import segment_has_clearance
 
 
@@ -90,7 +91,7 @@ class FixedStepLoop:
         )
         if not safe or world.overlaps(x, y, radius):
             x, y = after.x, after.y
-        turn = (after.yaw - before.yaw + pi) % (2 * pi) - pi
+        turn = angle_difference(after.yaw, before.yaw)
         camera = replace(after, x=x, y=y, yaw=(before.yaw + turn * alpha) % (2 * pi))
         alien=self.current.alien
         prior=self.previous.alien

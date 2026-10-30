@@ -5,14 +5,14 @@ keeps expiring last-seen memory, and never receives Core/WorldSnapshot/AlienStat
 """
 
 from dataclasses import dataclass, replace
-from math import atan2, ceil, cos, hypot, isfinite, pi, radians, sin
+from math import atan2, ceil, hypot, isfinite, pi, radians
 
 import numpy as np
 
 from ai.navigation import Navigator, find_path
-from game.interaction import segment_clear
+from game.interaction import angle_difference, segment_clear
 from game.state import SurvivorCommand
-from rl.survivor_bots import ExplorerBot, SurvivorView, observe_survivor
+from rl.survivor_bots import ExplorerBot, SurvivorView, move_command, observe_survivor
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ def observe_threat(world, survivor, has_keycard, alien, settings):
     point = None
     if alien is not None:
         dx, dy = alien.x - survivor.x, alien.y - survivor.y
-        angle = abs((atan2(dy, dx) - survivor.yaw + pi) % (2 * pi) - pi)
+        angle = abs(angle_difference(atan2(dy, dx), survivor.yaw))
         if (
             hypot(dx, dy) <= settings.sight_range
             and angle <= radians(settings.fov_degrees) / 2
@@ -220,7 +220,7 @@ class EvasiveExplorerBot:
         wanted = "exit" if view.has_keycard else "keycard"
         for obj in self.explorer.known.values():
             dx, dy = obj.x - view.x, obj.y - view.y
-            angle = abs((atan2(dy, dx) - view.yaw + pi) % (2 * pi) - pi)
+            angle = abs(angle_difference(atan2(dy, dx), view.yaw))
             if (
                 obj.kind == "exit"
                 and self.last_seen is not None
@@ -344,10 +344,8 @@ class EvasiveExplorerBot:
             self._clear_exit_approach(unsafe=True)
             return None
         facing = atan2(goal.y - view.y, goal.x - view.x)
-        error = (facing - view.yaw + pi) % (2 * pi) - pi
+        error = angle_difference(facing, view.yaw)
         turn = max(-self.explorer.turn_per_tick, min(self.explorer.turn_per_tick, error))
-        yaw = view.yaw + turn
-        scale = self.config.tick_hz / self.config.walk_speed
         if hypot(dx, dy) > 1e-12:
             self.exit_approach_steps += 1
             self.exit_motion_audit = {
@@ -355,11 +353,7 @@ class EvasiveExplorerBot:
                 "clearance": self.settings.threat_clearance,
                 "predicted_min_clearance": clearance,
             }
-        return SurvivorCommand(
-            forward=max(-1.0, min(1.0, (dx * cos(yaw) + dy * sin(yaw)) * scale)),
-            strafe=max(-1.0, min(1.0, (-dx * sin(yaw) + dy * cos(yaw)) * scale)),
-            yaw_delta=turn,
-        )
+        return move_command(dx, dy, view.yaw, turn, self.config)
 
     def _retry_clear_pending(self):
         self.retry_pending = None
@@ -648,17 +642,10 @@ class EvasiveExplorerBot:
         dx, dy = self.navigator.displacement(position, self.config.run_speed / self.config.tick_hz)
         if hypot(dx, dy) < 1e-12:
             return SurvivorCommand()
-        error = (self._flee_facing(position, dx, dy) - mission.yaw + pi) % (2 * pi) - pi
+        error = angle_difference(self._flee_facing(position, dx, dy), mission.yaw)
         turn = max(-self.explorer.turn_per_tick, min(self.explorer.turn_per_tick, error))
-        yaw = mission.yaw + turn
-        scale = self.config.tick_hz / self.config.run_speed
-        # Core applies yaw first. Local backward/strafe movement retreats immediately while turning.
-        return SurvivorCommand(
-            forward=max(-1.0, min(1.0, (dx * cos(yaw) + dy * sin(yaw)) * scale)),
-            strafe=max(-1.0, min(1.0, (-dx * sin(yaw) + dy * cos(yaw)) * scale)),
-            yaw_delta=turn,
-            running=True,
-        )
+        # Local backward/strafe movement retreats immediately while turning.
+        return move_command(dx, dy, mission.yaw, turn, self.config, running=True)
 
 
 class WallLoopEvasiveBot(EvasiveExplorerBot):
