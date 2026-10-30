@@ -1,18 +1,21 @@
 """Explorer uses known static geometry and visible objects only, no Alien action."""
 
-from math import atan2, ceil, hypot, pi, radians
+from math import atan2, ceil, floor, hypot, inf, pi, radians
 
 from ai.navigation import Navigator
 from game.interaction import angle_difference, segment_clear
 from game.map import WorldMap
 from game.state import SurvivorCommand
+from rl.bots.stations import plan_stations
 from rl.bots.views import move_command
+
+ROUTE_JITTER = 8.0  # steps a station may lose to a nearer one, so routes differ by seed
 
 
 class ExplorerBot:
     label = "explorer_scripted"
 
-    def __init__(self, rows, config):
+    def __init__(self, rows, config, *, doors=()):
         # Copy geometry only. No undiscovered object positions, spawn list or Alien state.
         floors = tuple(
             (x + 0.5, y + 0.5)
@@ -25,17 +28,35 @@ class ExplorerBot:
         self.geometry = WorldMap(tuple(rows), (floors[0],))
         self.config = config
         self.points = tuple(p for p in floors if not self.geometry.overlaps(*p, config.radius))
+        # A deck with doors is searched room by room; other scenes roam every floor point.
+        self.stations, self.walk_steps = (
+            plan_stations(tuple(rows), self.points, tuple(doors)) if doors else (self.points, {})
+        )
         self.turn_per_tick = radians(120) / config.tick_hz
         self.scan_ticks = ceil(2 * pi / self.turn_per_tick)
 
     def reset(self, rng):
-        self.order = tuple(self.points[int(i)] for i in rng.permutation(len(self.points)))
+        self.order = tuple(self.stations[int(i)] for i in rng.permutation(len(self.stations)))
+        self.bias = {p: i * ROUTE_JITTER / len(self.order) for i, p in enumerate(self.order)}
         self.known = {}
         self.visited = set()
         self.explore_target = None
         self.scanning = self.scan_ticks
         self.navigator = Navigator()
         self.last_command_reason = "reset"
+
+    def _next_target(self, position):
+        waiting = [p for p in self.order if p not in self.visited]
+        if not waiting or not self.walk_steps:
+            return waiting[0] if waiting else None
+        here = (floor(position[0]) + 0.5, floor(position[1]) + 0.5)
+        return min(waiting, key=lambda p: self.walk_steps[p].get(here, inf) + self.bias[p])
+
+    def postpone_target(self):
+        """A deck search leaves a station it was chased from until the next sweep."""
+        if self.walk_steps and self.explore_target is not None:
+            self.visited.add(self.explore_target)
+            self.explore_target = None
 
     def command(self, view, *, move_while_turning=False):
         """Default commands stay unchanged; RESUME may project walking through yaw."""
@@ -67,7 +88,7 @@ class ExplorerBot:
         else:
             # Select once, then apply the same arrival rules to new and existing targets.
             if self.explore_target is None and not self.scanning:
-                self.explore_target = next((p for p in self.order if p not in self.visited), None)
+                self.explore_target = self._next_target(position)
                 if self.explore_target is None:
                     if not self.order:
                         self.last_command_reason = "no_target"

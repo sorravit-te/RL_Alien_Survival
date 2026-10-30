@@ -68,8 +68,8 @@ class EvasiveExplorerBot:
 
     label = "evasive_explorer_scripted"
 
-    def __init__(self, rows, config, settings=None):
-        self.explorer = ExplorerBot(rows, config)
+    def __init__(self, rows, config, settings=None, *, doors=()):
+        self.explorer = ExplorerBot(rows, config, doors=doors)
         self.config = config
         self.settings = settings if settings is not None else EvasionConfig()
         if (
@@ -208,6 +208,7 @@ class EvasiveExplorerBot:
     def _begin_flee(self):
         if not self.fleeing:
             self._end_resume("flee_entered")
+            self.explorer.postpone_target()
             self.fleeing = True
             self.flee_started = self.tick
             self.last_plan = -self.hold_ticks

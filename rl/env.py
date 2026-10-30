@@ -87,9 +87,11 @@ class AlienEnv(gym.Env):
         if evasion_settings is not None and bot_kind not in THREAT_BOT_KINDS:
             raise ValueError("Evasion settings require evasive bot kinds")
         self.bot = (
-            THREAT_BOTS[bot_kind](self.world.rows, self.config, evasion_settings)
+            THREAT_BOTS[bot_kind](
+                self.world.rows, self.config, evasion_settings, doors=self.world.doors
+            )
             if bot_kind in THREAT_BOT_KINDS
-            else ExplorerBot(self.world.rows, self.config)
+            else ExplorerBot(self.world.rows, self.config, doors=self.world.doors)
             if bot_kind == "explorer"
             else StationaryDebugBot()
         )

@@ -540,7 +540,7 @@ def test_environment_constructor_routing_with_mocked_actors_only(name, monkeypat
         return object()
 
     monkeypatch.setattr(environment, "GameCore", fake_core)
-    monkeypatch.setattr(environment, "ExplorerBot", lambda *a: object())
+    monkeypatch.setattr(environment, "ExplorerBot", lambda *a, **k: object())
     assembly = SimpleNamespace()  # No real AlienEnv instance, native Core or bot.
     ENV_INIT(assembly, scenario=name)
     expected = DEFAULT_SCENARIO if name is None else name

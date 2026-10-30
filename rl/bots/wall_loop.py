@@ -18,8 +18,8 @@ class WallLoopEvasiveBot(EvasiveExplorerBot):
     replan_on_arrival = True  # keep running: a reached cover point is not a hiding place
     cover_route_limit = 8.0  # world units of route to the next cover point
 
-    def __init__(self, rows, config, settings=None):
-        super().__init__(rows, config, settings)
+    def __init__(self, rows, config, settings=None, *, doors=()):
+        super().__init__(rows, config, settings, doors=doors)
         # Flee from any sighting inside the old safe band, keep fleeing until the threat
         # is at sight range, and remember it twice as long, like a player circling a block.
         s = self.settings
@@ -65,9 +65,9 @@ class EvasiveMixBot:
 
     wall_loop_probability = 0.5
 
-    def __init__(self, rows, config, settings=None):
-        self.plain = EvasiveExplorerBot(rows, config, settings)
-        self.wall_loop = WallLoopEvasiveBot(rows, config, settings)
+    def __init__(self, rows, config, settings=None, *, doors=()):
+        self.plain = EvasiveExplorerBot(rows, config, settings, doors=doors)
+        self.wall_loop = WallLoopEvasiveBot(rows, config, settings, doors=doors)
         self.settings = self.plain.settings
         self.active = self.plain
 
