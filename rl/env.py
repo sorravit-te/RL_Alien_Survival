@@ -29,12 +29,24 @@ from rl.contract import (
     search_contract,
     validate_search_control,
 )
-from rl.evasive_survivor import EvasiveExplorerBot, observe_threat
+from rl.evasive_survivor import (
+    EvasiveExplorerBot,
+    EvasiveMixBot,
+    WallLoopEvasiveBot,
+    observe_threat,
+)
 from rl.observations import build_observation
 from rl.rewards import RewardTracker
 from rl.survivor_bots import ExplorerBot, StationaryDebugBot, observe_survivor
 
-BOT_KINDS = ("explorer", "evasive_explorer", "stationary_debug")
+BOT_KINDS = ("explorer", "evasive_explorer", "stationary_debug", "wall_loop_evasive", "evasive_mix")
+# Bots that receive the LoS-filtered threat view and accept EvasionConfig.
+THREAT_BOT_KINDS = ("evasive_explorer", "wall_loop_evasive", "evasive_mix")
+THREAT_BOTS = {
+    "evasive_explorer": EvasiveExplorerBot,
+    "wall_loop_evasive": WallLoopEvasiveBot,
+    "evasive_mix": EvasiveMixBot,
+}
 
 
 class AlienEnv(gym.Env):
@@ -87,11 +99,11 @@ class AlienEnv(gym.Env):
         if bot_kind not in BOT_KINDS:
             raise ValueError("Unknown bot kind")
         self.bot_kind = bot_kind
-        if evasion_settings is not None and bot_kind != "evasive_explorer":
-            raise ValueError("Evasion settings require evasive_explorer")
+        if evasion_settings is not None and bot_kind not in THREAT_BOT_KINDS:
+            raise ValueError("Evasion settings require evasive bot kinds")
         self.bot = (
-            EvasiveExplorerBot(self.world.rows, self.config, evasion_settings)
-            if bot_kind == "evasive_explorer"
+            THREAT_BOTS[bot_kind](self.world.rows, self.config, evasion_settings)
+            if bot_kind in THREAT_BOT_KINDS
             else ExplorerBot(self.world.rows, self.config)
             if bot_kind == "explorer"
             else StationaryDebugBot()
@@ -144,7 +156,10 @@ class AlienEnv(gym.Env):
         if min(self.scenario_seed, self.bot_seed) < 0:
             raise ValueError("Seeds must be nonnegative")
         self.core.reset(self.scenario_seed)
-        self.bot.reset(np.random.default_rng(self.bot_seed))
+        if self.bot_kind == "evasive_mix":
+            self.bot.reset(np.random.default_rng(self.bot_seed), bot_seed=self.bot_seed)
+        else:
+            self.bot.reset(np.random.default_rng(self.bot_seed))
         self.reward_tracker = RewardTracker()
         self.last_action = WAIT
         self.visit_ticks = [None] * len(self.world.patrol_waypoints)
@@ -209,7 +224,7 @@ class AlienEnv(gym.Env):
                 observe_threat(
                     self.world, before.survivor, before.has_keycard, before.alien, self.bot.settings
                 )
-                if self.bot_kind == "evasive_explorer"
+                if self.bot_kind in THREAT_BOT_KINDS
                 else observe_survivor(self.world, before.survivor, before.has_keycard)
             )
             command = self.bot.command(view)
