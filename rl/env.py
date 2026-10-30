@@ -14,6 +14,7 @@ from gymnasium import spaces
 
 from ai.navigation import find_path
 from game.core import GameCore
+from game.doors import sight_world
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
 from rl.alien_view import allowed_view, record_waypoint_visits, target_source
@@ -172,7 +173,7 @@ class AlienEnv(gym.Env):
             before = self.core.snapshot()
             view = (
                 observe_threat(
-                    before.world_map,
+                    sight_world(before),
                     before.survivor,
                     before.has_keycard,
                     before.alien,
@@ -181,7 +182,10 @@ class AlienEnv(gym.Env):
                 )
                 if self.bot_kind in THREAT_BOT_KINDS
                 else observe_survivor(
-                    before.world_map, before.survivor, before.has_keycard, before.ruled_out_exits
+                    sight_world(before),
+                    before.survivor,
+                    before.has_keycard,
+                    before.ruled_out_exits,
                 )
             )
             command = self.bot.command(view)

@@ -8,6 +8,7 @@ from math import atan2
 from pathlib import Path
 from time import perf_counter
 
+from game.doors import sight_world
 from game.interaction import angle_difference, segment_clear
 from game.state import SurvivorCommand
 
@@ -230,7 +231,7 @@ class GameplayRecorder:
         )
         return {
             "line_of_sight": segment_clear(
-                snapshot.world_map, alien.x, alien.y, survivor.x, survivor.y
+                sight_world(snapshot), alien.x, alien.y, survivor.x, survivor.y
             ),
             "bearing_error_radians": bearing,
         }

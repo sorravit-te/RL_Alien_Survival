@@ -74,7 +74,7 @@
   "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
   "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
   "scenario": "occluded_loop_random_v1",
-  "scenario_sha256": "f578a895cf84f31b185068456c69b00c92a68371a837430fd93d965ac3a0fef1",
+  "scenario_sha256": "2a14286ecbf8e17c91caa5931fd8baa4c392e691db4027c69b7694133626bbb9",
   "search_control": "continue_cancel_waypoint_commitment_v1",
   "contract_version": "alien-vector-v6-scenario-randomization",
   "bot_mix": "evasive_mix: per case 50/50 plain vs wall-loop evasive bot, chosen from bot_seed"

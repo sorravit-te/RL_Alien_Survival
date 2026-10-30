@@ -57,11 +57,13 @@ STRIPES = {  # guide rail colors: the district language of the whole ship
     "stripe_engine": (1.0, 0.14, 0.06),
 }
 LIT_COPIES = ("ceiling3_lit", "ceiling4_lit")
+MADE = ("ceiling2_lit", "viewport", "hazard", "cross", "door1_seam")
 WARNINGS = {"quarantine": "QUARANTINE", "seal": "SEAL THIS DECK", "listen": "IT HEARS YOU"}
+SEAM_HALF = 5  # texels either side of a door's middle
 
 
 def texture_names():
-    names = [*MATERIALS, *LIT_COPIES, *STRIPES, "ceiling2_lit", "viewport", "hazard", "cross"]
+    names = [*MATERIALS, *LIT_COPIES, *STRIPES, *MADE]
     names += [f"{name}_blood" for name in BLOODIED]
     names += [f"{name}_clawed" for name in CLAWED]
     names += [f"sign_{key}" for key in SIGNS]
@@ -231,6 +233,14 @@ def lit_panel(rgb):
     return rgb * (1 - mask[..., None]) + lamp * mask[..., None], mask
 
 
+def leaf_seam(rgb):
+    """Two leaves meet down the middle; painted, the line stays steady as the view moves."""
+    seam = rgb.copy()
+    middle = SIZE // 2
+    seam[:, middle - SEAM_HALF : middle + SEAM_HALF] *= 0.1
+    return seam
+
+
 def hazard_stripes():
     """Yellow and black diagonals for dangerous thresholds."""
     ys, xs = np.mgrid[0:SIZE, 0:SIZE]
@@ -266,6 +276,7 @@ def bake(directory, seed=20261030):
         rgb, glow = material(directory, name)
         textures[name] = (weather(rgb, rng), glow)
     textures["ceiling2_lit"] = lit_panel(textures["ceiling2"][0])
+    textures["door1_seam"] = (leaf_seam(textures["door1"][0]), textures["door1"][1])
     for name in LIT_COPIES:
         # Most vents are dead: the plain name loses its glow, the lit copy keeps it.
         base = name.removesuffix("_lit")

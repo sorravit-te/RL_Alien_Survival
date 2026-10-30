@@ -7,6 +7,7 @@ from random import Random
 from ai.controller import ControllerState, choose_target
 from ai.navigation import Navigator
 from game.capture import capture_fraction
+from game.doors import Doors, DoorSight
 from game.interaction import segment_clear, select_target
 from game.investigation import LastSeenInvestigation
 from game.map import WorldMap, small_test_map
@@ -79,6 +80,7 @@ class GameCore:
         self._survivor = SurvivorState(x, y)
         self._episode_map = self._scenario_objects(rng)
         self._ruled_out_exits = ()
+        self._doors = Doors(self.world_map, self.config)
         self._tick = 0
         self._has_keycard = False
         self._outcome = None
@@ -118,6 +120,8 @@ class GameCore:
             self._investigation.state,
             self._controller.clue_revision,
             self._ruled_out_exits,
+            self._doors.openness,
+            self._doors.closed,
         )
 
     def set_alien_target(self, target, *, source="external", evidence_revision=None):
@@ -183,6 +187,10 @@ class GameCore:
             (sin(yaw) * command.forward + cos(yaw) * command.strafe) * distance,
         )
         captured = self._move_both(survivor_delta, alien_delta, yaw)
+        bodies = [(self._survivor.x, self._survivor.y)]
+        if self._alien is not None:
+            bodies.append((self._alien.x, self._alien.y))
+        self._doors.update(bodies)
         self._tick += 1
         if captured:
             self._outcome = "captured"
@@ -195,8 +203,9 @@ class GameCore:
     def _alien_displacement(self):
         if self._alien is None:
             return (0.0, 0.0)
+        sight = DoorSight(self._episode_map, frozenset(self._doors.closed))
         self._perception = update_perception(
-            self.world_map, self._alien, self._survivor, self._perception, self.config
+            sight, self._alien, self._survivor, self._perception, self.config
         )
         age = self._perception.last_seen_age_ticks
         chasing = age is not None and age <= ceil(

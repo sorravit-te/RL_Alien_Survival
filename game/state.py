@@ -35,6 +35,9 @@ class CoreConfig:
     target_arrival_distance: float = 0.15
     capture_padding: float = 0.0  # contact distance = both radii + this explicit padding
     minimum_spawn_distance: float = 2.0
+    door_reach: float = 1.7  # how far up its passage a body opens a door
+    door_lateral: float = 0.9
+    door_seconds: float = 0.35
 
     def __post_init__(self):
         if self.tick_hz != 30:
@@ -56,6 +59,9 @@ class CoreConfig:
             self.alien_decision_seconds,
             self.target_arrival_distance,
             self.investigation_turn_speed,
+            self.door_reach,
+            self.door_lateral,
+            self.door_seconds,
         )
         if not all(isfinite(v) and v > 0 for v in values):
             raise ValueError("Alien distances, speeds and times must be finite and positive")
@@ -125,3 +131,5 @@ class WorldSnapshot:
     investigation: InvestigationSnapshot = InvestigationSnapshot()
     alien_target_revision: int | None = None
     ruled_out_exits: tuple[str, ...] = ()  # Survivor knowledge, never Alien input
+    door_open: tuple[float, ...] = ()  # 0 shut to 1 open, in world_map.doors order
+    closed_doors: tuple[tuple[int, int], ...] = ()

@@ -94,6 +94,11 @@ def test_ceilings_step_and_doorways_drop_a_header(mesh):
     assert np.isclose(heights, WALL_TOP).any() and np.isclose(heights, DOOR_TOP).any()
 
 
+def test_door_leaves_carry_their_seam_in_the_texture(mesh):
+    seam = texture_names().index("door1_seam")
+    assert (mesh["textures"][mesh["door_quads"]] == seam).all()
+
+
 def test_windows_show_space_from_behind_closed_reveals(mesh):
     sky = texture_names().index("viewport")
     panes = mesh["textures"] == sky

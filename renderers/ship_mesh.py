@@ -36,9 +36,29 @@ LINTEL_FOOT = 1.7
 PANEL_LOW = 0.16  # recess depth at the foot of a bay panel
 PANEL_HIGH = 0.42  # recess depth at its head
 WINDOW_LOW, WINDOW_HIGH, WINDOW_DEPTH = 0.42, 1.65, 0.3
+DOOR_TRIM, DOOR_COLUMN = 0.26, 0.5  # frame widths beside a doorway
+DOOR_FRAME_PROUD, DOOR_COLUMN_PROUD, DOOR_HEADER_PROUD = 0.1, 0.18, 0.14  # past PILLAR_PROUD
+FRAME_INSET, FRAME_BACK = 0.01, 0.05  # the frame's inner face must not share a pillar's plane
+CAP_RISE = 0.16
+EDGE_TEXTURE, EDGE_SHAPE = "trim5", 8.0  # a trim this many times taller than it is wide
+RAIL_INNER, RAIL_DEPTH, RAIL_HEAD = 0.4, 0.2, 1.56  # the frame the leaves run in
+LEAF_SUNK, LEAF_RAISED = 0.03, 0.08
+LEAF_PROFILE = (  # height, distance out from the door's middle plane
+    (0.0, LEAF_RAISED),
+    (0.34, LEAF_RAISED),
+    (0.38, LEAF_SUNK),
+    (0.7, LEAF_SUNK),
+    (0.74, LEAF_RAISED),
+    (0.96, LEAF_RAISED),
+    (1.0, LEAF_SUNK),
+    (1.5, LEAF_SUNK),
+    (1.54, LEAF_RAISED),
+    (DOOR_TOP, LEAF_RAISED),
+)
 LINE_OFFSET = 0.3  # painted floor line, measured out from the wall
 LINE_WIDTH = 0.09
 BAND_LOW, BAND_HIGH = 1.08, 1.13  # district color around each pillar
+SIDEWAYS = ("columna1", "columna2")  # these images lie down, so a pillar stands them up
 
 
 class Mesh:
@@ -46,10 +66,11 @@ class Mesh:
         self.index = index
         self.vertices, self.uvs, self.normals, self.textures = [], [], [], []
         self.tints, self.shifts, self.shades = [], [], []
+        self.door_parts = []  # (quad, door index, sliding direction) of every door leaf
 
     def quad(
         self, a, b, c, d, texture, facing, *, repeat=(1.0, 1.0), turned=False, tint=(0, 0, 0),
-        reach=0.12, shade=1.0,
+        reach=0.12, shade=1.0, span=None, rows=None,
     ):  # fmt: skip
         """Corners run bottom-left, bottom-right, top-right, top-left as seen from the front."""
         points = np.array((a, b, c, d), np.float32)
@@ -61,7 +82,9 @@ class Mesh:
         if np.dot(normal, facing) < 0:
             normal = -normal
         ru, rv = repeat
-        corners = ((0, rv), (ru, rv), (ru, 0), (0, 0))
+        left, right = span or (0, ru)
+        upper, lower = rows or (0, rv)
+        corners = ((left, lower), (right, lower), (right, upper), (left, upper))
         if turned:
             corners = ((rv, 0), (rv, ru), (0, ru), (0, 0))
         self.vertices.append(points)
@@ -231,23 +254,30 @@ class Wall:
     def side(self, sign):
         return float(self.right[0] * sign), float(self.right[1] * sign), 0.0
 
-    def flat(self, s0, s1, z0, z1, texture, *, depth=0.0, repeat=(1.0, 1.0), shade=1.0, reach=0.14):
+    def flat(
+        self, s0, s1, z0, z1, texture, *, depth=0.0, repeat=(1.0, 1.0), shade=1.0, reach=0.14,
+        turned=False,
+    ):  # fmt: skip
         self.mesh.quad(
             self.at(s0, depth, z0), self.at(s1, depth, z0), self.at(s1, depth, z1),
-            self.at(s0, depth, z1), texture, self.facing, repeat=repeat, shade=shade, reach=reach,
+            self.at(s0, depth, z1), texture, self.facing, repeat=repeat, turned=turned,
+            shade=shade, reach=reach,
         )  # fmt: skip
 
     def pillar(self, s0, s1):
         """Stands proud of the wall line, so its sides show from along the corridor."""
         proud = -PILLAR_PROUD
-        self.flat(s0, s1, 0, self.top, self.zone.pillar, depth=proud, shade=0.9, reach=0.2)
+        turned = self.zone.pillar in SIDEWAYS
+        self.flat(
+            s0, s1, 0, self.top, self.zone.pillar, depth=proud, shade=0.9, reach=0.2, turned=turned,
+        )  # fmt: skip
         if self.zone.stripe:
             self.flat(s0, s1, BAND_LOW, BAND_HIGH, self.zone.stripe, depth=proud - 0.01, reach=0.2)
         for s, sign in ((s0, -1), (s1, 1)):
             self.mesh.quad(
                 self.at(s, 0, 0), self.at(s, proud, 0), self.at(s, proud, self.top),
                 self.at(s, 0, self.top), self.zone.pillar, self.side(sign),
-                repeat=(0.2, 1.0), shade=0.6, reach=0.2,
+                repeat=(0.2, 1.0), turned=turned, shade=0.6, reach=0.2,
             )  # fmt: skip
 
     def bay(self, s0, s1, texture):
@@ -358,7 +388,7 @@ def add_walls(mesh, theme):
             top = WALL_TOP
         wall = Wall(mesh, dx, dy, line, first, last, top, zone, stable(x, y, 4))
         if key == "D":
-            wall.flat(0, wall.length, 0, top, "walltrim1", shade=0.7)
+            wall.flat(0, wall.length, 0, top, "walltrim1", repeat=(wall.length * 2, 1.0), shade=0.7)
         elif is_block:
             add_block(wall, FURNITURE.get(key, "cabinet"))
             continue
@@ -432,6 +462,139 @@ def add_signs(mesh, theme):
         wall.flat(-0.25, 1.25, 1.74, 2.0, name, depth=-0.1, shade=1.0, reach=0.3)
 
 
+def add_doors(mesh, theme):
+    """Sliding leaves set deep in a real frame, built to the look of the pack's door bay."""
+    for index, (x, y) in enumerate(theme.world.doors):
+        along_x = theme.is_open(x - 1, y) and theme.is_open(x + 1, y)
+        ahead = (1.0, 0.0) if along_x else (0.0, 1.0)
+        for sign in (1.0, -1.0):
+            side = DoorSide(mesh, x, y, (ahead[0] * sign, ahead[1] * sign))
+            for leaf in (0, 1):
+                side.leaf(index, leaf)
+            side.rail()
+            side.frame(theme)
+
+
+class DoorSide:
+    """One face of a doorway; s runs left to right as seen from this side, d toward the viewer."""
+
+    def __init__(self, mesh, x, y, normal):
+        self.mesh, self.x, self.y = mesh, x, y
+        self.normal = normal
+        self.right = (normal[1], -normal[0])
+        self.facing = (*normal, 0.0)
+
+    def at(self, s, d, z):
+        return (
+            self.x + 0.5 + self.right[0] * s + self.normal[0] * d,
+            self.y + 0.5 + self.right[1] * s + self.normal[1] * d,
+            z,
+        )
+
+    def box(self, s0, s1, d, z0, z1, texture, *, shade=1.0, turned=False, span=None):
+        self.mesh.quad(
+            self.at(s0, d, z0), self.at(s1, d, z0), self.at(s1, d, z1), self.at(s0, d, z1),
+            texture, self.facing, turned=turned, shade=shade, reach=0.3, span=span,
+        )  # fmt: skip
+
+    def end(self, s, d0, d1, z0, z1, sign, shade=0.5):
+        """A face running back along the passage, cut to size from a tall trim; sign is its look."""
+        facing = (self.right[0] * sign, self.right[1] * sign, 0.0)
+        width = abs(d1 - d0) / (z1 - z0) * EDGE_SHAPE
+        self.mesh.quad(
+            self.at(s, d0, z0), self.at(s, d1, z0), self.at(s, d1, z1), self.at(s, d0, z1),
+            EDGE_TEXTURE, facing, span=(0, width), shade=shade, reach=0.3,
+        )  # fmt: skip
+
+    def leaf(self, index, leaf):
+        """Raised plates and sunken panels, sliding apart; the texture runs across them all."""
+        s0, s1 = -0.5 + leaf * 0.5, leaf * 0.5
+        sign = -1.0 if leaf == 0 else 1.0
+        slide = (self.right[0] * sign * 0.5, self.right[1] * sign * 0.5, 0.0)
+        u0, u1 = leaf * 0.5, (leaf + 1) * 0.5
+        for (z0, d0), (z1, d1) in zip(LEAF_PROFILE, LEAF_PROFILE[1:]):
+            if d1 < d0:
+                shade = 0.95  # a slope that faces up catches the light
+            elif d1 > d0:
+                shade = 0.42  # one that faces down stays in shadow
+            else:
+                shade = 0.9 if d0 > LEAF_SUNK else 0.68
+            self.mesh.quad(
+                self.at(s0, d0, z0), self.at(s1, d0, z0), self.at(s1, d1, z1), self.at(s0, d1, z1),
+                "door1_seam", self.facing, span=(u0, u1),
+                rows=(1 - z1 / DOOR_TOP, 1 - z0 / DOOR_TOP), shade=shade, reach=0.3,
+            )  # fmt: skip
+            self.mesh.door_parts.append((len(self.mesh.vertices) - 1, index, slide))
+
+    def rail(self):
+        """Heavy posts and a head beam the leaves slide behind, so they sit in a real frame."""
+        for inner, outer, sign in ((-RAIL_INNER, -0.5, 1), (RAIL_INNER, 0.5, -1)):
+            left, right = sorted((inner, outer))
+            self.box(left, right, RAIL_DEPTH, 0, DOOR_TOP, "doorborder4", shade=0.8)
+            self.end(inner, RAIL_DEPTH, 0.0, 0, RAIL_HEAD, sign, shade=0.42)
+        self.box(
+            -RAIL_INNER, RAIL_INNER, RAIL_DEPTH, RAIL_HEAD, DOOR_TOP, "doorborder3", shade=0.8,
+            span=(0, 0.3),
+        )  # fmt: skip
+        self.mesh.quad(
+            self.at(-RAIL_INNER, 0.0, RAIL_HEAD), self.at(RAIL_INNER, 0.0, RAIL_HEAD),
+            self.at(RAIL_INNER, RAIL_DEPTH, RAIL_HEAD), self.at(-RAIL_INNER, RAIL_DEPTH, RAIL_HEAD),
+            "walltrim5", (0.0, 0.0, -1.0), span=(0, 0.5), shade=0.35, reach=0.3,
+        )  # fmt: skip
+
+    def frame(self, theme):
+        """Stepped surround on the room side: trim, then a column standing proud of it."""
+        line = 0.5
+        near_s, trim_s = line - FRAME_INSET, line + DOOR_TRIM
+        column_s = trim_s + DOOR_COLUMN
+        trim, proud = line + DOOR_FRAME_PROUD, line + DOOR_COLUMN_PROUD
+        for sign in (-1.0, 1.0):
+            far = self.at(sign * 1.6, 0, 0)
+            roomy = not theme.is_open(int(far[0]), int(far[1]))
+            self._strip(near_s, trim_s, sign, trim, "trim5", False)
+            self.end(sign * near_s, trim, line - FRAME_BACK, 0, DOOR_TOP, -sign)
+            if roomy:
+                self._strip(trim_s, column_s, sign, proud, "columna1", True)
+                self.end(sign * trim_s, proud, trim, 0, DOOR_TOP, -sign)
+                # It runs back past the wall line to close the bay recess behind the column.
+                self.end(sign * column_s, proud, line - PANEL_HIGH, 0, DOOR_TOP, sign)
+                self._cap(sign, trim_s, column_s, proud, line)
+        self._header(line, trim_s)
+
+    def _cap(self, sign, near, far, proud, line):
+        """The column's sloped head, with a wedge closing each side of the slope."""
+        left, right = sorted((sign * near, sign * far))
+        top = DOOR_TOP + CAP_RISE
+        self.mesh.quad(
+            self.at(left, proud, DOOR_TOP), self.at(right, proud, DOOR_TOP),
+            self.at(right, line, top), self.at(left, line, top),
+            "walltrim4", (*self.normal, 0.6), span=(0, 0.3), shade=0.7, reach=0.3,
+        )  # fmt: skip
+        for s, look in ((left, -1.0), (right, 1.0)):
+            self.mesh.quad(
+                self.at(s, proud, DOOR_TOP), self.at(s, line, DOOR_TOP), self.at(s, line, top),
+                self.at(s, line, top), EDGE_TEXTURE, (self.right[0] * look, self.right[1] * look, 0.0),
+                shade=0.45, reach=0.3,
+            )  # fmt: skip
+
+    def _strip(self, near, far, sign, depth, texture, turned):
+        left, right = sorted((sign * near, sign * far))
+        self.box(left, right, depth, 0, DOOR_TOP, texture, shade=0.9, turned=turned)
+
+    def _header(self, line, span):
+        """The beam over the doorway and its trim stands out, with a shadowed underside."""
+        depth = line + DOOR_HEADER_PROUD
+        top = DOOR_TOP + 0.3
+        self.box(-span, span, depth, DOOR_TOP, top, "doorborder1", shade=0.9)
+        for sign in (-1.0, 1.0):
+            self.end(sign * span, depth, line, DOOR_TOP, top, sign, shade=0.45)
+        self.mesh.quad(
+            self.at(-span, line, DOOR_TOP), self.at(span, line, DOOR_TOP),
+            self.at(span, depth, DOOR_TOP), self.at(-span, depth, DOOR_TOP), "walltrim5",
+            (0.0, 0.0, -1.0), shade=0.3, reach=0.3,
+        )  # fmt: skip
+
+
 def add_crosses(mesh, theme):
     for x, y, face in CROSSES:
         wall_at(mesh, x, y, face).flat(0.15, 0.85, 1.15, 1.85, "cross", depth=-0.1, reach=0.3)
@@ -479,6 +642,7 @@ def build_mesh(theme, names):
     add_walls(mesh, theme)
     add_hull_doors(mesh, theme)
     add_signs(mesh, theme)
+    add_doors(mesh, theme)
     add_crosses(mesh, theme)
     add_hazard_lines(mesh, theme)
     add_wreck(mesh)
@@ -490,4 +654,7 @@ def build_mesh(theme, names):
         "tints": np.array(mesh.tints, np.float32),
         "shifts": np.array(mesh.shifts, np.float32),
         "shades": np.array(mesh.shades, np.float32),
+        "door_quads": np.array([part[0] for part in mesh.door_parts], np.int64),
+        "door_index": np.array([part[1] for part in mesh.door_parts], np.int64),
+        "door_slide": np.array([part[2] for part in mesh.door_parts], np.float32),
     }

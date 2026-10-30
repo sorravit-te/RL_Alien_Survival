@@ -96,6 +96,7 @@ class ShipRenderer:
         self.starts = np.array((0, sizes[0], sizes[0] + sizes[1]), np.int64)
         self.theme = ShipTheme(world)
         self.mesh = build_mesh(self.theme, textures["names"])
+        self.door_rest = self.mesh["vertices"][self.mesh["door_quads"]].copy()
         self.width, self.height = size
         self.plane_scale = tan(radians(fov) / 2)
         self.focal_length = self.width / (2 * self.plane_scale)
@@ -156,8 +157,17 @@ class ShipRenderer:
         )  # fmt: skip
         return light, fx, fy
 
+    def _place_doors(self, openness):
+        """Slide the leaves; a wall hides whatever passes behind its door frame."""
+        mesh = self.mesh
+        amount = np.asarray(openness, np.float32)[mesh["door_index"]]
+        moved = self.door_rest + (mesh["door_slide"] * amount[:, None])[:, None, :]
+        mesh["vertices"][mesh["door_quads"]] = moved
+
     def render(self, snapshot, pitch=0.0):
         camera = snapshot.survivor
+        if snapshot.door_open:
+            self._place_doors(snapshot.door_open)
         horizon = self.height / 2 + self.focal_length * tan(pitch)
         light, fx, fy = self._draw(camera.x, camera.y, camera.yaw, horizon, snapshot.tick)
         middle = self.inverse_depth[self.height // 2]

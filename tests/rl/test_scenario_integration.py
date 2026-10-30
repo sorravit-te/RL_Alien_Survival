@@ -19,13 +19,14 @@ from rl.train import validate_fresh_start
 ENV_STEP = AlienEnv.step
 ENV_INIT = AlienEnv.__init__  # Called only with a namespace and fully mocked actors below.
 
-LOOP_HASH = "af5142aeeee14782b5a3fc668f9ea97432c5bff72f8f498b920c3a4aad7f850f"
-DEFAULT_HASH = "7aeafcc0b15f5361f4baefa420ceb5f17fc5f38eccd82fbdd52c6e9ca215736a"
-RANDOM_HASH = "f578a895cf84f31b185068456c69b00c92a68371a837430fd93d965ac3a0fef1"
+LOOP_HASH = "27d7552082293fc5e2dd61cf3ec89a6ce148d8c62376076985ed0a97f837a1d3"
+DEFAULT_HASH = "4d7e4e90a6d998f6a1e2b89b46e2ee961d4487b9e5cd5bfc9dc724c42dbc77cb"
+RANDOM_HASH = "2a14286ecbf8e17c91caa5931fd8baa4c392e691db4027c69b7694133626bbb9"
 
 # Independent expected fixture ships with this test; no ignored experiment data.
 EXPECTED_LOOP_WORLD = {
     "alien_spawn_options": [],
+    "doors": [],
     "rows": [
         "################",
         "#..............#",

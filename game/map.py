@@ -5,6 +5,7 @@ from math import floor, isfinite, pi
 
 from game.ship_deck import (
     ALIEN_SPAWNS,
+    DOORS,
     EXITS,
     KEYCARDS,
     ROWS,
@@ -38,6 +39,7 @@ class WorldMap:
     alien_spawn: tuple[float, float, float] | None = None
     patrol_waypoints: tuple[tuple[float, float], ...] = ()
     alien_spawn_options: tuple[tuple[float, float, float], ...] = ()  # beside alien_spawn
+    doors: tuple[tuple[int, int], ...] = ()  # floor cells closed by automatic doors
 
     def __post_init__(self):
         # Own immutable copies even when a caller supplies lists.
@@ -46,6 +48,7 @@ class WorldMap:
             raise TypeError("Map rows must be strings")
         object.__setattr__(self, "spawn_points", tuple(tuple(p) for p in self.spawn_points))
         object.__setattr__(self, "objects", tuple(self.objects))
+        object.__setattr__(self, "doors", tuple(tuple(cell) for cell in self.doors))
         if any(not isinstance(obj, MapObject) for obj in self.objects):
             raise TypeError("Map objects must be immutable MapObject values")
         if len({obj.object_id for obj in self.objects}) != len(self.objects):
@@ -136,6 +139,7 @@ def ship_deck() -> WorldMap:
         alien_spawn=ALIEN_SPAWNS[0],
         patrol_waypoints=WAYPOINTS,
         alien_spawn_options=ALIEN_SPAWNS[1:],
+        doors=DOORS,
     )
 
 

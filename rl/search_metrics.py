@@ -8,6 +8,7 @@ pre-motion pose used by that tick's sole native sensor. Only wall-only losses
 from copy import deepcopy
 from math import atan2, hypot
 
+from game.doors import sight_world
 from game.interaction import angle_difference, segment_clear
 from rl.patrol_metrics import PatrolMetrics
 from rl.search_control_metrics import SearchControlMetrics
@@ -31,7 +32,7 @@ def wall_only_loss(before):
     in_sensor = distance <= c.alien_near_range or (
         distance <= c.alien_sight_range and angle <= c.alien_fov / 2
     )
-    return in_sensor and not segment_clear(before.world_map, a.x, a.y, s.x, s.y)
+    return in_sensor and not segment_clear(sight_world(before), a.x, a.y, s.x, s.y)
 
 
 class SearchMetrics:
