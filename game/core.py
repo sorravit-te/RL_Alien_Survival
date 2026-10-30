@@ -208,19 +208,22 @@ class GameCore:
         return self.snapshot()
 
     def _hear(self, start, running):
-        """A running footfall lands on a fixed beat; running into a wall makes none."""
+        """Footfalls land on a fixed beat; standing or walking into a wall makes none."""
         if self._alien is None:
             return
         period = max(1, ceil(self.config.sound_step_seconds * self.config.tick_hz - 1e-12))
         moved = hypot(self._survivor.x - start.x, self._survivor.y - start.y) > 1e-9
+        noises = [((x + 0.5, y + 0.5), self.config.door_sound_range) for x, y in self._doors.opened]
+        if moved and self._tick % period == 0:
+            reach = self.config.run_sound_range if running else self.config.walk_sound_range
+            noises.insert(0, ((self._survivor.x, self._survivor.y), reach))
         self._heard = listen(
             self.world_map,
             frozenset(self._doors.closed),
             self._alien,
-            self._survivor,
+            noises,
             self._heard,
             self.config,
-            noisy=running and moved and self._tick % period == 0,
         )
 
     def _alien_displacement(self):

@@ -14,7 +14,8 @@ action21 to a written helper chase until the next decision.
 A waypoint action holds as the only valid action until arrival, a dead path, a new
 noise or new confirmed evidence; the mask carries this, so the observation shape
 is unchanged. Action22 walks to the coarse region of the latest noise that reached
-the Alien along the floor; standing at that point masks it until the next noise.
+the Alien along the floor: running, walking or a door the Survivor opened. Standing
+at that point masks it until the next noise.
 Scenario objects are never policy input: spawns, the card and the working exit vary
 by scenario seed, and the Alien learns them only through what it senses.
 No unconfirmed sight confidence/count is exposed. An unreachable observed floor

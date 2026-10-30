@@ -43,6 +43,7 @@ class Doors:
         )
         self.openness = (0.0,) * len(self.cells)
         self.closed = self.cells
+        self.opened = ()  # doors the Survivor started opening this tick
 
     def _wanted(self, cell, along_x, bodies):
         for x, y in bodies:
@@ -53,6 +54,8 @@ class Doors:
         return False
 
     def update(self, bodies):
+        """The first body is the Survivor; a door the Alien opens tells it nothing."""
+        before = self.openness
         self.openness = tuple(
             min(1.0, amount + self.step)
             if self._wanted(cell, along_x, bodies)
@@ -63,4 +66,11 @@ class Doors:
             cell
             for cell, amount in zip(self.cells, self.openness, strict=True)
             if amount < SIGHT_CLEAR
+        )
+        self.opened = tuple(
+            cell
+            for cell, along_x, old, new in zip(
+                self.cells, self.along_x, before, self.openness, strict=True
+            )
+            if old == 0.0 < new and self._wanted(cell, along_x, bodies[:1])
         )

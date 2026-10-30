@@ -28,8 +28,17 @@ SPLIT = (
 )
 RUN = SurvivorCommand(forward=1.0, running=True)
 WALK = SurvivorCommand(forward=1.0)
+LONG = (
+    "#################",
+    "#...............#",
+    "#...............#",
+    "#################",
+)
 # The Alien looks away, so only hearing can tell it anything.
 BLIND = CoreConfig(alien_sight_range=1.0, alien_near_range=0.5)
+DOOR_ONLY = CoreConfig(
+    alien_sight_range=1.0, alien_near_range=0.5, walk_sound_range=0.1, run_sound_range=0.1
+)
 
 
 def core_with(rows, survivor, alien, *, doors=(), config=BLIND, control="external"):
@@ -50,8 +59,12 @@ def test_running_in_range_is_heard():
     assert heard.point is not None and heard.revision >= 1 and heard.age_ticks is not None
 
 
-def test_walking_and_standing_make_no_noise_yet():
+def test_walking_is_heard_only_close_by():
     assert steps(core_with(HALL, (1.5, 1.5), (7.5, 1.5)), WALK, 20).heard == HeardSnapshot()
+    assert steps(core_with(HALL, (1.5, 1.5), (3.5, 2.5)), WALK, 16).heard.revision >= 1
+
+
+def test_standing_still_is_silent():
     assert steps(core_with(HALL, (1.5, 1.5), (7.5, 1.5)), SurvivorCommand(), 20).heard.point is None
 
 
@@ -64,6 +77,30 @@ def test_running_into_a_wall_makes_no_noise():
     core = core_with(HALL, (1.5, 1.5), (7.5, 1.5))
     core._survivor = SurvivorState(1.2, 1.5, pi)
     assert steps(core, RUN, 20).heard.point is None
+
+
+def test_a_door_the_survivor_opens_is_heard_past_a_walking_step():
+    core = core_with(HALL, (2.2, 1.5), (7.5, 1.5), doors=((4, 1),), config=DOOR_ONLY)
+    snapshot = steps(core, WALK, 10)
+    assert snapshot.door_open[0] > 0.0
+    assert snapshot.heard.point == region_point(core.world_map, 4.5, 1.5, 4)
+
+
+def test_a_door_is_heard_once_per_opening():
+    core = core_with(HALL, (2.2, 1.5), (7.5, 1.5), doors=((4, 1),), config=DOOR_ONLY)
+    assert steps(core, WALK, 15).heard.revision == 1
+
+
+def test_a_door_the_alien_opens_itself_gives_no_clue():
+    core = core_with(HALL, (1.5, 1.5), (5.8, 1.5), doors=((4, 1),), config=DOOR_ONLY)
+    snapshot = steps(core, SurvivorCommand(), 10)
+    assert snapshot.door_open[0] > 0.0 and snapshot.heard.point is None
+
+
+def test_a_door_too_far_along_the_floor_stays_unheard():
+    core = core_with(LONG, (2.2, 1.5), (14.5, 1.5), doors=((4, 1),), config=DOOR_ONLY)
+    snapshot = steps(core, WALK, 10)
+    assert snapshot.door_open[0] > 0.0 and snapshot.heard.point is None
 
 
 def test_noise_cannot_cross_a_wall_it_would_have_to_walk_around():
@@ -105,13 +142,13 @@ def test_every_floor_cell_has_a_region_point_on_floor():
 
 def test_old_clue_ages_in_place_and_new_noise_replaces_it():
     world = WorldMap(HALL, ((1.5, 1.5),))
-    alien, survivor = AlienState(7.5, 1.5), SurvivorState(1.5, 1.5)
-    first = listen(world, frozenset(), alien, survivor, HeardSnapshot(), BLIND, noisy=True)
+    alien = AlienState(7.5, 1.5)
+    far = (((1.5, 1.5), 8.0),)
+    first = listen(world, frozenset(), alien, far, HeardSnapshot(), BLIND)
     assert (first.age_ticks, first.revision) == (0, 1)
-    moved = SurvivorState(5.5, 1.5)
-    older = listen(world, frozenset(), alien, moved, first, BLIND, noisy=False)
+    older = listen(world, frozenset(), alien, (), first, BLIND)
     assert older.point == first.point and older.age_ticks == 1
-    fresh = listen(world, frozenset(), alien, moved, older, BLIND, noisy=True)
+    fresh = listen(world, frozenset(), alien, (((5.5, 1.5), 8.0),), older, BLIND)
     assert fresh.point != first.point and (fresh.age_ticks, fresh.revision) == (0, 2)
 
 
@@ -119,9 +156,7 @@ def test_standing_at_the_point_marks_it_checked():
     world = WorldMap(HALL, ((1.5, 1.5),))
     clue = HeardSnapshot((2.5, 1.5), 0, 1)
     alien = AlienState(2.5, 1.5)
-    assert listen(
-        world, frozenset(), alien, SurvivorState(5.5, 1.5), clue, BLIND, noisy=False
-    ).checked
+    assert listen(world, frozenset(), alien, (), clue, BLIND).checked
 
 
 def test_heuristic_prefers_sight_then_clue_then_sound_then_patrol():
@@ -156,7 +191,16 @@ def test_scripted_alien_walks_to_a_noise_then_returns_to_patrol():
     assert snapshot.heard.checked and snapshot.alien_target_source == "patrol"
 
 
-@pytest.mark.parametrize("field", ["run_sound_range", "sound_step_seconds", "sound_door_cost"])
+@pytest.mark.parametrize(
+    "field",
+    [
+        "run_sound_range",
+        "walk_sound_range",
+        "door_sound_range",
+        "sound_step_seconds",
+        "sound_door_cost",
+    ],
+)
 def test_sound_settings_must_be_positive(field):
     with pytest.raises(ValueError):
         CoreConfig(**{field: 0.0})

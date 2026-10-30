@@ -1,6 +1,6 @@
 """Noise follows the floor to the Alien and never passes through a wall.
 
-A footfall is a Core event, so it behaves the same with or without a speaker. The Alien
+Footfalls and doors are Core events, so they behave the same without a speaker. The Alien
 keeps only a coarse region: every point in a region gives one fixed floor point, so
 hearing many footfalls can never be averaged into the Survivor's real position.
 """
@@ -63,18 +63,12 @@ def region_point(world, x, y, size):
     return min(cells, key=lambda p: (hypot(p[0] - middle[0], p[1] - middle[1]), p))
 
 
-def listen(world, closed, alien, survivor, previous, config, *, noisy):
-    """One tick of hearing; an old clue keeps its point while it ages."""
-    if noisy and carries(
-        world,
-        closed,
-        (survivor.x, survivor.y),
-        (alien.x, alien.y),
-        config.run_sound_range,
-        config.sound_door_cost,
-    ):
-        point = region_point(world, survivor.x, survivor.y, config.sound_region)
-        return HeardSnapshot(point, 0, previous.revision + 1)
+def listen(world, closed, alien, noises, previous, config):
+    """One tick of hearing; noises are (point, reach), an old clue ages in place."""
+    for source, reach in noises:
+        if carries(world, closed, source, (alien.x, alien.y), reach, config.sound_door_cost):
+            point = region_point(world, *source, config.sound_region)
+            return HeardSnapshot(point, 0, previous.revision + 1)
     if previous.point is None:
         return previous
     arrived = (
