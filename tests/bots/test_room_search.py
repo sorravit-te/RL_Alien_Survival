@@ -101,6 +101,14 @@ def test_a_station_the_bot_was_chased_from_waits_for_the_next_sweep():
     assert bot.explorer.explore_target is None and target in bot.explorer.visited
 
 
+def test_a_deck_retreats_to_a_station():
+    bot = EvasiveExplorerBot(ROOMS, CoreConfig(), doors=(DOOR,))
+    bot.reset(np.random.default_rng(1))
+    bot.last_seen = (2.5, 3.5)
+    target, path = bot._plan((1.5, 1.5))
+    assert target is None or target in bot.explorer.stations
+
+
 def test_a_scene_without_doors_keeps_its_target_through_a_flee():
     bot = EvasiveExplorerBot(ROOMS, CoreConfig())
     bot.reset(np.random.default_rng(1))

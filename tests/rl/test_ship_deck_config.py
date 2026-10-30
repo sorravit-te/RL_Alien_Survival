@@ -1,0 +1,37 @@
+"""The full-deck pilot configs agree with the deck, the contract and each other."""
+
+import json
+from pathlib import Path
+
+from game.ship_deck import SHIP_SCENARIO
+from rl.contract import SEARCH_CONTROL, VERSION
+from rl.evaluation_protocol import evaluation_budget, validate_protocol
+from rl.pipeline import ROOT, make_env, validate_environment_config
+
+TRAINING = "configs/ship_deck_training_pilot.json"
+
+
+def read(path):
+    return json.loads((Path(ROOT) / path).read_text("utf-8"))
+
+
+def test_pilot_trains_on_the_deck_against_the_runner_mix():
+    config = read(TRAINING)
+    assert config["scenario"] == SHIP_SCENARIO and config["bot_kind"] == "runner_mix"
+    assert config["contract_version"] == VERSION and config["search_control"] == SEARCH_CONTROL
+    assert validate_environment_config(config)["name"] == SHIP_SCENARIO
+
+
+def test_evaluation_protocol_matches_training():
+    config = read(TRAINING)
+    validate_protocol(config, read(config["evaluation_protocol"]))
+
+
+def test_pilot_environment_uses_the_room_search():
+    env = make_env(read(TRAINING))
+    assert env.scenario == SHIP_SCENARIO and env.bot.runner.explorer.walk_steps
+
+
+def test_pilot_budget_stays_bounded():
+    budget = evaluation_budget(read(TRAINING))
+    assert budget["baseline_validation_episodes"] + budget["checkpoint_validation_episodes"] <= 800

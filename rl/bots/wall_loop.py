@@ -42,7 +42,7 @@ class WallLoopEvasiveBot(EvasiveExplorerBot):
         # Farthest-from-threat cover first; a straight line bounds the route from below.
         covers = sorted(
             (-hypot(p[0] - threat[0], p[1] - threat[1]), p[1], p[0], p)
-            for p in self.explorer.points
+            for p in self.explorer.stations
             if not segment_clear(self.explorer.geometry, *threat, *p)  # out of threat's sight
             and hypot(p[0] - threat[0], p[1] - threat[1]) > distance + 0.25
             and hypot(p[0] - position[0], p[1] - position[1]) <= limit

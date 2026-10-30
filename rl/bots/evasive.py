@@ -158,8 +158,9 @@ class EvasiveExplorerBot:
     def _plan(self, position):
         threat = self.last_seen
         distance = hypot(position[0] - threat[0], position[1] - threat[1])
+        # A deck retreats to its stations: trying every floor cell costs seconds per plan.
         points = sorted(
-            self.explorer.points,
+            self.explorer.stations,
             key=lambda p: (-hypot(p[0] - threat[0], p[1] - threat[1]), p[1], p[0]),
         )
         detour = None
