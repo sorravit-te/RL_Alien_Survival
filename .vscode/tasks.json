@@ -44,7 +44,7 @@
       "id": "run",
       "type": "promptString",
       "description": "Run folder inside experiments/",
-      "default": "waypoint_commitment_pilot_v1"
+      "default": "scenario_randomization_pilot_v1"
     }
   ]
 }
