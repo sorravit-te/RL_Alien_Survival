@@ -21,9 +21,7 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def prepare(max_size: int = 256, source_root: Path | None = None) -> dict:
-    if max_size < 16:
-        raise ValueError("max-size must be at least 16 pixels")
+def resolve_source_root(source_root: Path | None = None) -> Path:
     if source_root is None:
         config_path = ROOT / "configs" / "assets.local.json"
         if config_path.is_file():
@@ -34,7 +32,13 @@ def prepare(max_size: int = 256, source_root: Path | None = None) -> dict:
     source_root = source_root.expanduser()
     if not source_root.is_absolute():
         source_root = ROOT / source_root
-    source_root = source_root.resolve()
+    return source_root.resolve()
+
+
+def prepare(max_size: int = 256, source_root: Path | None = None) -> dict:
+    if max_size < 16:
+        raise ValueError("max-size must be at least 16 pixels")
+    source_root = resolve_source_root(source_root)
     source_dir = source_root / "Flat"
     license_path = source_root / "LICENSE.txt"
     sources = {role: source_dir / filename for role, filename in TEXTURES.items()}

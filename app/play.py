@@ -12,8 +12,12 @@ import pygame
 from app.loop import FixedStepLoop
 from app.recorder import GameplayRecorder, validate_record_directory
 from game.core import GameCore
+from game.map import DEFAULT_SCENARIO, SCENARIOS, scenario_map
+from game.ship_deck import ROWS as SHIP_ROWS
 from renderers.raycasting import RaycastingRenderer
+from renderers.ship_renderer import ShipRenderer
 
+SHIP_FRAME = (960, 540)
 KEYS = {
     pygame.K_w: "w",
     pygame.K_s: "s",
@@ -154,6 +158,17 @@ def hud_labels(loop, *, debug_alien=False):
     return labels + debug
 
 
+def frame_size(world):
+    return SHIP_FRAME if world.rows == SHIP_ROWS else (320, 180)
+
+
+def make_renderer(world):
+    """The ship deck has its own textures and light; test scenes keep the plain renderer."""
+    if world.rows == SHIP_ROWS:
+        return ShipRenderer(world, size=SHIP_FRAME)
+    return RaycastingRenderer()
+
+
 def percentile(values, fraction):
     return sorted(values)[min(len(values) - 1, int((len(values) - 1) * fraction))]
 
@@ -166,6 +181,7 @@ def main(argv=None):
     parser.add_argument("--record-dir", type=Path, help="New local experiments folder; RL only")
     parser.add_argument("--sampling-seed", type=int)
     parser.add_argument("--scenario-seed", type=int, default=0)
+    parser.add_argument("--scenario", choices=SCENARIOS, help="Heuristic only; RL uses its run")
     parser.add_argument(
         "--debug-alien", action="store_true", help="Privileged yaw/sensor HUD; off by default"
     )
@@ -187,6 +203,8 @@ def main(argv=None):
         except RuntimeError as exc:
             parser.error(str(exc))
     if args.controller == "rl":
+        if args.scenario is not None:
+            parser.error("--scenario is fixed by the RL run")
         if args.run_dir is None or args.checkpoint is None or args.sampling_seed is None:
             parser.error("RL requires --run-dir, --checkpoint and --sampling-seed")
         try:
@@ -200,7 +218,7 @@ def main(argv=None):
     else:
         if any(value is not None for value in (args.run_dir, args.checkpoint, args.sampling_seed)):
             parser.error("RL checkpoint options require --controller rl")
-        core = GameCore()
+        core = GameCore(scenario_map(args.scenario or DEFAULT_SCENARIO))
         core.reset(args.scenario_seed)
     # Initialize only graphics/font; the game currently has no audio system.
     recorder = None
@@ -217,7 +235,7 @@ def main(argv=None):
                     "max_catchup_ticks": loop.max_steps,
                     "max_frame_seconds": loop.max_frame_time,
                     "fps_limit": args.fps_limit,
-                    "framebuffer": [320, 180],
+                    "framebuffer": list(frame_size(core.snapshot().world_map)),
                     "window": [960, 540],
                     "fov_degrees": 75,
                     "mouse_sensitivity": loop.inputs.mouse_sensitivity,
@@ -235,7 +253,9 @@ def main(argv=None):
         pygame.display.set_caption(
             "Alien Survival - " + getattr(core, "controller_label", "Heuristic Test")
         )
-        renderer = RaycastingRenderer()
+        renderer = make_renderer(core.snapshot().world_map)
+        smooth = isinstance(renderer, ShipRenderer)
+        fit = pygame.transform.smoothscale if smooth else pygame.transform.scale
         font = pygame.font.Font(None, 22)
         session = PlaySession(loop)
         clock = pygame.time.Clock()
@@ -254,7 +274,7 @@ def main(argv=None):
                 loop.advance(elapsed)
             session.after_step()
             frame = renderer.render(loop.display_snapshot(), pitch=loop.display_pitch())
-            pygame.transform.scale(frame, screen.get_size(), screen)
+            fit(frame, screen.get_size(), screen)
             labels = hud_labels(loop, debug_alien=args.debug_alien)
             if recorder is not None:
                 labels.append(f"Recording: {recorder.directory.name}")
@@ -277,7 +297,7 @@ def main(argv=None):
             print(
                 json.dumps(
                     {
-                        "framebuffer": [320, 180],
+                        "framebuffer": list(frame_size(core.snapshot().world_map)),
                         "window": [960, 540],
                         "fov_degrees": 75,
                         "display_driver": pygame.display.get_driver(),

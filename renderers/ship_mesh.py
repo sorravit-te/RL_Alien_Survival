@@ -1,0 +1,493 @@
+"""Build the ship's real 3D surfaces from the 2D deck, in the pack's corridor style.
+
+Corridor walls follow the pack's preview: proud pillars between recessed bays, a tilted
+panel in each bay, a sloped lintel above it and a sill below. Ceilings step up over the
+middle of a room, floor grates sink, and doorways drop a header. Surfaces may sit behind a
+wall line but never reach past where collision stops the player, so Core stays the truth.
+"""
+
+import numpy as np
+
+from game.ship_deck import EXITS
+from renderers.ship_kernels import SKY
+from renderers.ship_theme import (
+    CORRIDORS,
+    CROSSES,
+    FACES,
+    FURNITURE,
+    SIGNS,
+    WARNINGS,
+    ZONES,
+    pick,
+    stable,
+)
+
+WALL_TOP = 2.05
+RAISED = 0.42  # ceiling step over the middle of a room
+DOOR_TOP = 1.72
+CRAWL_TOP = 1.55
+SUNK = 0.12  # grate depth below the deck
+PILLAR = 0.42
+PILLAR_PROUD = 0.07
+BAY_SPAN = 2.0
+SILL_TOP = 0.3
+PANEL_TOP = 1.5
+LINTEL_FOOT = 1.7
+PANEL_LOW = 0.16  # recess depth at the foot of a bay panel
+PANEL_HIGH = 0.42  # recess depth at its head
+WINDOW_LOW, WINDOW_HIGH, WINDOW_DEPTH = 0.42, 1.65, 0.3
+LINE_OFFSET = 0.3  # painted floor line, measured out from the wall
+LINE_WIDTH = 0.09
+BAND_LOW, BAND_HIGH = 1.08, 1.13  # district color around each pillar
+
+
+class Mesh:
+    def __init__(self, index):
+        self.index = index
+        self.vertices, self.uvs, self.normals, self.textures = [], [], [], []
+        self.tints, self.shifts, self.shades = [], [], []
+
+    def quad(
+        self, a, b, c, d, texture, facing, *, repeat=(1.0, 1.0), turned=False, tint=(0, 0, 0),
+        reach=0.12, shade=1.0,
+    ):  # fmt: skip
+        """Corners run bottom-left, bottom-right, top-right, top-left as seen from the front."""
+        points = np.array((a, b, c, d), np.float32)
+        normal = np.cross(points[1] - points[0], points[3] - points[0])
+        length = np.linalg.norm(normal)
+        if length < 1e-7:
+            return
+        normal = normal / length
+        if np.dot(normal, facing) < 0:
+            normal = -normal
+        ru, rv = repeat
+        corners = ((0, rv), (ru, rv), (ru, 0), (0, 0))
+        if turned:
+            corners = ((rv, 0), (rv, ru), (0, ru), (0, 0))
+        self.vertices.append(points)
+        self.uvs.append(corners)
+        self.normals.append(normal)
+        self.textures.append(self.index[texture])
+        self.tints.append(tint)
+        self.shifts.append((facing[0] * reach, facing[1] * reach))
+        self.shades.append(shade)
+
+
+def cell_ceiling(theme, x, y):
+    key = theme.zone_at(x, y)
+    if key == "D":
+        return DOOR_TOP
+    if key == "N":
+        return CRAWL_TOP
+    if key != "A" and theme.edge_count(x, y) == 0:
+        return WALL_TOP + RAISED
+    return WALL_TOP
+
+
+def cell_floor(theme, x, y):
+    sunk = floor_name(theme, x, y)[0] == "floor3" and theme.edge_count(x, y) == 0
+    return -SUNK if sunk else 0.0
+
+
+def floor_name(theme, x, y):
+    """Texture and direction of a deck tile; corridors run a strip down each side."""
+    key = theme.zone_at(x, y)
+    zone = ZONES[key]
+    if key in CORRIDORS:
+        side, middle = zone.floors
+        if theme.edge_count(x, y) == 0:
+            return middle, False
+        if side != "floortrim4":
+            return side, False
+        west_or_east = not theme.is_open(x - 1, y) or not theme.is_open(x + 1, y)
+        return "floortrim4", not west_or_east
+    name = pick(zone.floors, x, y, 1)
+    if zone.blood and stable(x, y, 2) < zone.blood * 0.5 and f"{name}_blood" in BLOODY_FLOORS:
+        return f"{name}_blood", False
+    return name, False
+
+
+BLOODY_FLOORS = ("floor1_blood", "floor2_blood", "floor5_blood")
+
+
+def ceiling_name(theme, x, y):
+    zone = ZONES[theme.zone_at(x, y)]
+    if theme.light_cells.get((x, y)):
+        return zone.lamp
+    if theme.edge_count(x, y) == 0 and "ceiling2" in zone.ceilings:
+        return "ceiling2"
+    return pick(zone.ceilings, x, y, 3)
+
+
+def add_cells(mesh, theme):
+    for y in range(theme.height):
+        for x in range(theme.width):
+            if not theme.is_open(x, y):
+                continue
+            low, high = cell_floor(theme, x, y), cell_ceiling(theme, x, y)
+            name, turned = floor_name(theme, x, y)
+            mesh.quad(
+                (x, y + 1, low), (x + 1, y + 1, low), (x + 1, y, low), (x, y, low), name,
+                (0, 0, 1), repeat=(1.0, 0.5 if name == "floortrim4" else 1.0), turned=turned,
+                reach=0.0,
+            )  # fmt: skip
+            lit = bool(theme.light_cells.get((x, y)))
+            mesh.quad(
+                (x, y, high), (x + 1, y, high), (x + 1, y + 1, high), (x, y + 1, high),
+                ceiling_name(theme, x, y), (0, 0, -1), reach=0.0, shade=1.0 if lit else 0.8,
+            )  # fmt: skip
+            add_steps(mesh, theme, x, y, low, high)
+
+
+def add_steps(mesh, theme, x, y, low, high):
+    """Risers where a neighbouring ceiling or floor sits at another height."""
+    for dx, dy in FACES:
+        nx, ny = x + dx, y + dy
+        if not theme.is_open(nx, ny):
+            continue
+        left, right = edge_points(x, y, dx, dy)
+        facing = (-dx, -dy, 0)
+        other_high = cell_ceiling(theme, nx, ny)
+        if other_high < high:
+            door = theme.zone_at(nx, ny) == "D"
+            mesh.quad(
+                (*left, other_high), (*right, other_high), (*right, high), (*left, high),
+                "doorborder1" if door else "ceiling_trim4", facing, turned=not door,
+                shade=0.7, reach=0.3,
+            )  # fmt: skip
+        other_low = cell_floor(theme, nx, ny)
+        if other_low > low:
+            mesh.quad(
+                (*left, low), (*right, low), (*right, other_low), (*left, other_low),
+                "floor_trim1", facing, shade=0.45, reach=0.3,
+            )  # fmt: skip
+
+
+def edge_points(x, y, dx, dy):
+    """Ends of the cell edge toward (dx, dy), left then right as seen from inside the cell."""
+    if dx > 0:
+        return (x + 1, y), (x + 1, y + 1)
+    if dx < 0:
+        return (x, y + 1), (x, y)
+    if dy > 0:
+        return (x + 1, y + 1), (x, y + 1)
+    return (x, y), (x + 1, y)
+
+
+def wall_edges(theme):
+    """Every open-to-solid cell edge, grouped into straight runs of one kind of wall."""
+    groups = {}
+    for y in range(theme.height):
+        for x in range(theme.width):
+            if not theme.is_open(x, y):
+                continue
+            for dx, dy in FACES:
+                nx, ny = x + dx, y + dy
+                if theme.is_open(nx, ny):
+                    continue
+                line = (x + (dx > 0)) if dx else (y + (dy > 0))
+                along = y if dx else x
+                inside = 0 <= nx < theme.width and 0 <= ny < theme.height
+                solid_cell = bool(inside and theme.blocks[ny, nx])
+                key = (dx, dy, line, theme.zone_at(x, y), solid_cell)
+                groups.setdefault(key, []).append(along)
+    runs = []
+    for key, spots in groups.items():
+        spots.sort()
+        start = previous = spots[0]
+        for spot in spots[1:] + [None]:
+            if spot is None or spot != previous + 1:
+                runs.append((*key, start, previous + 1))
+                start = spot
+            previous = spot
+    return runs
+
+
+class Wall:
+    """A straight wall seen from the open side; s runs left to right across the view."""
+
+    def __init__(self, mesh, dx, dy, line, first, last, top, zone, seed):
+        self.mesh, self.top, self.zone, self.seed = mesh, top, zone, seed
+        self.normal = np.array((-dx, -dy), np.float32)
+        if dx > 0:
+            self.origin, self.right = np.array((line, first)), np.array((0, 1))
+        elif dx < 0:
+            self.origin, self.right = np.array((line, last)), np.array((0, -1))
+        elif dy > 0:
+            self.origin, self.right = np.array((last, line)), np.array((-1, 0))
+        else:
+            self.origin, self.right = np.array((first, line)), np.array((1, 0))
+        self.length = float(last - first)
+
+    def at(self, s, depth, z):
+        """A point s along the wall, depth behind its line (negative stands in front)."""
+        x, y = self.origin + self.right * s - self.normal * depth
+        return float(x), float(y), z
+
+    @property
+    def facing(self):
+        return float(self.normal[0]), float(self.normal[1]), 0.0
+
+    def side(self, sign):
+        return float(self.right[0] * sign), float(self.right[1] * sign), 0.0
+
+    def flat(self, s0, s1, z0, z1, texture, *, depth=0.0, repeat=(1.0, 1.0), shade=1.0, reach=0.14):
+        self.mesh.quad(
+            self.at(s0, depth, z0), self.at(s1, depth, z0), self.at(s1, depth, z1),
+            self.at(s0, depth, z1), texture, self.facing, repeat=repeat, shade=shade, reach=reach,
+        )  # fmt: skip
+
+    def pillar(self, s0, s1):
+        """Stands proud of the wall line, so its sides show from along the corridor."""
+        proud = -PILLAR_PROUD
+        self.flat(s0, s1, 0, self.top, self.zone.pillar, depth=proud, shade=0.9, reach=0.2)
+        if self.zone.stripe:
+            self.flat(s0, s1, BAND_LOW, BAND_HIGH, self.zone.stripe, depth=proud - 0.01, reach=0.2)
+        for s, sign in ((s0, -1), (s1, 1)):
+            self.mesh.quad(
+                self.at(s, 0, 0), self.at(s, proud, 0), self.at(s, proud, self.top),
+                self.at(s, 0, self.top), self.zone.pillar, self.side(sign),
+                repeat=(0.2, 1.0), shade=0.6, reach=0.2,
+            )  # fmt: skip
+
+    def bay(self, s0, s1, texture):
+        """A recess: sloped sill, tilted panel, sloped lintel, then the wall above."""
+        zone = self.zone
+        glow = zone.bay_glow
+        low, high = PANEL_LOW, PANEL_HIGH
+        reach = 0.6
+        self.mesh.quad(
+            self.at(s0, 0, 0), self.at(s1, 0, 0), self.at(s1, low, SILL_TOP),
+            self.at(s0, low, SILL_TOP), zone.sill, self.facing, shade=0.8, reach=0.3,
+        )  # fmt: skip
+        self.mesh.quad(
+            self.at(s0, low, SILL_TOP), self.at(s1, low, SILL_TOP), self.at(s1, high, PANEL_TOP),
+            self.at(s0, high, PANEL_TOP), texture, self.facing, tint=glow, reach=reach,
+        )  # fmt: skip
+        self.mesh.quad(
+            self.at(s0, high, PANEL_TOP), self.at(s1, high, PANEL_TOP),
+            self.at(s1, 0, LINTEL_FOOT), self.at(s0, 0, LINTEL_FOOT), zone.lintel, self.facing,
+            tint=tuple(c * 0.5 for c in glow), shade=0.55, reach=reach,
+        )  # fmt: skip
+        self.flat(s0, s1, LINTEL_FOOT, self.top, zone.cornice, shade=0.85)
+        for s, sign in ((s0, 1), (s1, -1)):
+            self.mesh.quad(
+                self.at(s, 0, 0), self.at(s, low, SILL_TOP), self.at(s, high, PANEL_TOP),
+                self.at(s, 0, LINTEL_FOOT), "trim1", self.side(sign), repeat=(0.3, 1.0),
+                tint=tuple(c * 0.6 for c in glow), shade=0.62, reach=reach,
+            )  # fmt: skip
+
+    def window(self, s0, s1):
+        """A framed opening. The sky sits at the back and its four reveals close every gap."""
+        low, high, deep = WINDOW_LOW, WINDOW_HIGH, WINDOW_DEPTH
+        self.flat(s0, s1, 0, low, "wall9", shade=0.8)
+        self.flat(s0, s1, high, self.top, "walltrim6", shade=0.8)
+        self.flat(s0, s1, low, high, "viewport", depth=deep, shade=SKY)
+        frame = "walltrim3"
+        self.mesh.quad(
+            self.at(s0, 0, low), self.at(s1, 0, low), self.at(s1, deep, low),
+            self.at(s0, deep, low), frame, (0, 0, 1), shade=0.7, reach=0.3,
+        )  # fmt: skip
+        self.mesh.quad(
+            self.at(s0, deep, high), self.at(s1, deep, high), self.at(s1, 0, high),
+            self.at(s0, 0, high), frame, (0, 0, -1), shade=0.5, reach=0.3,
+        )  # fmt: skip
+        for s, sign in ((s0, 1), (s1, -1)):
+            self.mesh.quad(
+                self.at(s, 0, low), self.at(s, deep, low), self.at(s, deep, high),
+                self.at(s, 0, high), frame, self.side(sign), shade=0.6, reach=0.3,
+            )  # fmt: skip
+
+    def floor_line(self):
+        """A painted line beside the wall: its color tells which part of the ship this is."""
+        if self.zone.stripe:
+            near, far = -LINE_OFFSET, -LINE_OFFSET - LINE_WIDTH
+            self.mesh.quad(
+                self.at(0, near, 0.012), self.at(self.length, near, 0.012),
+                self.at(self.length, far, 0.012), self.at(0, far, 0.012), self.zone.stripe,
+                (0, 0, 1), repeat=(self.length, 1.0), reach=0.0,
+            )  # fmt: skip
+
+    def modules(self, choose):
+        """Share the run out between pillars and bays, ending on a pillar at both ends."""
+        count = max(int((self.length - PILLAR) / BAY_SPAN + 0.5), 1)
+        span = (self.length - (count + 1) * PILLAR) / count
+        if span < 0.6:
+            self.panelled(choose(0))
+            return
+        s = 0.0
+        for index in range(count):
+            self.pillar(s, s + PILLAR)
+            self.bay(s + PILLAR, s + PILLAR + span, choose(index))
+            s += PILLAR + span
+        self.pillar(s, s + PILLAR)
+
+    def panelled(self, texture):
+        """A short wall has no room for a bay: a kick plate, a panel and a cornice."""
+        self.flat(0, self.length, 0, 0.26, self.zone.sill, shade=0.8)
+        self.flat(0, self.length, 0.26, self.top - 0.3, texture, repeat=(self.length / 1.6, 1.0))
+        self.flat(0, self.length, self.top - 0.3, self.top, self.zone.cornice, shade=0.85)
+
+
+def worn(zone, name, x, y):
+    """Blood and claw marks stay rare, and only appear on panels that have such a copy."""
+    if stable(x, y, 8) >= zone.blood:
+        return name
+    variant = "clawed" if stable(x, y, 9) < 0.5 else "blood"
+    candidate = f"{name}_{variant}"
+    return candidate if candidate in WORN_NAMES else name
+
+
+WORN_NAMES = tuple(
+    f"{name}_{kind}"
+    for name in ("wall10", "wall6", "wall1", "wall4")
+    for kind in ("blood", "clawed")
+)
+
+
+def add_walls(mesh, theme):
+    for dx, dy, line, key, is_block, first, last in wall_edges(theme):
+        zone = ZONES[key]
+        x = line if dx else first
+        y = first if dx else line
+        if key == "D":
+            top = DOOR_TOP
+        elif key == "N":
+            top = CRAWL_TOP
+        else:
+            top = WALL_TOP
+        wall = Wall(mesh, dx, dy, line, first, last, top, zone, stable(x, y, 4))
+        if key == "D":
+            wall.flat(0, wall.length, 0, top, "walltrim1", shade=0.7)
+        elif is_block:
+            add_block(wall, FURNITURE.get(key, "cabinet"))
+            continue
+        elif key == "B" and dy < 0 and line <= 4:
+            add_viewport(wall)
+        elif key in "NA":
+            wall.panelled(pick(zone.bays, x, y, 5))
+        else:
+            wall.modules(
+                lambda i, x=x, y=y, z=zone: worn(z, pick(z.bays, x + i, y + i, 5), x + i, y + i)
+            )
+            wall.floor_line()
+
+
+def add_block(wall, kind):
+    length = wall.length
+    if kind == "crate":
+        wall.flat(0, length, 0, 1.0, "other1", repeat=(length, 1.0))
+        wall.flat(0, length, 1.0, 1.1, "walltrim5", repeat=(length, 1.0), shade=0.7)
+        wall.flat(0, length, 1.1, wall.top, "other2", repeat=(length, 1.0))
+    elif kind == "reactor":
+        wall.flat(0, length, 0, 0.5, "wall12", repeat=(length, 0.4), shade=0.8)
+        wall.flat(0, length, 0.5, 1.5, "rack1", repeat=(length, 1.0))
+        wall.flat(0, length, 1.5, wall.top, "columna2", repeat=(length / 2, 1.0), shade=0.8)
+    elif kind == "column":
+        # The ship's centre: glowing conduits ringed by plate, seen from every corridor.
+        wall.flat(0, length, 0, 0.5, "columna1", repeat=(length, 1.0), shade=0.9)
+        wall.flat(0, length, 0.5, 1.7, "wall12", repeat=(length, 1.0))
+        wall.flat(0, length, 1.7, wall.top + RAISED, "columna2", repeat=(length, 1.0), shade=0.9)
+    else:
+        wall.flat(0, length, 0, 0.2, "floor_trim2", repeat=(length, 1.0), shade=0.8)
+        wall.flat(0, length, 0.2, wall.top, "wall11", repeat=(length, 1.0))
+
+
+def add_viewport(wall):
+    """Windows on the bow: pillars frame deep openings onto open space."""
+    count = max(int(wall.length / 2), 1)
+    span = (wall.length - (count + 1) * PILLAR) / count
+    if span < 0.6:
+        wall.panelled("walltrim6")
+        return
+    s = 0.0
+    for _ in range(count):
+        wall.pillar(s, s + PILLAR)
+        wall.window(s + PILLAR, s + PILLAR + span)
+        s += PILLAR + span
+    wall.pillar(s, s + PILLAR)
+
+
+def add_hull_doors(mesh, theme):
+    """All three exits look alike; only trying the door tells which one works."""
+    for _, ex, ey in EXITS:
+        x, y = int(ex), int(ey)
+        for face, (dx, dy) in enumerate(FACES):
+            if theme.is_open(x + dx, y + dy):
+                continue
+            line = (x + (dx > 0)) if dx else (y + (dy > 0))
+            along = y if dx else x
+            wall = Wall(mesh, dx, dy, line, along - 1, along + 2, WALL_TOP, ZONES["S"], face)
+            wall.flat(0.45, 2.55, 0, 1.75, "door1", depth=-0.09, shade=0.95)
+            wall.flat(0.45, 2.55, 1.75, WALL_TOP, "doorborder1", depth=-0.09, shade=0.8)
+
+
+def add_signs(mesh, theme):
+    for (x, y, face), name in (*SIGNS.items(), *WARNINGS.items()):
+        dx, dy = FACES[face]
+        line = (x + (dx > 0)) if dx else (y + (dy > 0))
+        along = y if dx else x
+        # The wall's outward normal is (dx, dy), so it is built from the open cell's side.
+        wall = Wall(mesh, -dx, -dy, line, along, along + 1, WALL_TOP, ZONES["S"], 0)
+        wall.flat(-0.25, 1.25, 1.74, 2.0, name, depth=-0.1, shade=1.0, reach=0.3)
+
+
+def add_crosses(mesh, theme):
+    for x, y, face in CROSSES:
+        wall_at(mesh, x, y, face).flat(0.15, 0.85, 1.15, 1.85, "cross", depth=-0.1, reach=0.3)
+
+
+def add_hazard_lines(mesh, theme):
+    """Striped thresholds warn that the ship's dangerous end starts here."""
+    for y in range(theme.height):
+        for x in range(theme.width):
+            if not theme.is_open(x, y) or theme.zone_at(x, y) != "D":
+                continue
+            if not any(
+                theme.is_open(x + dx, y + dy) and theme.zone_at(x + dx, y + dy) in "CRG"
+                for dx, dy in FACES
+            ):
+                continue
+            mesh.quad(
+                (x, y + 1, 0.01), (x + 1, y + 1, 0.01), (x + 1, y, 0.01), (x, y, 0.01), "hazard",
+                (0, 0, 1), reach=0.0,
+            )  # fmt: skip
+
+
+def add_wreck(mesh):
+    """One ceiling panel has torn loose in the crew ring: a sight nobody forgets passing."""
+    mesh.quad(
+        (7.1, 16.2, 1.25), (8.9, 16.5, 1.55), (8.9, 17.3, WALL_TOP), (7.1, 17.0, WALL_TOP),
+        "ceiling2", (0.1, -0.6, 0.8), shade=0.75, reach=0.0,
+    )  # fmt: skip
+    mesh.quad(
+        (7.1, 16.2, 1.25), (8.9, 16.5, 1.55), (8.9, 17.3, WALL_TOP), (7.1, 17.0, WALL_TOP),
+        "walltrim5", (-0.1, 0.6, -0.8), shade=0.6, reach=0.0,
+    )  # fmt: skip
+
+
+def wall_at(mesh, x, y, face):
+    dx, dy = FACES[face]
+    line = (x + (dx > 0)) if dx else (y + (dy > 0))
+    along = y if dx else x
+    return Wall(mesh, -dx, -dy, line, along, along + 1, WALL_TOP, ZONES["S"], 0)
+
+
+def build_mesh(theme, names):
+    mesh = Mesh({str(name): i for i, name in enumerate(names)})
+    add_cells(mesh, theme)
+    add_walls(mesh, theme)
+    add_hull_doors(mesh, theme)
+    add_signs(mesh, theme)
+    add_crosses(mesh, theme)
+    add_hazard_lines(mesh, theme)
+    add_wreck(mesh)
+    return {
+        "vertices": np.array(mesh.vertices, np.float32),
+        "uvs": np.array(mesh.uvs, np.float32),
+        "normals": np.array(mesh.normals, np.float32),
+        "textures": np.array(mesh.textures, np.int64),
+        "tints": np.array(mesh.tints, np.float32),
+        "shifts": np.array(mesh.shifts, np.float32),
+        "shades": np.array(mesh.shades, np.float32),
+    }

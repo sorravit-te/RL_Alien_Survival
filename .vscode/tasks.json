@@ -18,6 +18,25 @@
       "problemMatcher": []
     },
     {
+      "label": "Alien RL: Bake ship textures",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "args": ["-m", "tools.bake_ship_textures"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Alien RL: Play ship deck",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "args": [
+        "-B", "-m", "app.play", "--scenario", "ship_deck_v1",
+        "--scenario-seed", "${input:seed}", "--fps-limit", "60"
+      ],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
       "label": "Alien RL: Run tests",
       "type": "process",
       "command": "${workspaceFolder}/.venv/Scripts/python.exe",
@@ -40,6 +59,12 @@
     }
   ],
   "inputs": [
+    {
+      "id": "seed",
+      "type": "promptString",
+      "description": "Scenario seed: picks spawns, keycard and working exit",
+      "default": "1"
+    },
     {
       "id": "run",
       "type": "promptString",

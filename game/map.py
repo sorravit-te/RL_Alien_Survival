@@ -3,6 +3,16 @@
 from dataclasses import dataclass, replace
 from math import floor, isfinite, pi
 
+from game.ship_deck import (
+    ALIEN_SPAWNS,
+    EXITS,
+    KEYCARDS,
+    ROWS,
+    SHIP_SCENARIO,
+    SURVIVOR_SPAWNS,
+    WAYPOINTS,
+)
+
 
 @dataclass(frozen=True)
 class MapObject:
@@ -113,9 +123,25 @@ def small_test_map() -> WorldMap:
     )
 
 
+def ship_deck() -> WorldMap:
+    objects = tuple(
+        MapObject(object_id, kind, x, y)
+        for kind, points in (("keycard", KEYCARDS), ("exit", EXITS))
+        for object_id, x, y in points
+    )
+    return WorldMap(
+        ROWS,
+        SURVIVOR_SPAWNS,
+        objects,
+        alien_spawn=ALIEN_SPAWNS[0],
+        patrol_waypoints=WAYPOINTS,
+        alien_spawn_options=ALIEN_SPAWNS[1:],
+    )
+
+
 DEFAULT_SCENARIO = "small_test_map_v1"
 RANDOM_SCENARIO = "occluded_loop_random_v1"
-SCENARIOS = (DEFAULT_SCENARIO, "occluded_loop_dev_v1", RANDOM_SCENARIO)
+SCENARIOS = (DEFAULT_SCENARIO, "occluded_loop_dev_v1", RANDOM_SCENARIO, SHIP_SCENARIO)
 
 
 def scenario_map(name=DEFAULT_SCENARIO) -> WorldMap:
@@ -124,6 +150,8 @@ def scenario_map(name=DEFAULT_SCENARIO) -> WorldMap:
         return small_test_map()
     if name not in SCENARIOS:
         raise ValueError(f"Unknown scenario: {name!r}")
+    if name == SHIP_SCENARIO:
+        return ship_deck()
     # Reviewed fixed DEV world. Keep object/order/waypoint identity exact.
     world = WorldMap(
         (
