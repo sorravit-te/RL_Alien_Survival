@@ -6,8 +6,8 @@ from math import ceil, isfinite
 
 import numpy as np
 
+from rl.bots.evasive import EvasionConfig
 from rl.contract import search_contract
-from rl.evasive_survivor import EvasionConfig
 
 CONTROLLER_SPECS = {
     "random_valid_mask": ("uniform_valid", 3, "baseline"),

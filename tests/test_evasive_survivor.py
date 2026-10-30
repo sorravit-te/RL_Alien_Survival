@@ -9,16 +9,12 @@ import pytest
 from game.core import GameCore
 from game.map import WorldMap, small_test_map
 from game.state import AlienState, CoreConfig, SurvivorState
+from rl.bots.evasive import EvasionConfig, EvasiveExplorerBot
+from rl.bots.explorer import ExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView, observe_survivor, observe_threat
 from rl.env import AlienEnv
-from rl.evasive_survivor import (
-    EvasionConfig,
-    EvasiveExplorerBot,
-    SurvivorThreatView,
-    observe_threat,
-)
 from rl.observations import build_observation
 from rl.pipeline import make_env, prepare_run, read_json
-from rl.survivor_bots import ExplorerBot, SurvivorView, observe_survivor
 
 
 def arena():

@@ -7,16 +7,12 @@ import numpy as np
 import pytest
 
 import ai.navigation as navigation
-import rl.evasive_survivor as evasion
+import rl.bots.evasive as evasion
 from game.map import MapObject, WorldMap
 from game.state import AlienState, CoreConfig, SurvivorCommand, SurvivorState
-from rl.evasive_survivor import (
-    EvasiveExplorerBot,
-    ExplorationRetryRecord,
-    SurvivorThreatView,
-    observe_threat,
-)
-from rl.survivor_bots import ExplorerBot, SurvivorView
+from rl.bots.evasive import EvasiveExplorerBot, ExplorationRetryRecord
+from rl.bots.explorer import ExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView, observe_threat
 
 ROWS = ("#" * 16,) + ("#" + "." * 14 + "#",) * 10 + ("#" * 16,)
 TARGET = (8.5, 5.5)

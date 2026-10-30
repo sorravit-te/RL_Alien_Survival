@@ -1,57 +1,12 @@
-"""Explorer uses known static geometry and visible objects only, no Alien action.
+"""Explorer uses known static geometry and visible objects only, no Alien action."""
 
-Object perception is an explicit privileged boundary. Bot.command receives the
-filtered view, not WorldSnapshot/WorldMap objects. FOV75 and LoS match the human
-horizontal camera rules; simulated pitch has no interaction meaning. The bot
-uses center visibility (conservative vs a partially visible human sprite).
-"""
-
-from dataclasses import dataclass
-from math import atan2, ceil, cos, hypot, pi, radians, sin
+from math import atan2, ceil, hypot, pi, radians
 
 from ai.navigation import Navigator
 from game.interaction import angle_difference, segment_clear
 from game.map import WorldMap
 from game.state import SurvivorCommand
-
-
-@dataclass(frozen=True)
-class SurvivorView:
-    x: float
-    y: float
-    yaw: float
-    has_keycard: bool
-    visible_objects: tuple
-
-
-def move_command(dx, dy, yaw, turn, config, *, running=False):
-    """Command for world displacement (dx, dy); Core rotates first, then moves in that frame."""
-    yaw += turn
-    scale = config.tick_hz / (config.run_speed if running else config.walk_speed)
-    return SurvivorCommand(
-        forward=max(-1.0, min(1.0, (dx * cos(yaw) + dy * sin(yaw)) * scale)),
-        strafe=max(-1.0, min(1.0, (-dx * sin(yaw) + dy * cos(yaw)) * scale)),
-        yaw_delta=turn,
-        running=running,
-    )
-
-
-def observe_survivor(world, survivor, has_keycard):
-    visible = []
-    for obj in world.objects:
-        if obj.kind == "keycard" and has_keycard:
-            continue
-        dx, dy = obj.x - survivor.x, obj.y - survivor.y
-        angle = abs(angle_difference(atan2(dy, dx), survivor.yaw)) if hypot(dx, dy) else 0
-        if angle <= radians(75) / 2 and segment_clear(world, survivor.x, survivor.y, obj.x, obj.y):
-            visible.append(obj)
-    return SurvivorView(
-        survivor.x,
-        survivor.y,
-        survivor.yaw,
-        has_keycard,
-        tuple(sorted(visible, key=lambda obj: obj.object_id)),
-    )
+from rl.bots.views import move_command
 
 
 class ExplorerBot:

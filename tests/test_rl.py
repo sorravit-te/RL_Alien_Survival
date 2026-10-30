@@ -12,12 +12,13 @@ from game.core import GameCore
 from game.map import MapObject, WorldMap, small_test_map
 from game.perception import PerceptionSnapshot
 from game.state import CoreConfig, GameEvent, SurvivorCommand
+from rl.bots.explorer import ExplorerBot
+from rl.bots.views import observe_survivor
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
 from rl.contract import BASE_FIELDS, CANDIDATE_FIELDS, OBSERVATION_SIZE, VERSION, WAIT
 from rl.env import AlienEnv
 from rl.observations import build_observation
 from rl.rewards import RewardTracker
-from rl.survivor_bots import ExplorerBot, observe_survivor
 
 
 def arena(objects=(), survivor=(2.5, 2.5), alien=(10.5, 10.5, 0), waypoints=()):

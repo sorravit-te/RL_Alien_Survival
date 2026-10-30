@@ -9,8 +9,8 @@ import pytest
 from game.core import GameCore
 from game.map import MapObject, WorldMap
 from game.state import SurvivorCommand
-from rl.evasive_survivor import EvasiveExplorerBot, SurvivorThreatView, observe_threat
-from rl.survivor_bots import SurvivorView
+from rl.bots.evasive import EvasiveExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView, observe_threat
 
 
 def fixture():

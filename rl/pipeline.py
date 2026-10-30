@@ -18,9 +18,9 @@ from sb3_contrib import MaskablePPO
 
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
+from rl.bots.evasive import EvasionConfig
 from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, search_contract
 from rl.env import THREAT_BOT_KINDS, AlienEnv
-from rl.evasive_survivor import EvasionConfig
 
 # Mission bots a training run may use; stationary_debug is a mechanics fixture only.
 TRAINING_BOT_KINDS = ("explorer", *THREAT_BOT_KINDS)
@@ -68,11 +68,15 @@ def dependencies():
     }
 
 
+def source_files():
+    """Every behavior-defining file, including packages nested below game/ai/rl."""
+    files = sorted(p for folder in ("game", "ai", "rl") for p in (ROOT / folder).rglob("*.py"))
+    return [*files, ROOT / "requirements.lock.txt"]
+
+
 def source_state():
-    files = sorted(p for folder in ("game", "ai", "rl") for p in (ROOT / folder).glob("*.py"))
-    files += [ROOT / "requirements.lock.txt"]
     source_hash = hashlib.sha256(
-        b"".join(p.relative_to(ROOT).as_posix().encode() + p.read_bytes() for p in files)
+        b"".join(p.relative_to(ROOT).as_posix().encode() + p.read_bytes() for p in source_files())
     ).hexdigest()
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True

@@ -8,13 +8,9 @@ import pytest
 from game.core import GameCore
 from game.map import MapObject, WorldMap
 from game.state import AlienState, CoreConfig, SurvivorState
-from rl.evasive_survivor import (
-    EvasionConfig,
-    EvasiveExplorerBot,
-    SurvivorThreatView,
-    observe_threat,
-)
-from rl.survivor_bots import ExplorerBot, SurvivorView
+from rl.bots.evasive import EvasionConfig, EvasiveExplorerBot
+from rl.bots.explorer import ExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView, observe_threat
 
 
 @pytest.fixture(autouse=True)

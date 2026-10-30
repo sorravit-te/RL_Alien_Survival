@@ -15,6 +15,7 @@ from rl.env import AlienEnv
 from rl.evaluate import HeuristicSelector, evaluate, frozen_evaluation
 from rl.pipeline import (
     CHECKPOINT_FORMAT,
+    ROOT,
     ManifestEnv,
     digest,
     load_checkpoint,
@@ -25,6 +26,7 @@ from rl.pipeline import (
     read_json,
     read_run,
     save_checkpoint,
+    source_files,
     source_state,
     write_json,
 )
@@ -100,6 +102,12 @@ def test_training_manifest_reset_cycle_and_cap(config):
             env.reset(options={"bot_seed": 1})
     finally:
         env.close()
+
+
+def test_source_identity_covers_nested_packages():
+    relative = {p.relative_to(ROOT).as_posix() for p in source_files()}
+    assert {"rl/env.py", "rl/bots/evasive.py", "rl/bots/wall_loop.py"} <= relative
+    assert {"game/core.py", "ai/navigation.py", "requirements.lock.txt"} <= relative
 
 
 def test_frozen_config_manifest_and_source_rejected(tmp_path, base_config, monkeypatch):

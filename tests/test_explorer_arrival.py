@@ -8,8 +8,9 @@ import pytest
 from game.interaction import select_target
 from game.map import MapObject, WorldMap
 from game.state import CoreConfig, SurvivorCommand, SurvivorState
-from rl.evasive_survivor import EvasiveExplorerBot, SurvivorThreatView
-from rl.survivor_bots import ExplorerBot, SurvivorView
+from rl.bots.evasive import EvasiveExplorerBot
+from rl.bots.explorer import ExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView
 
 ROWS = ("########",) + ("#......#",) * 5 + ("########",)
 HERE = (2.5, 2.5)

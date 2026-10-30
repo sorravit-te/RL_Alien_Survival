@@ -9,13 +9,9 @@ from test_flee_resume import arena, retreating
 from game.map import MapObject
 from game.motion import segment_has_clearance
 from game.state import AlienState, CoreConfig, SurvivorCommand, SurvivorState
-from rl.evasive_survivor import (
-    EvasionConfig,
-    EvasiveExplorerBot,
-    SurvivorThreatView,
-    observe_threat,
-)
-from rl.survivor_bots import ExplorerBot, SurvivorView
+from rl.bots.evasive import EvasionConfig, EvasiveExplorerBot
+from rl.bots.explorer import ExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView, observe_threat
 
 
 def mission(yaw=pi / 2, objects=(), has_keycard=False):

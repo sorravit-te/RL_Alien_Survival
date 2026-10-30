@@ -8,16 +8,11 @@ import pytest
 from game.interaction import segment_clear
 from game.map import scenario_map
 from game.state import CoreConfig
+from rl.bots.evasive import EvasionConfig, EvasiveExplorerBot
+from rl.bots.views import SurvivorThreatView, SurvivorView
+from rl.bots.wall_loop import EvasiveMixBot, WallLoopEvasiveBot
 from rl.env import AlienEnv
-from rl.evasive_survivor import (
-    EvasionConfig,
-    EvasiveExplorerBot,
-    EvasiveMixBot,
-    SurvivorThreatView,
-    WallLoopEvasiveBot,
-)
 from rl.scripted_controllers import HeuristicSelector
-from rl.survivor_bots import SurvivorView
 
 SCENE = "occluded_loop_dev_v1"
 

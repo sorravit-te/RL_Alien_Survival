@@ -64,9 +64,9 @@ def forbid_runtime(monkeypatch):
     import torch
 
     from game.core import GameCore
+    from rl.bots.evasive import EvasiveExplorerBot
+    from rl.bots.explorer import ExplorerBot
     from rl.env import AlienEnv
-    from rl.evasive_survivor import EvasiveExplorerBot
-    from rl.survivor_bots import ExplorerBot
 
     def forbidden(*a, **kw):
         pytest.fail("Native actor/model/rollout execution forbidden in pure readiness tests")

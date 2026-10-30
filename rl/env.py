@@ -17,6 +17,10 @@ from game.core import GameCore
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
 from rl.alien_view import allowed_view, record_waypoint_visits, target_source
+from rl.bots.evasive import EvasiveExplorerBot
+from rl.bots.explorer import ExplorerBot, StationaryDebugBot
+from rl.bots.views import observe_survivor, observe_threat
+from rl.bots.wall_loop import EvasiveMixBot, WallLoopEvasiveBot
 from rl.candidates import build_candidates, candidate_masks
 from rl.contract import (
     ACTION_COUNT,
@@ -26,16 +30,9 @@ from rl.contract import (
     WAIT,
     WORLD_SCALE,
 )
-from rl.evasive_survivor import (
-    EvasiveExplorerBot,
-    EvasiveMixBot,
-    WallLoopEvasiveBot,
-    observe_threat,
-)
 from rl.observations import build_observation
 from rl.rewards import RewardTracker
 from rl.search_metrics import SearchMetrics
-from rl.survivor_bots import ExplorerBot, StationaryDebugBot, observe_survivor
 
 BOT_KINDS = ("explorer", "evasive_explorer", "stationary_debug", "wall_loop_evasive", "evasive_mix")
 # Bots that receive the LoS-filtered threat view and accept EvasionConfig.
