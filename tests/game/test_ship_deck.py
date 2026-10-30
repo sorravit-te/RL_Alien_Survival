@@ -118,6 +118,11 @@ def test_corridors_form_loops():
         assert cell_of(WAYPOINTS[8]) in seen and cell_of(WAYPOINTS[12]) in seen
 
 
+def test_long_halls_have_partitions_to_hide_behind():
+    for x in (*range(2, 6), *range(34, 38)):
+        assert any(WORLD.blocked(x, y) for y in range(15, 26)), x
+
+
 def test_zone_rows_trace_the_same_floor():
     assert len(ZONE_ROWS) == len(ROWS)
     for row, zones in zip(ROWS, ZONE_ROWS, strict=True):
