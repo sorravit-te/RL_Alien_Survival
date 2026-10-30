@@ -167,34 +167,3 @@ def test_cli_debug_flag_is_off_by_default_and_pygame_closes(monkeypatch, enabled
     play.main(["--debug-alien"] if enabled else [])
     assert seen == [enabled]
     assert not pygame.display.get_init() and not pygame.font.get_init()
-
-
-def test_old_source_metadata_rejected_before_any_model_loading(tmp_path, monkeypatch):
-    import rl.pipeline as pipeline
-    from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, SEARCH_CONTROL, VERSION
-
-    config = {"manifest_seed": 123, "manifest_counts": {"train": 1, "validation": 1, "test": 1}}
-    old = "7ff359178fed37db2d48e6149761ad7c9e6820633c875fe50221251db800e424"
-    current = pipeline.source_state()
-    assert current["source_sha256"] != old
-    metadata = {
-        "contract_version": VERSION,
-        "search_control": SEARCH_CONTROL,
-        "observation_shape": [OBSERVATION_SIZE],
-        "action_n": ACTION_COUNT,
-        "config_sha256": pipeline.digest(config),
-        "config": config,
-        "manifest_sha256": pipeline.digest(pipeline.make_manifest(123, config["manifest_counts"])),
-        "dependencies": pipeline.dependencies(),
-        "format": pipeline.CHECKPOINT_FORMAT,
-        "source": {"source_sha256": old},
-    }
-    path = tmp_path / "not_a_model.zip"
-    pipeline.write_json(path.with_suffix(".metadata.json"), metadata)
-
-    def never_load(*args, **kwargs):
-        pytest.fail("Source mismatch must stop before any model load")
-
-    monkeypatch.setattr(pipeline.MaskablePPO, "load", never_load)
-    with pytest.raises(ValueError, match="source"):
-        pipeline.load_checkpoint(path, config, current)

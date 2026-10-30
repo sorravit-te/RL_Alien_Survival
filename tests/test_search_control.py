@@ -467,7 +467,16 @@ def test_evaluation_rows_serialize_search_audit(env, tmp_path, monkeypatch):
         "reset_seed": 3,
         "selector_seed": 4,
     }
-    _, rows = evaluation.evaluate("wait", cfg, [case], tmp_path / "fake.csv")
+    _, rows = evaluation.evaluate(
+        "wait",
+        cfg,
+        [case],
+        tmp_path / "fake.csv",
+        inference="constant_wait",
+        episode_seeds=[5],
+        repeat_index=0,
+        controller_name="wait",
+    )
     assert (
         rows[0]["search_metrics"]["control"]["version"]
         == "continue-cancel-audit-v2-pursuit-tracking"

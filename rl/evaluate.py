@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from rl.contract import WAIT
-from rl.pipeline import load_checkpoint, make_env, parameter_hash, read_run, write_json
+from rl.pipeline import load_checkpoint, make_env, parameter_hash, read_json, read_run, write_json
 from rl.scripted_controllers import HeuristicSelector as HeuristicSelector
 from rl.search_metrics import summarize_search
 
@@ -75,17 +75,13 @@ def evaluate(
     cases,
     output_csv,
     *,
+    inference,
+    episode_seeds,
+    repeat_index,
+    controller_name,
     model=None,
     label="validation",
-    inference=None,
-    episode_seeds=None,
-    repeat_index=None,
-    controller_name=None,
 ):
-    if config.get("evaluation_protocol") and inference is None:
-        raise ValueError("Sampled runs require explicit frozen evaluation inference")
-    explicit = inference is not None
-    inference = inference or "argmax_masked"
     if inference not in (
         "sampled_masked",
         "argmax_masked",
@@ -94,7 +90,7 @@ def evaluate(
         "constant_wait",
     ):
         raise ValueError("Unsupported inference mode")
-    if explicit and (episode_seeds is None or len(episode_seeds) != len(cases)):
+    if len(episode_seeds) != len(cases):
         raise ValueError("A frozen per-episode seed schedule is required")
     if kind not in ("random", "untrained", "heuristic", "wait", "trained"):
         raise ValueError("Unknown evaluation controller")
@@ -116,39 +112,35 @@ def evaluate(
         "first_sight",
         "action_sha256",
         "search_metrics",
+        "controller",
+        "inference",
+        "repeat_index",
+        "reset_seed",
+        "selector_seed",
+        "sampling_seed",
+        "evaluation_role",
     ]
-    if explicit:
-        fields += [
-            "controller",
-            "inference",
-            "repeat_index",
-            "reset_seed",
-            "selector_seed",
-            "sampling_seed",
-            "evaluation_role",
-        ]
     evaluation_role = (
-        "sampled_primary"
-        if kind in ("trained", "untrained") and inference == "sampled_masked"
+        "baseline"
+        if kind not in ("trained", "untrained")
+        else "sampled_primary"
+        if inference == "sampled_masked"
         else "argmax_secondary"
-        if kind in ("trained", "untrained") and explicit
-        else "baseline"
     )
     env = make_env(config)  # Never reuse/reset the training environment.
     try:
         with (
             frozen_evaluation(model),
-            path.open("x" if explicit else "w", newline="", encoding="utf-8") as handle,
+            path.open("x", newline="", encoding="utf-8") as handle,
         ):
             writer = csv.DictWriter(handle, fieldnames=fields)
             writer.writeheader()
             for index, case in enumerate(cases):
-                seed = episode_seeds[index] if explicit else case["selector_seed"]
-                if explicit:
-                    # Once per episode, never per decision. Outer context restores all streams.
-                    random.seed(seed)
-                    np.random.seed(seed)
-                    torch.manual_seed(seed)
+                seed = episode_seeds[index]
+                # Once per episode, never per decision. Outer context restores all streams.
+                random.seed(seed)
+                np.random.seed(seed)
+                torch.manual_seed(seed)
                 obs, _ = env.reset(
                     seed=case["reset_seed"],
                     options={"scenario_seed": case["scenario_seed"], "bot_seed": case["bot_seed"]},
@@ -194,30 +186,24 @@ def evaluate(
                     **components,
                     "action_sha256": actions.hexdigest(),
                     "search_metrics": info["search_metrics"],
+                    "controller": controller_name,
+                    "inference": inference,
+                    "repeat_index": repeat_index,
+                    "reset_seed": case["reset_seed"],
+                    "selector_seed": case["selector_seed"],
+                    "sampling_seed": seed,
+                    "evaluation_role": evaluation_role,
                 }
-                if explicit:
-                    row.update(
-                        controller=controller_name,
-                        inference=inference,
-                        repeat_index=repeat_index,
-                        reset_seed=case["reset_seed"],
-                        selector_seed=case["selector_seed"],
-                        sampling_seed=seed,
-                        evaluation_role=evaluation_role,
-                    )
                 rows.append(row)
-                csv_row = dict(row)
-                if "search_metrics" in csv_row:
-                    csv_row["search_metrics"] = json.dumps(
-                        csv_row["search_metrics"], sort_keys=True
-                    )
-                writer.writerow(csv_row)
+                writer.writerow(
+                    {**row, "search_metrics": json.dumps(row["search_metrics"], sort_keys=True)}
+                )
                 handle.flush()
                 if (index + 1) % 10 == 0 or index + 1 == len(cases):
                     s = summarize(rows)
                     print(
-                        f"EVAL {label:12s} {controller_name or kind} "
-                        f"{evaluation_role if explicit else 'legacy_deterministic'} episodes={index + 1}/{len(cases)} "
+                        f"EVAL {label:12s} {controller_name} {evaluation_role} "
+                        f"episodes={index + 1}/{len(cases)} "
                         f"return={s['mean_return']:.3f} Catch/Escape/Unresolved="
                         f"{s['captured']}/{s['escaped']}/{s['unresolved']}",
                         flush=True,
@@ -288,8 +274,6 @@ def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
     from rl.evaluation_protocol import frozen_protocol
 
     protocol = frozen_protocol(config)
-    if protocol is None:
-        raise ValueError("Sampled suite requires a frozen protocol")
     if stage not in ("baseline", "trained", "final"):
         raise ValueError("Unknown evaluation stage")
     expected = [
@@ -358,25 +342,6 @@ def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
     return summaries, all_rows
 
 
-def paired_catch_difference(first, second):
-    if [r["id"] for r in first] != [r["id"] for r in second]:
-        raise ValueError("Paired comparison requires identical case order")
-    delta = np.array(
-        [
-            int(a["outcome"] == "captured") - int(b["outcome"] == "captured")
-            for a, b in zip(first, second, strict=True)
-        ]
-    )
-    rng = np.random.default_rng(704)
-    draws = delta[rng.integers(0, len(delta), size=(10000, len(delta)))].mean(axis=1)
-    return {
-        "difference": float(delta.mean()),
-        "paired_bootstrap95": np.quantile(draws, [0.025, 0.975]).tolist(),
-        "episodes": len(delta),
-        "note": "Episode resampling only; one training seed, same small map.",
-    }
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", required=True, type=Path)
@@ -386,21 +351,14 @@ def main():
     config, manifest, source = read_run(args.run_dir)
     torch.set_num_threads(config["torch_threads"])
     model, _ = load_checkpoint(args.checkpoint, config, source)
-    if config.get("evaluation_protocol"):
-        from rl.pipeline import read_json
-
-        summary, _ = evaluate_suite(
-            config,
-            manifest["splits"]["validation"],
-            args.output,
-            schedule=read_json(args.run_dir / "sampling_schedule.json")["validation"],
-            models={"trained": model},
-            stage="trained",
-        )
-    else:
-        summary, _ = evaluate(
-            "trained", config, manifest["splits"]["validation"], args.output, model=model
-        )
+    summary, _ = evaluate_suite(
+        config,
+        manifest["splits"]["validation"],
+        args.output,
+        schedule=read_json(args.run_dir / "sampling_schedule.json")["validation"],
+        models={"trained": model},
+        stage="trained",
+    )
     write_json(args.output.with_suffix(".json"), summary)
 
 

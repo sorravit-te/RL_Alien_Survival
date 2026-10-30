@@ -22,7 +22,7 @@ from game.map import MapObject, WorldMap
 from game.perception import PerceptionSnapshot, update_perception
 from game.state import AlienState, CoreConfig, SurvivorCommand, SurvivorState
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
-from rl.contract import BASE_FIELDS, SEARCH_CONTROL, VERSION, WAIT
+from rl.contract import BASE_FIELDS, VERSION, WAIT
 from rl.env import AlienEnv
 from rl.observations import build_observation
 
@@ -509,42 +509,6 @@ def test_pause_focus_resume_and_reset_freeze_sweep_no_time_or_rng_and_clear_inpu
         assert loop.display_pitch() == 0 and loop.inputs.consume(loop.dt) == SurvivorCommand()
     finally:
         pygame.quit()
-
-
-@pytest.mark.parametrize("legacy", ["schema", "source"])
-def test_legacy_rejection_before_model_load_even_with_same_dimensions(
-    tmp_path, monkeypatch, legacy
-):
-    import rl.pipeline as pipeline
-    from rl.contract import ACTION_COUNT, OBSERVATION_SIZE
-
-    config = {"manifest_seed": 123, "manifest_counts": {"train": 1, "validation": 1, "test": 1}}
-    source = pipeline.source_state()
-    metadata = {
-        "contract_version": VERSION,
-        "search_control": SEARCH_CONTROL,
-        "observation_shape": [OBSERVATION_SIZE],
-        "action_n": ACTION_COUNT,
-        "config_sha256": pipeline.digest(config),
-        "config": config,
-        "manifest_sha256": pipeline.digest(pipeline.make_manifest(123, config["manifest_counts"])),
-        "dependencies": pipeline.dependencies(),
-        "format": pipeline.CHECKPOINT_FORMAT,
-        "source": source,
-    }
-    if legacy == "schema":
-        metadata["contract_version"] = "alien-vector-v1"
-    else:
-        metadata["source"] = {
-            "source_sha256": "30bbbde96539d61286a74d9edaca50b77624bbc8af04b3ad453d04b96ee7dcac"
-        }
-    path = tmp_path / "not_a_policy.zip"
-    pipeline.write_json(path.with_suffix(".metadata.json"), metadata)
-    monkeypatch.setattr(
-        pipeline.MaskablePPO, "load", lambda *a, **k: pytest.fail("must not load a model")
-    )
-    with pytest.raises(ValueError, match="contract_version" if legacy == "schema" else "source"):
-        pipeline.load_checkpoint(path, config, source)
 
 
 @pytest.mark.parametrize("revision", [None, 0, True, 2])

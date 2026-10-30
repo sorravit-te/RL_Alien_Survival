@@ -9,14 +9,13 @@ import torch
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.logger import configure
 
-from rl.evaluate import evaluate, evaluate_suite, summarize_cases
+from rl.evaluate import evaluate_suite, summarize_cases
 from rl.evaluation_protocol import frozen_protocol, trained_score, validate_protocol
 from rl.pipeline import (
     ManifestEnv,
     digest,
     file_hash,
     load_checkpoint,
-    make_manifest,
     new_model,
     parameter_hash,
     prepare_run,
@@ -273,10 +272,6 @@ def test_real_sampled_masked_replay_restores_rng_mode_env_and_rollout(
     assert first == second and rows == reloaded
     assert metadata["evaluation_identity"] == config["frozen_evaluation"]
     assert metadata["evaluated_at_decision_steps"] is None
-    with pytest.raises(ValueError, match="explicit frozen"):
-        evaluate(
-            "trained", config, manifest["splits"]["validation"], run / "forbidden.csv", model=model
-        )
 
 
 def test_baseline_controllers_repeats_seeds_and_masked_uniform(prepared, policy, monkeypatch):
@@ -519,33 +514,12 @@ def test_checkpoint_evaluation_identity_mutation_rejected(prepared, policy):
         load_checkpoint(path, config, source)
 
 
-def test_legacy_without_protocol_is_explicitly_deterministic(tmp_path, monkeypatch):
-    config = read_json("configs/training_pilot.json")
-    config.update(
-        manifest_seed=9100328,
-        manifest_counts={"train": 1, "validation": 1, "test": 1},
-        max_episode_seconds=1 / 30,
-    )
-    run = tmp_path / "legacy"
-    prepare_run(run, config)
-    assert read_run(run)[0] == config
-    assert read_json(run / "run_identity.json")["evaluation_mode"] == "legacy_deterministic_argmax"
-    env = ManifestEnv(
-        config, make_manifest(config["manifest_seed"], config["manifest_counts"])["splits"]["train"]
-    )
-    try:
-        model = new_model(config, env)
-        predict = model.predict
-
-        def checked(*args, **kwargs):
-            assert kwargs["deterministic"] is True
-            return predict(*args, **kwargs)
-
-        monkeypatch.setattr(model, "predict", checked)
-        _, rows = evaluate("untrained", config, env.cases, run / "legacy.csv", model=model)
-        assert "inference" not in rows[0]  # legacy metric and CSV contracts stay intact
-    finally:
-        env.close()
+def test_prepare_requires_an_evaluation_protocol(tmp_path):
+    config = read_json("configs/pursuit_tracking_training_pilot.json")
+    config["evaluation_protocol"] = ""
+    with pytest.raises(ValueError, match="evaluation_protocol"):
+        prepare_run(tmp_path / "never_created", config)
+    assert not (tmp_path / "never_created").exists()
 
 
 @pytest.mark.parametrize(

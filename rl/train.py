@@ -13,7 +13,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.monitor import Monitor
 
-from rl.evaluate import evaluate, evaluate_suite, frozen_evaluation, paired_catch_difference
+from rl.evaluate import evaluate_suite, frozen_evaluation
 from rl.evaluation_protocol import trained_score
 from rl.pipeline import (
     ManifestEnv,
@@ -30,8 +30,6 @@ from rl.pipeline import (
     write_json,
 )
 
-CONTROLLERS = ("random", "untrained", "heuristic", "wait")
-
 
 def claim_phase(run, phase):
     # Exclusive file creation prevents two trainers or accidental repeated held-out tests.
@@ -46,25 +44,14 @@ def baselines(run):
     try:
         model = new_model(config, env)
         save_checkpoint(run / "checkpoints/untrained.zip", model, config, source, role="untrained")
-        results = {}
-        if config.get("evaluation_protocol"):
-            results, _ = evaluate_suite(
-                config,
-                manifest["splits"]["validation"],
-                run / "validation/baselines",
-                schedule=read_json(run / "sampling_schedule.json")["validation"],
-                models={"untrained": model},
-                stage="baseline",
-            )
-        else:
-            for kind in CONTROLLERS:
-                results[kind], _ = evaluate(
-                    kind,
-                    config,
-                    manifest["splits"]["validation"],
-                    run / f"validation/baseline_{kind}.csv",
-                    model=model if kind == "untrained" else None,
-                )
+        results, _ = evaluate_suite(
+            config,
+            manifest["splits"]["validation"],
+            run / "validation/baselines",
+            schedule=read_json(run / "sampling_schedule.json")["validation"],
+            models={"untrained": model},
+            stage="baseline",
+        )
         write_json(run / "baseline_summary.json", results)
         print("BASELINES COMPLETE. Review ceiling diagnostics before invoking pilot.", flush=True)
         return results
@@ -100,31 +87,18 @@ class PilotCallback(BaseCallback):
         )
         self.episodes.writeheader()
         self.curve_handle = (run / "validation_curve.csv").open("w", newline="", encoding="utf-8")
-        self.sampled = bool(config.get("evaluation_protocol"))
         self.curve = csv.DictWriter(
             self.curve_handle,
-            fieldnames=(
-                [
-                    "steps",
-                    "optimizer_update_epochs",
-                    "evaluation_context",
-                    "elapsed_seconds",
-                    "sampled_primary_case_mean_catch_rate",
-                    "sampled_primary_case_mean_unresolved_rate",
-                    "sampled_primary_case_mean_return",
-                    "argmax_secondary_case_mean_catch_rate",
-                ]
-                if self.sampled
-                else [
-                    "steps",
-                    "elapsed_seconds",
-                    "episodes",
-                    "captured",
-                    "escaped",
-                    "unresolved",
-                    "mean_return",
-                ]
-            ),
+            fieldnames=[
+                "steps",
+                "optimizer_update_epochs",
+                "evaluation_context",
+                "elapsed_seconds",
+                "sampled_primary_case_mean_catch_rate",
+                "sampled_primary_case_mean_unresolved_rate",
+                "sampled_primary_case_mean_return",
+                "argmax_secondary_case_mean_catch_rate",
+            ],
         )
         self.curve.writeheader()
 
@@ -132,57 +106,6 @@ class PilotCallback(BaseCallback):
         return perf_counter() - self.started
 
     def validate_checkpoint(self, path, role):
-        if self.sampled:
-            return self._validate_sampled_checkpoint(path, role)
-        elapsed = self.elapsed()
-        summary, rows = evaluate(
-            "trained",
-            self.config,
-            self.cases,
-            self.run / f"validation/step_{self.model.num_timesteps:08d}.csv",
-            model=self.model,
-            label=f"step{self.model.num_timesteps}",
-        )
-        save_checkpoint(
-            path,
-            self.model,
-            self.config,
-            self.source,
-            role=role,
-            elapsed_seconds=elapsed,
-            validation=summary,
-        )
-        self.curve.writerow(
-            {
-                "steps": self.model.num_timesteps,
-                "elapsed_seconds": self.elapsed(),
-                **{
-                    key: summary[key]
-                    for key in ("episodes", "captured", "escaped", "unresolved", "mean_return")
-                },
-            }
-        )
-        self.curve_handle.flush()
-        for name in ("catch_rate", "escape_rate", "unresolved_rate", "mean_return"):
-            self.logger.record(f"validation/{name}", summary[name])
-        self.logger.dump(self.model.num_timesteps)
-        score = (summary["captured"], -summary["unresolved"])
-        if self.best_score is None or score > self.best_score:
-            self.best_score, self.best_steps = score, self.model.num_timesteps
-            self.best_rows, self.best_summary = rows, summary
-            save_checkpoint(
-                self.run / "checkpoints/best.zip",
-                self.model,
-                self.config,
-                self.source,
-                role="best_validation",
-                elapsed_seconds=self.elapsed(),
-                validation=summary,
-            )
-            print(f"SELECTION best trained checkpoint = {self.best_steps} steps", flush=True)
-        return summary
-
-    def _validate_sampled_checkpoint(self, path, role):
         config, _, _ = read_run(self.run)  # Recheck frozen files before evaluation.
         if config != self.config:
             raise ValueError("Callback frozen config changed")
@@ -297,56 +220,6 @@ class PilotCallback(BaseCallback):
         self.curve_handle.close()
 
 
-def read_rows(path):
-    with Path(path).open(newline="", encoding="utf-8") as handle:
-        return list(csv.DictReader(handle))
-
-
-def plot_curves(run, baseline, test):
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    episodes, curve = read_rows(run / "train_episodes.csv"), read_rows(run / "validation_curve.csv")
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-    returns = np.array([float(row["return"]) for row in episodes])
-    steps = [int(row["steps"]) for row in episodes]
-    axes[0].scatter(steps, returns, s=2, alpha=0.18)
-    window = min(100, len(returns))
-    if window:
-        axes[0].plot(steps[window - 1 :], np.convolve(returns, np.ones(window) / window, "valid"))
-    axes[0].set(
-        title="Training return (100-episode mean)", xlabel="Decision steps", ylabel="Raw return"
-    )
-    axes[1].plot(
-        [int(row["steps"]) for row in curve],
-        [int(row["captured"]) / int(row["episodes"]) for row in curve],
-        marker="o",
-        label="Trained validation",
-    )
-    for kind in ("random", "untrained", "heuristic", "wait"):
-        axes[1].axhline(baseline[kind]["catch_rate"], linestyle="--", label=kind)
-    axes[1].set(
-        title="Validation (50 episodes/checkpoint)",
-        xlabel="Decision steps",
-        ylabel="Catch rate",
-        ylim=(-0.05, 1.05),
-    )
-    axes[1].legend(fontsize=7)
-    for index, (kind, result) in enumerate(test.items()):
-        rate = result["catch_rate"]
-        low, high = result["catch_wilson95"]
-        axes[2].errorbar(index, rate, yerr=[[rate - low], [high - rate]], fmt="o", capsize=4)
-    axes[2].set_xticks(range(len(test)), test.keys(), rotation=25)
-    axes[2].set(
-        title="Final test: catch with Wilson 95% CI", ylabel="Catch rate", ylim=(-0.05, 1.05)
-    )
-    fig.tight_layout()
-    fig.savefig(run / "learning_curves.png", dpi=150)
-    plt.close(fig)
-
-
 def validate_fresh_start(config, metadata):
     """Fresh pilot must originate from this run's compatible, unoptimized baseline."""
     if config.get("fresh_run") and (
@@ -396,87 +269,18 @@ def pilot(run):
         if model.num_timesteps != expected:
             raise RuntimeError("Unexpected rollout step count")
         training_seconds = perf_counter() - started
-        if config.get("evaluation_protocol"):
-            return complete_sampled_pilot(
-                run,
-                config,
-                manifest,
-                source,
-                model,
-                untrained_meta,
-                callback,
-                baseline,
-                started,
-                training_seconds,
-            )
-        # Fresh deserialization must reproduce the selected validation trajectories/actions.
-        best, best_meta = load_checkpoint(run / "checkpoints/best.zip", config, source)
-        reproduced, reproduced_rows = evaluate(
-            "trained",
+        return complete_sampled_pilot(
+            run,
             config,
-            manifest["splits"]["validation"],
-            run / "validation/best_reloaded.csv",
-            model=best,
-            label="reload_check",
+            manifest,
+            source,
+            model,
+            untrained_meta,
+            callback,
+            baseline,
+            started,
+            training_seconds,
         )
-        if reproduced_rows != callback.best_rows or reproduced != callback.best_summary:
-            raise RuntimeError("Fresh checkpoint validation replay did not reproduce")
-        write_json(
-            run / "selection.json",
-            {
-                "best_steps": callback.best_steps,
-                "rule": config["selection"],
-                "best_validation": reproduced,
-                "fresh_load_reproduced_actions_and_episodes": True,
-            },
-        )
-        # Select first, then use held-out test only once. Never feed test results into selection.
-        claim_phase(run, "test")
-        untrained, _ = load_checkpoint(run / "checkpoints/untrained.zip", config, source)
-        test, rows = {}, {}
-        for kind in (*CONTROLLERS, "trained"):
-            test[kind], rows[kind] = evaluate(
-                kind,
-                config,
-                manifest["splits"]["test"],
-                run / f"test/{kind}.csv",
-                model=best if kind == "trained" else untrained if kind == "untrained" else None,
-                label="final_test",
-            )
-        result = {
-            "requested_steps": config["requested_steps"],
-            "actual_steps": model.num_timesteps,
-            "training_seconds_including_validation": training_seconds,
-            "total_pilot_seconds": perf_counter() - started,
-            "decision_steps_per_second_including_validation": model.num_timesteps
-            / training_seconds,
-            "best_steps": callback.best_steps,
-            "baseline_validation": baseline,
-            "best_validation": reproduced,
-            "test": test,
-            "test_trained_minus_untrained": paired_catch_difference(
-                rows["trained"], rows["untrained"]
-            ),
-            "test_trained_minus_random": paired_catch_difference(rows["trained"], rows["random"]),
-            "weights_changed": parameter_hash(model) != untrained_meta["policy_sha256"],
-            "fresh_load_reproduced": True,
-            "training_episodes": sum(callback.counts.values()),
-            "training_outcomes": callback.counts,
-            "limitations": [
-                "Single training seed; pilot results do not establish generalization.",
-                "Fixed layout/card/exit, two real spawns. Numeric seed holdout is not layout generalization.",
-                "Heuristic selects from the action catalog using the latest completed perception; internal game sensing occurs on the next physics tick.",
-                "Weights/reward alone do not prove learning; baseline ceilings may limit this task.",
-            ],
-        }
-        write_json(run / "results.json", result)
-        plot_curves(run, baseline, test)
-        print(
-            f"PILOT COMPLETE actual_steps={model.num_timesteps} best_steps={callback.best_steps} "
-            f"train_wall={training_seconds:.2f}s; see results.json. App integration is a separate step.",
-            flush=True,
-        )
-        return result
     finally:
         if callback is not None:
             callback.close()
@@ -613,7 +417,9 @@ def main():
     parser.add_argument(
         "--phase", choices=("prepare", "baselines", "pilot", "final-test"), required=True
     )
-    parser.add_argument("--config", type=Path, default=Path("configs/training_pilot.json"))
+    parser.add_argument(
+        "--config", type=Path, default=Path("configs/pursuit_tracking_training_pilot.json")
+    )
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.phase == "prepare":

@@ -11,7 +11,6 @@ from game.map import DEFAULT_SCENARIO, scenario_map, small_test_map
 from game.perception import PerceptionSnapshot
 from game.state import AlienState, CoreConfig, SurvivorState, WorldSnapshot
 from rl import pipeline
-from rl.contract import SEARCH_CONTROL, VERSION
 from rl.env import AlienEnv
 from rl.evaluation_protocol import evaluation_budget, trained_score, validate_protocol
 from rl.search_metrics import SearchMetrics, summarize_search
@@ -171,33 +170,24 @@ def test_manifest_semantic_mismatch_even_if_outer_digest_updated(config, tmp_pat
 
 @pytest.mark.parametrize("tamper", ["name", "sha256", "spawn_points", "missing"])
 def test_checkpoint_scene_mismatch_rejected_before_any_load(config, tmp_path, monkeypatch, tamper):
-    # Synthetic checkpoint metadata only; no actual model is created/saved/loaded.
-    config = deepcopy(config)
-    config.pop("evaluation_protocol")
-    source = {"source_sha256": "synthetic-source"}
-    monkeypatch.setattr(pipeline, "dependencies", lambda: {})
-    metadata = {
-        "format": pipeline.CHECKPOINT_FORMAT,
-        "source": source,
-        "config": config,
-        "config_sha256": pipeline.digest(config),
-        "manifest_sha256": pipeline.digest(
-            pipeline.make_manifest(
-                config["manifest_seed"], config["manifest_counts"], config["scenario"]
-            )
-        ),
-        "contract_version": VERSION,
-        "search_control": SEARCH_CONTROL,
-        "observation_shape": [352],
-        "action_n": 32,
-        "dependencies": {},
-        "map": pipeline.map_identity(config["scenario"]),
-    }
+    # Synthetic fake save only; no actual model is created or loaded.
+    from types import SimpleNamespace
+
+    pipeline.prepare_run(tmp_path / "run", config)
+    config, _, source = pipeline.read_run(tmp_path / "run")
+    model = SimpleNamespace(
+        num_timesteps=0,
+        _n_updates=0,
+        save=lambda p: __import__("pathlib").Path(p).write_text("synthetic only"),
+    )
+    monkeypatch.setattr(pipeline, "parameter_hash", lambda m: "synthetic-parameter-hash")
+    monkeypatch.setattr(pipeline.MaskablePPO, "load", lambda *a, **k: pytest.fail("no load"))
+    path = tmp_path / "synthetic.zip"
+    metadata = pipeline.save_checkpoint(path, model, config, source, role="untrained")
     if tamper == "missing":
         metadata.pop("map")
     else:
         metadata["map"][tamper] = "wrong"
-    path = tmp_path / "synthetic.zip"
     pipeline.write_json(path.with_suffix(".metadata.json"), metadata)
     with pytest.raises(ValueError, match="mismatch: map"):
         pipeline.load_checkpoint(path, config, source)
@@ -400,7 +390,14 @@ def test_evaluate_serializes_passive_metrics_using_only_fake_environment(
     }
     path = tmp_path / "fake.csv"
     _, rows = evaluation.evaluate(
-        "wait", config, [case], path, inference="constant_wait", episode_seeds=[5], repeat_index=0
+        "wait",
+        config,
+        [case],
+        path,
+        inference="constant_wait",
+        episode_seeds=[5],
+        repeat_index=0,
+        controller_name="wait",
     )
     with path.open() as handle:
         saved = next(csv.DictReader(handle))
@@ -506,8 +503,8 @@ def test_mock_checkpoint_save_records_exact_scene_and_zero_provenance(
     # Text marker and fake save only; no policy serialization or checkpoint load.
     from types import SimpleNamespace
 
-    config = deepcopy(config)
-    config.pop("evaluation_protocol")
+    pipeline.prepare_run(tmp_path / "run", config)
+    config = pipeline.read_run(tmp_path / "run")[0]
     model = SimpleNamespace(
         num_timesteps=0,
         _n_updates=0,

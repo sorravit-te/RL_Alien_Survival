@@ -182,8 +182,6 @@ def frozen_protocol(config):
     from game.map import DEFAULT_SCENARIO
     from rl.pipeline import digest, make_manifest
 
-    if not config.get("evaluation_protocol"):
-        return None
     frozen = config.get("frozen_evaluation")
     if not frozen:
         raise ValueError("Sampled evaluation requires a prepared frozen protocol")

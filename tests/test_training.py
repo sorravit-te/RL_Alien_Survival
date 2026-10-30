@@ -12,7 +12,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 from game.map import MapObject, WorldMap
 from rl.env import AlienEnv
-from rl.evaluate import HeuristicSelector, evaluate, frozen_evaluation, paired_catch_difference
+from rl.evaluate import HeuristicSelector, evaluate, frozen_evaluation
 from rl.pipeline import (
     CHECKPOINT_FORMAT,
     ManifestEnv,
@@ -32,22 +32,43 @@ from rl.train import baselines, pilot
 
 
 @pytest.fixture
-def config():
-    result = read_json(Path(__file__).resolve().parents[1] / "configs/training_pilot.json")
+def base_config(tmp_path):
+    """Tiny unprepared pilot config with its own synthetic evaluation protocol file."""
+    result = read_json(
+        Path(__file__).resolve().parents[1] / "configs/pursuit_tracking_training_pilot.json"
+    )
+    protocol = read_json(result["evaluation_protocol"])
+    counts = {"train": 4, "validation": 2, "test": 2}
     result.update(
-        manifest_counts={"train": 4, "validation": 2, "test": 2},
+        manifest_seed=9100329,
+        manifest_counts=counts,
         requested_steps=32,
         evaluation_interval=16,
         progress_interval=16,
         max_episode_seconds=1,
     )
     result["ppo"].update(n_steps=16, batch_size=16, n_epochs=1)
+    protocol.update(manifest_seed=9100329, manifest_counts=counts)
+    spec = tmp_path / "synthetic_protocol.json"
+    write_json(spec, protocol)
+    result["evaluation_protocol"] = str(spec)
     return result
 
 
+@pytest.fixture
+def config(tmp_path, base_config):
+    run = tmp_path / "prepared"
+    prepare_run(run, base_config)
+    return read_run(run)[0]
+
+
+def manifest_of(config):
+    return make_manifest(config["manifest_seed"], config["manifest_counts"], config["scenario"])
+
+
 def test_manifest_deterministic_disjoint_both_seed_kinds_and_fixed_map_warning(config):
-    first = make_manifest(config["manifest_seed"], config["manifest_counts"])
-    assert first == make_manifest(config["manifest_seed"], config["manifest_counts"])
+    first = manifest_of(config)
+    assert first == manifest_of(config)
     values = [
         row[key]
         for cases in first["splits"].values()
@@ -60,7 +81,7 @@ def test_manifest_deterministic_disjoint_both_seed_kinds_and_fixed_map_warning(c
 
 
 def test_training_manifest_reset_cycle_and_cap(config):
-    cases = make_manifest(config["manifest_seed"], config["manifest_counts"])["splits"]["train"]
+    cases = manifest_of(config)["splits"]["train"]
     env = ManifestEnv(config, cases)
     try:
         for i in range(6):
@@ -81,10 +102,11 @@ def test_training_manifest_reset_cycle_and_cap(config):
         env.close()
 
 
-def test_frozen_config_manifest_and_source_rejected(tmp_path, config, monkeypatch):
+def test_frozen_config_manifest_and_source_rejected(tmp_path, base_config, monkeypatch):
     run = tmp_path / "run"
-    prepare_run(run, config)
-    assert read_run(run)[0] == config
+    prepare_run(run, base_config)
+    config = read_run(run)[0]
+    assert config["frozen_evaluation"]["protocol"]["manifest_seed"] == base_config["manifest_seed"]
     manifest = read_json(run / "manifest.json")
     changed = deepcopy(manifest)
     changed["splits"]["test"][0]["bot_seed"] += 1
@@ -136,8 +158,8 @@ def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path,
     assert VERSION == "alien-vector-v4-pursuit-tracking"
     assert CHECKPOINT_FORMAT == "alien-maskable-checkpoint-v1"
     assert map_identity()["name"] == "small_test_map_v1"
-    manifest = make_manifest(config["manifest_seed"], config["manifest_counts"])
-    assert manifest["map"]["name"] == "small_test_map_v1"
+    manifest = manifest_of(config)
+    assert manifest["map"]["name"] == "occluded_loop_dev_v1"
     env = AlienEnv(max_episode_seconds=1)
     try:
         model = new_model(config, env)
@@ -147,7 +169,7 @@ def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path,
         assert metadata["format"] == CHECKPOINT_FORMAT
         assert metadata["contract_version"] == VERSION
         assert metadata["manifest_sha256"] == digest(manifest)
-        assert metadata["map"]["name"] == "small_test_map_v1"
+        assert metadata["map"]["name"] == "occluded_loop_dev_v1"
         loaded, checked = load_checkpoint(path, config, source)
         assert digest(checked) == digest(metadata)
         assert loaded.num_timesteps == model.num_timesteps == 0
@@ -175,7 +197,7 @@ def test_checkpoint_source_and_archive_mismatch(tmp_path, config):
 def test_real_masked_train_save_fresh_load_and_eval_do_not_touch_training_env(
     tmp_path, config, monkeypatch
 ):
-    cases = make_manifest(config["manifest_seed"], config["manifest_counts"])["splits"]["train"]
+    cases = manifest_of(config)["splits"]["train"]
     env = ManifestEnv(config, cases)
     applied = []
     original_step = env.step
@@ -215,9 +237,17 @@ def test_real_masked_train_save_fresh_load_and_eval_do_not_touch_training_env(
             return predict(obs, **kwargs)
 
         monkeypatch.setattr(model, "predict", checked_predict)
-        first, rows = evaluate("trained", config, cases[:2], tmp_path / "first.csv", model=model)
+        schedule = {
+            "inference": "argmax_masked",
+            "episode_seeds": [11, 12],
+            "repeat_index": 0,
+            "controller_name": "trained_deterministic",
+        }
+        first, rows = evaluate(
+            "trained", config, cases[:2], tmp_path / "first.csv", model=model, **schedule
+        )
         second, loaded_rows = evaluate(
-            "trained", config, cases[:2], tmp_path / "second.csv", model=loaded
+            "trained", config, cases[:2], tmp_path / "second.csv", model=loaded, **schedule
         )
         assert seen and first == second and rows == loaded_rows
         assert (
@@ -287,36 +317,33 @@ def test_actual_maskable_ppo_bootstraps_only_time_limit(terminal):
         env.close()
 
 
-def test_heuristic_sees_only_allowed_view_and_paired_statistics(config):
+def test_heuristic_sees_only_allowed_view():
     env = AlienEnv(max_episode_seconds=1)
     try:
         env.reset(seed=1)
         selector = HeuristicSelector(env.config.target_arrival_distance)
         action = selector.choose(env._allowed_view())
         assert action < 20 and env.action_masks()[action]
-        rows = [{"id": "a", "outcome": "captured"}, {"id": "b", "outcome": "escaped"}]
-        comparison = paired_catch_difference(rows, rows)
-        assert comparison["difference"] == 0 and comparison["paired_bootstrap95"] == [0.0, 0.0]
     finally:
         env.close()
 
 
-def test_complete_small_pipeline_has_best_last_test_guard_and_tensorboard(tmp_path, config):
+def test_complete_small_pipeline_has_best_last_test_guard_and_tensorboard(tmp_path, base_config):
     from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
     run = tmp_path / "smoke"
-    prepare_run(run, config)
+    prepare_run(run, base_config)
     baselines(run)
     result = pilot(run)
-    assert result["actual_steps"] == 32 and result["best_steps"] == 16  # exact tie keeps earliest
+    # Step16 is evaluated before the first optimizer update, so it can never be selected.
+    assert result["actual_steps"] == 32 and result["best_steps"] == 32
     assert result["fresh_load_reproduced"]
     assert (run / "checkpoints/best.zip").exists() and (run / "checkpoints/last.zip").exists()
-    assert read_json(run / "checkpoints/best.metadata.json")["actual_steps"] == 16
+    assert read_json(run / "checkpoints/best.metadata.json")["actual_steps"] == 32
     assert read_json(run / "checkpoints/last.metadata.json")["actual_steps"] == 32
-    assert (run / "learning_curves.png").stat().st_size > 1000
-    assert len(result["test"]) == 5
+    assert result["test"] is None and result["test_status"].startswith("deferred")
     events = EventAccumulator(str(run / "tensorboard")).Reload()
-    assert "validation/catch_rate" in events.Tags()["scalars"]
+    assert "validation/sampled_primary_case_mean_catch_rate" in events.Tags()["scalars"]
     assert "train/episode_return100" in events.Tags()["scalars"]
     with pytest.raises(FileExistsError):
         pilot(run)
