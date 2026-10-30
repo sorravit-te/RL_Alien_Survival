@@ -2,11 +2,11 @@
 
 Invalid masked actions become WAIT with no penalty; out-of-space values raise.
 A step is15 Core ticks unless terminal/cap intervenes; terminal beats the cap.
-Only _allowed_view extracts policy-permitted fields. Builder/candidates never
+Only rl.alien_view extracts policy-permitted fields. Builder/candidates never
 receive full world state. Info is diagnostic, not part of policy observation.
 """
 
-from math import ceil, hypot, isfinite
+from math import ceil, isfinite
 
 import gymnasium as gym
 import numpy as np
@@ -16,7 +16,8 @@ from ai.navigation import find_path
 from game.core import GameCore
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
-from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
+from rl.alien_view import allowed_view, record_waypoint_visits, target_source
+from rl.candidates import build_candidates, candidate_masks
 from rl.contract import (
     ACTION_COUNT,
     DECISION_TICKS,
@@ -103,28 +104,7 @@ class AlienEnv(gym.Env):
         self.visit_ticks = [None] * len(self.world.patrol_waypoints)
 
     def _allowed_view(self):
-        snapshot = self.core.snapshot()
-        alien = snapshot.alien
-        memory = snapshot.perception
-        return AllowedAlienView(
-            (alien.x, alien.y),
-            alien.yaw,
-            alien.speed_mode == "chase",
-            self.last_action,
-            memory.visible,
-            memory.last_seen,
-            memory.last_seen_age_ticks / self.config.tick_hz
-            if memory.last_seen_age_ticks is not None
-            else None,
-            self.world.patrol_waypoints,
-            tuple(
-                (snapshot.tick - tick) / self.config.tick_hz if tick is not None else None
-                for tick in self.visit_ticks
-            ),
-            bool(snapshot.navigation_path),
-            memory.revision,
-            snapshot.investigation,
-        )
+        return allowed_view(self.core.snapshot(), self.last_action, self.visit_ticks)
 
     def action_masks(self):
         return candidate_masks(build_candidates(self._allowed_view()))
@@ -175,15 +155,7 @@ class AlienEnv(gym.Env):
         before_selection = self.core.snapshot()
         self.core.set_alien_target(
             chosen.target,
-            source=(
-                "wait"
-                if applied == WAIT
-                else "waypoint"
-                if applied < 20
-                else "visible"
-                if applied == 20
-                else "last_seen"
-            ),
+            source=target_source(applied),
             evidence_revision=chosen.evidence_revision,
         )
         self.metrics.decision(
@@ -215,12 +187,7 @@ class AlienEnv(gym.Env):
                 snapshot.perception.visible, snapshot.events
             ).items():
                 components[name] += value
-            for index, point in enumerate(self.world.patrol_waypoints):
-                if (
-                    hypot(snapshot.alien.x - point[0], snapshot.alien.y - point[1])
-                    <= self.config.target_arrival_distance
-                ):
-                    self.visit_ticks[index] = snapshot.tick
+            record_waypoint_visits(snapshot, self.visit_ticks)
             if snapshot.outcome is not None:
                 break
         terminated = snapshot.outcome is not None

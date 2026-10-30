@@ -2,7 +2,6 @@
 
 import random
 from contextlib import contextmanager
-from math import hypot
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +9,8 @@ import torch
 
 from game.core import GameCore
 from game.map import DEFAULT_SCENARIO, scenario_map
-from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
+from rl.alien_view import allowed_view, record_waypoint_visits, target_source
+from rl.candidates import build_candidates, candidate_masks
 from rl.contract import ACTION_COUNT, DECISION_TICKS, OBSERVATION_SIZE, WAIT
 from rl.observations import build_observation
 
@@ -110,28 +110,7 @@ class HumanRLController:
         return self.core.snapshot()
 
     def allowed_view(self):
-        # Same permitted fields and physical ages as AlienEnv._allowed_view.
-        snapshot = self.core.snapshot()
-        alien, memory = snapshot.alien, snapshot.perception
-        return AllowedAlienView(
-            (alien.x, alien.y),
-            alien.yaw,
-            alien.speed_mode == "chase",
-            self.last_action,
-            memory.visible,
-            memory.last_seen,
-            memory.last_seen_age_ticks / self.config.tick_hz
-            if memory.last_seen_age_ticks is not None
-            else None,
-            self.core.world_map.patrol_waypoints,
-            tuple(
-                (snapshot.tick - tick) / self.config.tick_hz if tick is not None else None
-                for tick in self.visit_ticks
-            ),
-            bool(snapshot.navigation_path),
-            memory.revision,
-            snapshot.investigation,
-        )
+        return allowed_view(self.core.snapshot(), self.last_action, self.visit_ticks)
 
     def observation(self):
         return build_observation(self.allowed_view())
@@ -154,29 +133,16 @@ class HumanRLController:
             action = self.sampler.predict(observation, mask)
             self.last_action = action
             chosen = candidates[action]
-            source = (
-                "wait"
-                if action == WAIT
-                else "waypoint"
-                if action < 20
-                else "visible"
-                if action == 20
-                else "last_seen"
-            )
             self.core.set_alien_target(
-                chosen.target, source=source, evidence_revision=chosen.evidence_revision
+                chosen.target,
+                source=target_source(action),
+                evidence_revision=chosen.evidence_revision,
             )
             self.decisions += 1
             if self.recorder is not None:
                 self.recorder.decision(self, before, view, observation, mask, action, chosen.target)
         snapshot = self.core.step(human_command)
-        # Env records arrivals from POST-tick position, including a terminal tick.
-        for index, point in enumerate(self.core.world_map.patrol_waypoints):
-            if (
-                hypot(snapshot.alien.x - point[0], snapshot.alien.y - point[1])
-                <= self.config.target_arrival_distance
-            ):
-                self.visit_ticks[index] = snapshot.tick
+        record_waypoint_visits(snapshot, self.visit_ticks)
         self.phase = (self.phase + 1) % DECISION_TICKS
         if self.recorder is not None:
             self.recorder.tick(self, human_command, before, snapshot, phase_before)
