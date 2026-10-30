@@ -152,11 +152,93 @@ def test_old_clue_ages_in_place_and_new_noise_replaces_it():
     assert fresh.point != first.point and (fresh.age_ticks, fresh.revision) == (0, 2)
 
 
-def test_standing_at_the_point_marks_it_checked():
+def noise_world():
+    # One row apart, so the Alien passes the Survivor without touching.
+    return WorldMap(
+        HALL, ((1.5, 2.5),), alien_spawn=(7.5, 1.5, 0.0), patrol_waypoints=((8.5, 1.5),)
+    )
+
+
+def test_standing_at_the_point_is_not_enough_to_check_it():
     world = WorldMap(HALL, ((1.5, 1.5),))
     clue = HeardSnapshot((2.5, 1.5), 0, 1)
     alien = AlienState(2.5, 1.5)
-    assert listen(world, frozenset(), alien, (), clue, BLIND).checked
+    assert not listen(world, frozenset(), alien, (), clue, BLIND).checked
+
+
+def test_alien_turns_a_full_circle_at_the_noise_before_it_is_checked():
+    core = GameCore(noise_world(), BLIND)
+    core.reset(1)
+    snapshot = steps(core, RUN, 16)
+    point, phases, yaws = snapshot.heard.point, set(), []
+    for _ in range(200):
+        snapshot = core.step(SurvivorCommand())
+        phases.add(snapshot.noise_sweep.phase)
+        if snapshot.noise_sweep.phase == "sweeping":
+            yaws.append(snapshot.alien.yaw)
+            assert (snapshot.alien.x, snapshot.alien.y) == pytest.approx(point, abs=0.2)
+    assert {"travelling", "sweeping"} <= phases
+    assert snapshot.heard.checked and len(yaws) >= 40
+    assert len({round(yaw, 3) for yaw in yaws}) >= 40
+
+
+def test_a_newer_noise_never_stops_the_alien_walking():
+    core = GameCore(noise_world(), BLIND)
+    core.reset(1)
+    steps(core, RUN, 16)
+    positions = []
+    for _ in range(40):
+        snapshot = core.step(RUN)
+        positions.append(snapshot.alien.x)
+        if snapshot.noise_sweep.phase != "travelling":
+            break
+    stalls = sum(a == b for a, b in zip(positions, positions[1:]))
+    assert stalls <= 1
+
+
+def test_seeing_the_survivor_during_a_noise_sweep_starts_a_chase():
+    config = CoreConfig(alien_sight_range=6.0, alien_near_range=0.5)
+    core = GameCore(noise_world(), config, alien_control="external")
+    core.reset(1)
+    core._heard = HeardSnapshot((6.5, 1.5), 0, 1)
+    core._alien = AlienState(6.5, 1.5, pi)
+    core.set_alien_target((6.5, 1.5), source="sound")
+    for _ in range(12):
+        snapshot = core.step(SurvivorCommand())
+    assert snapshot.alien_target_source == "visible_handoff"
+    assert not snapshot.heard.checked
+
+
+def test_a_finished_sweep_never_checks_a_newer_noise():
+    core = GameCore(noise_world(), BLIND, alien_control="external")
+    core.reset(1)
+    core._heard = HeardSnapshot((7.5, 1.5), 0, 1)
+    core.set_alien_target((7.5, 1.5), source="sound")
+    for _ in range(5):
+        core.step(SurvivorCommand())
+    core._heard = HeardSnapshot((1.5, 1.5), 0, 2)
+    for _ in range(60):
+        snapshot = core.step(SurvivorCommand())
+    assert snapshot.noise_sweep.phase == "completed" and not snapshot.heard.checked
+
+
+@pytest.mark.parametrize("clue", [HeardSnapshot(), HeardSnapshot((2.5, 1.5), 0, 1, True)])
+def test_sound_target_needs_the_latest_unchecked_noise(clue):
+    core = GameCore(noise_world(), BLIND, alien_control="external")
+    core.reset(1)
+    core._heard = clue
+    with pytest.raises(ValueError):
+        core.set_alien_target((2.5, 1.5), source="sound")
+
+
+def test_choosing_another_target_abandons_the_noise_sweep():
+    core = GameCore(noise_world(), BLIND, alien_control="external")
+    core.reset(1)
+    core._heard = HeardSnapshot((6.5, 1.5), 0, 1)
+    core.set_alien_target((6.5, 1.5), source="sound")
+    assert core.snapshot().noise_sweep.active
+    core.set_alien_target((8.5, 1.5), source="waypoint")
+    assert not core.snapshot().noise_sweep.active
 
 
 def test_heuristic_prefers_sight_then_clue_then_sound_then_patrol():

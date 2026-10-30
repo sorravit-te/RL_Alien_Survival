@@ -130,7 +130,8 @@ def alien_debug_labels(snapshot):
         "(0=E 90=S 180=W 270=N)",
         f"DEBUG sensor | confirmed-visible={snapshot.perception.visible} "
         f"({sensor_time}; BEFORE movement)",
-        f"DEBUG heard | {heard.point} checked={heard.checked} count={heard.revision}",
+        f"DEBUG heard | {heard.point} checked={heard.checked} count={heard.revision} "
+        f"sweep={snapshot.noise_sweep.phase}",
     ]
 
 

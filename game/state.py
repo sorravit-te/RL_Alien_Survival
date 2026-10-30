@@ -149,3 +149,4 @@ class WorldSnapshot:
     closed_doors: tuple[tuple[int, int], ...] = ()
     heard: HeardSnapshot = HeardSnapshot()
     alien_target_heard_revision: int = 0
+    noise_sweep: InvestigationSnapshot = InvestigationSnapshot()

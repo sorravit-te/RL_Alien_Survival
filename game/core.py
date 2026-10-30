@@ -96,6 +96,7 @@ class GameCore:
         self._controller = ControllerState()
         self._navigator = Navigator()
         self._investigation = LastSeenInvestigation(self.config)
+        self._noise_sweep = LastSeenInvestigation(self.config)
         return self.snapshot()
 
     def snapshot(self) -> WorldSnapshot:
@@ -126,6 +127,7 @@ class GameCore:
             self._doors.closed,
             self._heard,
             self._controller.heard_revision,
+            self._noise_sweep.state,
         )
 
     def set_alien_target(self, target, *, source="external", evidence_revision=None):
@@ -165,6 +167,12 @@ class GameCore:
             self._investigation.select(target, evidence_revision)
         else:
             self._investigation.cancel()
+        if source == "sound":
+            if target != self._heard.point or self._heard.checked:
+                raise ValueError("Sound targets only the latest unchecked noise")
+            self._noise_sweep.select(target, self._heard.revision)
+        else:
+            self._noise_sweep.cancel()
         self._controller = replace(
             self._controller,
             target=target,
@@ -256,19 +264,22 @@ class GameCore:
             )
         # Prune points already reached before checking the path-complete condition.
         self._navigator.displacement((self._alien.x, self._alien.y), 0.0)
-        state = self._investigation.state
+        sweep, memory = self._active_sweep()
+        state = sweep.state
         arrived = (
             state.target is not None
             and not self._navigator.path
             and hypot(self._alien.x - state.target[0], self._alien.y - state.target[1])
             <= self.config.target_arrival_distance
         )
-        turn, hold = self._investigation.advance(self._perception, arrived=arrived)
-        if state.phase != "cancelled" and self._investigation.state.phase == "cancelled":
+        turn, hold = sweep.advance(memory, arrived=arrived)
+        if state.phase != "cancelled" and sweep.state.phase == "cancelled":
             # Reacquisition/new evidence cancels old navigation, retaining chosen target in diagnostics.
             self._navigator.set_target(
                 self.world_map, (self._alien.x, self._alien.y), None, self.config.alien_radius
             )
+        if sweep is self._noise_sweep and sweep.state.investigated_revision == self._heard.revision:
+            self._heard = replace(self._heard, checked=True)
         hold = self._track_confirmed_sighting(hold)
         if hold:
             self._alien = replace(self._alien, yaw=(self._alien.yaw + turn) % (2 * pi))
@@ -277,6 +288,13 @@ class GameCore:
         return self._navigator.displacement(
             (self._alien.x, self._alien.y), speed / self.config.tick_hz
         )
+
+    def _active_sweep(self):
+        """A newer noise never cancels a noise sweep: the next decision simply retargets."""
+        if self._controller.source != "sound":
+            return self._investigation, self._perception
+        sweep = self._noise_sweep
+        return sweep, replace(self._perception, revision=sweep.state.revision)
 
     def _track_confirmed_sighting(self, hold):
         """Written pursuit helper; reads only this tick's pre-motion confirmed sample.
@@ -288,8 +306,8 @@ class GameCore:
         memory, source = self._perception, self._controller.source
         if (
             memory.visible
-            and source == "last_seen"
-            and self._investigation.state.phase == "cancelled"
+            and source in ("last_seen", "sound")
+            and self._active_sweep()[0].state.phase == "cancelled"
         ):
             source = "visible_handoff"
         if source not in ("visible", "visible_handoff"):

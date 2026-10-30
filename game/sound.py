@@ -20,7 +20,7 @@ class HeardSnapshot:
     point: tuple[float, float] | None = None
     age_ticks: int | None = None
     revision: int = 0  # increments on every noise that reaches the Alien
-    checked: bool = False  # the Alien has stood at this point since it was heard
+    checked: bool = False  # the Alien finished looking around this point
 
 
 def carries(world, closed, source, listener, reach, door_cost):
@@ -71,8 +71,4 @@ def listen(world, closed, alien, noises, previous, config):
             return HeardSnapshot(point, 0, previous.revision + 1)
     if previous.point is None:
         return previous
-    arrived = (
-        hypot(alien.x - previous.point[0], alien.y - previous.point[1])
-        <= config.target_arrival_distance
-    )
-    return replace(previous, age_ticks=previous.age_ticks + 1, checked=previous.checked or arrived)
+    return replace(previous, age_ticks=previous.age_ticks + 1)
