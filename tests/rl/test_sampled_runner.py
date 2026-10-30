@@ -38,7 +38,7 @@ def zero_learning(monkeypatch):
 
 @pytest.fixture
 def prepared(tmp_path):
-    config = read_json("configs/waypoint_commitment_training_pilot.json")
+    config = read_json("configs/scenario_randomization_training_pilot.json")
     protocol = read_json(config["evaluation_protocol"])
     # Distinct tiny synthetic split, not any reviewed population or future evaluation cases.
     config.update(
@@ -148,7 +148,7 @@ def test_frozen_input_mutation_rejected(prepared, name):
     ],
 )
 def test_invalid_protocol_fails_before_run_creation(tmp_path, bad):
-    c = read_json("configs/waypoint_commitment_training_pilot.json")
+    c = read_json("configs/scenario_randomization_training_pilot.json")
     p = read_json(c["evaluation_protocol"])
     if bad == "availability":
         p["controllers"][1]["available"] = "fallback"
@@ -187,7 +187,7 @@ def test_invalid_protocol_fails_before_run_creation(tmp_path, bad):
 
 
 def test_actual_review_config_validates_without_running_it():
-    c = read_json("configs/waypoint_commitment_training_pilot.json")
+    c = read_json("configs/scenario_randomization_training_pilot.json")
     validate_protocol(c, read_json(c["evaluation_protocol"]))
     with pytest.raises(ValueError, match="prepared frozen"):
         frozen_protocol(c)
@@ -515,7 +515,7 @@ def test_checkpoint_evaluation_identity_mutation_rejected(prepared, policy):
 
 
 def test_prepare_requires_an_evaluation_protocol(tmp_path):
-    config = read_json("configs/waypoint_commitment_training_pilot.json")
+    config = read_json("configs/scenario_randomization_training_pilot.json")
     config["evaluation_protocol"] = ""
     with pytest.raises(ValueError, match="evaluation_protocol"):
         prepare_run(tmp_path / "never_created", config)

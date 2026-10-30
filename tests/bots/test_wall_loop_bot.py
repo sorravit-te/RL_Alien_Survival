@@ -129,7 +129,7 @@ def test_pipeline_accepts_evasive_mix_pilot_config_and_rejects_debug_bot():
     from rl.evaluation_protocol import validate_protocol
     from rl.pipeline import make_env, read_json, validate_environment_config
 
-    config = read_json("configs/waypoint_commitment_training_pilot.json")
+    config = read_json("configs/scenario_randomization_training_pilot.json")
     protocol = read_json(config["evaluation_protocol"])
     validate_protocol(config, protocol)
     validate_environment_config(config)

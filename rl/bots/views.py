@@ -20,6 +20,7 @@ class SurvivorView:
     yaw: float
     has_keycard: bool
     visible_objects: tuple
+    ruled_out: tuple = ()  # exits this Survivor already tried
 
 
 def move_command(dx, dy, yaw, turn, config, *, running=False):
@@ -34,10 +35,10 @@ def move_command(dx, dy, yaw, turn, config, *, running=False):
     )
 
 
-def observe_survivor(world, survivor, has_keycard):
+def observe_survivor(world, survivor, has_keycard, ruled_out=()):
     visible = []
     for obj in world.objects:
-        if obj.kind == "keycard" and has_keycard:
+        if (obj.kind == "keycard" and has_keycard) or obj.object_id in ruled_out:
             continue
         dx, dy = obj.x - survivor.x, obj.y - survivor.y
         angle = abs(angle_difference(atan2(dy, dx), survivor.yaw)) if hypot(dx, dy) else 0
@@ -49,6 +50,7 @@ def observe_survivor(world, survivor, has_keycard):
         survivor.yaw,
         has_keycard,
         tuple(sorted(visible, key=lambda obj: obj.object_id)),
+        tuple(ruled_out),
     )
 
 
@@ -67,7 +69,7 @@ class SurvivorThreatView:
             object.__setattr__(self, "visible_alien", point)
 
 
-def observe_threat(world, survivor, has_keycard, alien, settings):
+def observe_threat(world, survivor, has_keycard, alien, settings, ruled_out=()):
     """Privileged sensing boundary; hidden Alien coordinates never leave this function."""
     point = None
     if alien is not None:
@@ -79,4 +81,4 @@ def observe_threat(world, survivor, has_keycard, alien, settings):
             and segment_clear(world, survivor.x, survivor.y, alien.x, alien.y)
         ):
             point = (alien.x, alien.y)
-    return SurvivorThreatView(observe_survivor(world, survivor, has_keycard), point)
+    return SurvivorThreatView(observe_survivor(world, survivor, has_keycard, ruled_out), point)

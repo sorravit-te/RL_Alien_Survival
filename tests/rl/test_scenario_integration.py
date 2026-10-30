@@ -7,7 +7,7 @@ from fractions import Fraction
 import pytest
 
 from game.investigation import InvestigationSnapshot
-from game.map import DEFAULT_SCENARIO, scenario_map, small_test_map
+from game.map import DEFAULT_SCENARIO, RANDOM_SCENARIO, scenario_map, small_test_map
 from game.perception import PerceptionSnapshot
 from game.state import AlienState, CoreConfig, SurvivorState, WorldSnapshot
 from rl import pipeline
@@ -19,11 +19,13 @@ from rl.train import validate_fresh_start
 ENV_STEP = AlienEnv.step
 ENV_INIT = AlienEnv.__init__  # Called only with a namespace and fully mocked actors below.
 
-LOOP_HASH = "c01c4cacc21c8c0b8342dc0f86e194cf6b066163bc2aac52b2123e723b33a730"
-DEFAULT_HASH = "96ea9376fb09beaeedc49a26e0faae29d4823e19f8d580578ab7e20a9ab2c44c"
+LOOP_HASH = "af5142aeeee14782b5a3fc668f9ea97432c5bff72f8f498b920c3a4aad7f850f"
+DEFAULT_HASH = "7aeafcc0b15f5361f4baefa420ceb5f17fc5f38eccd82fbdd52c6e9ca215736a"
+RANDOM_HASH = "f578a895cf84f31b185068456c69b00c92a68371a837430fd93d965ac3a0fef1"
 
 # Independent expected fixture ships with this test; no ignored experiment data.
 EXPECTED_LOOP_WORLD = {
+    "alien_spawn_options": [],
     "rows": [
         "################",
         "#..............#",
@@ -85,7 +87,7 @@ def forbid_runtime(monkeypatch):
 
 @pytest.fixture
 def config():
-    return pipeline.read_json("configs/waypoint_commitment_training_pilot.json")
+    return pipeline.read_json("configs/scenario_randomization_training_pilot.json")
 
 
 def test_exact_reviewed_world_and_default_backward_identity():
@@ -109,17 +111,17 @@ def test_unknown_scene_fails_closed(name):
 def test_factory_routes_once_with_explicit_scene(config, monkeypatch):
     calls = []
     monkeypatch.setattr(pipeline, "AlienEnv", lambda **kw: calls.append(kw) or kw)
-    assert pipeline.make_env(config)["scenario"] == "occluded_loop_dev_v1"
+    assert pipeline.make_env(config)["scenario"] == RANDOM_SCENARIO
     assert len(calls) == 1
 
 
 def test_protocol_budgets_and_static_settings(config):
     p = pipeline.read_json(config["evaluation_protocol"])
     validate_protocol(config, p)
-    assert pipeline.validate_environment_config(config)["sha256"] == LOOP_HASH
+    assert pipeline.validate_environment_config(config)["sha256"] == RANDOM_HASH
     budget = evaluation_budget(config)
     assert budget == {
-        "rollout_rounded_decisions": 20224,
+        "rollout_rounded_decisions": 40192,
         "baseline_validation_episodes": 450,
         "checkpoint_validation_calls": 5,
         "checkpoint_validation_episodes": 1000,
@@ -137,7 +139,7 @@ def test_pure_prepare_freezes_scenario_provenance_and_disjoint_seeds(config, tmp
     manifest, source = pipeline.prepare_run(run, config)
     frozen, stored, actual = pipeline.read_run(run)
     assert pipeline.read_json_value(manifest) == stored and actual == source
-    assert stored["map"]["sha256"] == LOOP_HASH
+    assert stored["map"]["sha256"] == RANDOM_HASH
     assert stored["map"]["name"] == frozen["scenario"]
     assert frozen["fresh_run"] and frozen["defer_final_test"]
     assert not list(run.rglob("*.zip"))
@@ -514,8 +516,8 @@ def test_mock_checkpoint_save_records_exact_scene_and_zero_provenance(
     metadata = pipeline.save_checkpoint(
         tmp_path / "fake.zip", model, config, {"source_sha256": "synthetic"}, role="untrained"
     )
-    assert metadata["map"]["sha256"] == LOOP_HASH
-    assert metadata["config"]["scenario_sha256"] == LOOP_HASH
+    assert metadata["map"]["sha256"] == RANDOM_HASH
+    assert metadata["config"]["scenario_sha256"] == RANDOM_HASH
     assert metadata["manifest_sha256"] == pipeline.digest(
         pipeline.make_manifest(
             config["manifest_seed"], config["manifest_counts"], config["scenario"]

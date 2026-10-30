@@ -22,7 +22,7 @@ from rl.scripted_controllers import HeuristicSelector
 from rl.search_metrics import summarize_search
 
 CLUE = (5.5, 5.5)
-PILOT_CONFIG = "configs/waypoint_commitment_training_pilot.json"
+PILOT_CONFIG = "configs/scenario_randomization_training_pilot.json"
 
 
 def arena(survivor=(17.5, 17.5), objects=()):

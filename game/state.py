@@ -124,3 +124,4 @@ class WorldSnapshot:
     navigation_path: tuple[tuple[float, float], ...] = ()
     investigation: InvestigationSnapshot = InvestigationSnapshot()
     alien_target_revision: int | None = None
+    ruled_out_exits: tuple[str, ...] = ()  # Survivor knowledge, never Alien input

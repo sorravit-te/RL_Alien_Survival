@@ -39,18 +39,18 @@ class GameCore:
             if self.world_map.overlaps(x, y, self.config.radius):
                 raise ValueError("Spawn does not have character clearance")
         if self.config.alien_enabled and self.world_map.alien_spawn is not None:
-            ax, ay, _ = self.world_map.alien_spawn
-            if self.world_map.overlaps(ax, ay, self.config.alien_radius):
-                raise ValueError("Alien spawn does not have character clearance")
-            for x, y in self.world_map.spawn_points:
-                distance = hypot(ax - x, ay - y)
-                contact = (
-                    self.config.radius + self.config.alien_radius + self.config.capture_padding
-                )
-                if distance < self.config.minimum_spawn_distance or (
-                    distance <= contact and segment_clear(self.world_map, x, y, ax, ay)
-                ):
-                    raise ValueError("Alien spawn is too close to Survivor spawn")
+            for ax, ay, _ in self._alien_spawns():
+                if self.world_map.overlaps(ax, ay, self.config.alien_radius):
+                    raise ValueError("Alien spawn does not have character clearance")
+                for x, y in self.world_map.spawn_points:
+                    distance = hypot(ax - x, ay - y)
+                    contact = (
+                        self.config.radius + self.config.alien_radius + self.config.capture_padding
+                    )
+                    if distance < self.config.minimum_spawn_distance or (
+                        distance <= contact and segment_clear(self.world_map, x, y, ax, ay)
+                    ):
+                        raise ValueError("Alien spawn is too close to Survivor spawn")
             if any(
                 self.world_map.overlaps(*p, self.config.alien_radius)
                 for p in self.world_map.patrol_waypoints
@@ -58,17 +58,33 @@ class GameCore:
                 raise ValueError("Patrol waypoint lacks Alien clearance")
         self.reset(0)
 
+    def _alien_spawns(self):
+        return (self.world_map.alien_spawn, *self.world_map.alien_spawn_options)
+
+    def _scenario_objects(self, rng):
+        """Keep one card and every exit in play; the working exit stays private."""
+        objects = self.world_map.objects
+        cards = [obj for obj in objects if obj.kind == "keycard"]
+        exits = [obj for obj in objects if obj.kind == "exit"]
+        self._active_exit = rng.choice(exits).object_id if exits else None
+        if len(cards) < 2:
+            return self.world_map
+        return replace(self.world_map, objects=(rng.choice(cards), *exits))
+
     def reset(self, seed: int | None = None) -> WorldSnapshot:
         """Explicit seed replays a spawn; None requests a fresh local RNG seed."""
         self._seed = seed
-        x, y = Random(seed).choice(self.world_map.spawn_points)
+        rng = Random(seed)
+        x, y = rng.choice(self.world_map.spawn_points)
         self._survivor = SurvivorState(x, y)
+        self._episode_map = self._scenario_objects(rng)
+        self._ruled_out_exits = ()
         self._tick = 0
         self._has_keycard = False
         self._outcome = None
         self._events = ()
         self._alien = (
-            AlienState(*self.world_map.alien_spawn)
+            AlienState(*rng.choice(self._alien_spawns()))
             if self.config.alien_enabled and self.world_map.alien_spawn is not None
             else None
         )
@@ -82,13 +98,13 @@ class GameCore:
         target = (
             None
             if self._outcome
-            else select_target(self.world_map, self._survivor, self.config, self._has_keycard)
+            else select_target(self._episode_map, self._survivor, self.config, self._has_keycard)
         )
         return WorldSnapshot(
             self._tick,
             self._seed,
             self._survivor,
-            self.world_map,
+            self._episode_map,
             self.config,
             self._has_keycard,
             target,
@@ -101,6 +117,7 @@ class GameCore:
             self._navigator.path,
             self._investigation.state,
             self._controller.clue_revision,
+            self._ruled_out_exits,
         )
 
     def set_alien_target(self, target, *, source="external", evidence_revision=None):
@@ -305,7 +322,7 @@ class GameCore:
         return captured
 
     def _interact(self, command):
-        target = select_target(self.world_map, self._survivor, self.config, self._has_keycard)
+        target = select_target(self._episode_map, self._survivor, self.config, self._has_keycard)
         eligible = (
             command.interact
             and command.forward == 0
@@ -318,6 +335,10 @@ class GameCore:
         if target.kind == "keycard":
             self._has_keycard = True
             kind = "keycard_collected"
+        elif target.object_id != self._active_exit:
+            kind = "exit_offline"
+            if target.object_id not in self._ruled_out_exits:
+                self._ruled_out_exits += (target.object_id,)
         else:
             self._outcome = "escaped"
             kind = "escaped"

@@ -93,8 +93,9 @@ def map_identity(scenario=DEFAULT_SCENARIO):
         "name": scenario,
         "sha256": digest(asdict(world)),
         "spawn_points": world.spawn_points,
-        "card_exit_fixed": True,
-        "warning": "Two real spawn points only; seeds are NOT layout/spawn holdout.",
+        "alien_spawn_options": world.alien_spawn_options,
+        "objects": [obj.object_id for obj in world.objects],
+        "warning": "Fixed layout; seeds are NOT a layout or scenario-tuple holdout.",
     }
 
 
@@ -143,7 +144,7 @@ def make_manifest(seed, counts, scenario=DEFAULT_SCENARIO):
         "seed": seed,
         "map": map_identity(scenario),
         "splits": splits,
-        "warning": "Disjoint numeric seeds, same fixed layout/card/exit and two spawns.",
+        "warning": "Disjoint numeric seeds on one layout; scenario tuples may repeat across splits.",
     }
 
 
@@ -178,12 +179,19 @@ def validate_environment_config(config):
         raise ValueError("World exceeds observation contract")
     if world.alien_spawn is None:
         raise ValueError("Scenario requires Alien spawn")
-    for point in (*world.spawn_points, world.alien_spawn[:2], *world.patrol_waypoints):
+    alien_starts = [world.alien_spawn[:2], *(p[:2] for p in world.alien_spawn_options)]
+    objects = [(obj.x, obj.y) for obj in world.objects]
+    for point in (*world.spawn_points, *alien_starts, *world.patrol_waypoints, *objects):
         if world.overlaps(*point, core.alien_radius):
             raise ValueError("Scenario lacks body clearance")
-    for point in world.patrol_waypoints:
-        if not find_path(world, world.alien_spawn[:2], point, core.alien_radius):
-            raise ValueError("Static policy waypoint is unreachable")
+    for start in alien_starts:
+        for point in world.patrol_waypoints:
+            if not find_path(world, start, point, core.alien_radius):
+                raise ValueError("Static policy waypoint is unreachable")
+    for start in world.spawn_points:
+        for point in objects:
+            if not find_path(world, start, point, core.radius):
+                raise ValueError("Scenario object is unreachable from a spawn")
     return map_identity(config.get("scenario", DEFAULT_SCENARIO))
 
 

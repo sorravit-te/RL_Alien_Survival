@@ -418,7 +418,7 @@ def main():
         "--phase", choices=("prepare", "baselines", "pilot", "final-test"), required=True
     )
     parser.add_argument(
-        "--config", type=Path, default=Path("configs/waypoint_commitment_training_pilot.json")
+        "--config", type=Path, default=Path("configs/scenario_randomization_training_pilot.json")
     )
     parser.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()

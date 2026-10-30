@@ -1,5 +1,5 @@
 {
-  "name": "waypoint_commitment_sampled_evaluation_v1",
+  "name": "scenario_randomization_sampled_evaluation_v1",
   "status": "implementation_only_runtime_requires_separate_authorization",
   "primary_inference": "sampled_masked_policy",
   "secondary_inference": "deterministic_argmax_diagnostic",
@@ -73,9 +73,9 @@
   },
   "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
   "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
-  "scenario": "occluded_loop_dev_v1",
-  "scenario_sha256": "c01c4cacc21c8c0b8342dc0f86e194cf6b066163bc2aac52b2123e723b33a730",
+  "scenario": "occluded_loop_random_v1",
+  "scenario_sha256": "f578a895cf84f31b185068456c69b00c92a68371a837430fd93d965ac3a0fef1",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v5-waypoint-commitment",
+  "contract_version": "alien-vector-v6-scenario-randomization",
   "bot_mix": "evasive_mix: per case 50/50 plain vs wall-loop evasive bot, chosen from bot_seed"
 }

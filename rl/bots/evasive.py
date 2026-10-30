@@ -528,6 +528,8 @@ class EvasiveExplorerBot:
         mission = view.mission
         for obj in mission.visible_objects:
             self.explorer.known[obj.object_id] = obj
+        for object_id in mission.ruled_out:
+            self.explorer.known.pop(object_id, None)
         position = (mission.x, mission.y)
         self._retry_cleanup(mission)
         distance = (

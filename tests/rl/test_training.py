@@ -35,7 +35,7 @@ from rl.train import baselines, pilot
 @pytest.fixture
 def base_config(tmp_path):
     """Tiny unprepared pilot config with its own synthetic evaluation protocol file."""
-    result = read_json(ROOT / "configs/waypoint_commitment_training_pilot.json")
+    result = read_json(ROOT / "configs/scenario_randomization_training_pilot.json")
     protocol = read_json(ROOT / result["evaluation_protocol"])
     counts = {"train": 4, "validation": 2, "test": 2}
     result.update(
@@ -75,8 +75,8 @@ def test_manifest_deterministic_disjoint_both_seed_kinds_and_fixed_map_warning(c
         for key in ("reset_seed", "scenario_seed", "bot_seed", "selector_seed")
     ]
     assert len(values) == len(set(values))
-    assert len(first["map"]["spawn_points"]) == 2
-    assert "NOT layout" in first["map"]["warning"]
+    assert len(first["map"]["spawn_points"]) == 3
+    assert "NOT a layout" in first["map"]["warning"]
 
 
 def test_training_manifest_reset_cycle_and_cap(config):
@@ -160,11 +160,11 @@ def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path,
     from rl.contract import VERSION
     from rl.pipeline import map_identity
 
-    assert VERSION == "alien-vector-v5-waypoint-commitment"
+    assert VERSION == "alien-vector-v6-scenario-randomization"
     assert CHECKPOINT_FORMAT == "alien-maskable-checkpoint-v1"
     assert map_identity()["name"] == "small_test_map_v1"
     manifest = manifest_of(config)
-    assert manifest["map"]["name"] == "occluded_loop_dev_v1"
+    assert manifest["map"]["name"] == "occluded_loop_random_v1"
     env = AlienEnv(max_episode_seconds=1)
     try:
         model = new_model(config, env)
@@ -174,7 +174,7 @@ def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path,
         assert metadata["format"] == CHECKPOINT_FORMAT
         assert metadata["contract_version"] == VERSION
         assert metadata["manifest_sha256"] == digest(manifest)
-        assert metadata["map"]["name"] == "occluded_loop_dev_v1"
+        assert metadata["map"]["name"] == "occluded_loop_random_v1"
         loaded, checked = load_checkpoint(path, config, source)
         assert digest(checked) == digest(metadata)
         assert loaded.num_timesteps == model.num_timesteps == 0

@@ -144,7 +144,9 @@ def hud_labels(loop, *, debug_alien=False):
     ]
     target = snapshot.interaction_target
     if target is not None:
-        if target.kind == "exit" and not snapshot.has_keycard:
+        if target.object_id in snapshot.ruled_out_exits:
+            labels.append("Exit - Offline")
+        elif target.kind == "exit" and not snapshot.has_keycard:
             labels.append("Exit - Keycard required")
         else:
             name = "Keycard" if target.kind == "keycard" else "Exit"

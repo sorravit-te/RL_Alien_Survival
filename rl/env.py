@@ -172,10 +172,17 @@ class AlienEnv(gym.Env):
             before = self.core.snapshot()
             view = (
                 observe_threat(
-                    self.world, before.survivor, before.has_keycard, before.alien, self.bot.settings
+                    before.world_map,
+                    before.survivor,
+                    before.has_keycard,
+                    before.alien,
+                    self.bot.settings,
+                    before.ruled_out_exits,
                 )
                 if self.bot_kind in THREAT_BOT_KINDS
-                else observe_survivor(self.world, before.survivor, before.has_keycard)
+                else observe_survivor(
+                    before.world_map, before.survivor, before.has_keycard, before.ruled_out_exits
+                )
             )
             command = self.bot.command(view)
             snapshot = self.core.step(command)

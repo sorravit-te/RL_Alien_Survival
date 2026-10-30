@@ -193,7 +193,7 @@ def test_unknown_bot_wrong_settings_and_unfrozen_config_rejected(tmp_path):
         AlienEnv(bot_kind="secret")
     with pytest.raises(ValueError, match="require evasive"):
         AlienEnv(evasion_settings=EvasionConfig())
-    config = read_json("configs/waypoint_commitment_training_pilot.json")
+    config = read_json("configs/scenario_randomization_training_pilot.json")
     env = make_env(config)
     assert env.bot_kind == "evasive_mix" and env.bot.settings == EvasionConfig()
     env.close()

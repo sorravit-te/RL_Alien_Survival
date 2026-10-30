@@ -13,12 +13,14 @@ Core retargets action20 to each confirmed sensor point and hands reacquisition d
 action21 to a written helper chase until the next decision.
 A waypoint action holds as the only valid action until arrival, a dead path or new
 confirmed evidence; the mask carries this, so the observation shape is unchanged.
+Scenario objects are never policy input: spawns, the card and the working exit vary
+by scenario seed, and the Alien learns them only through what it senses.
 No unconfirmed sight confidence/count is exposed. An unreachable observed floor
 point may have no path; navigation never substitutes a heuristic target.
 """
 
 # Schema identifier for new runs; archived checkpoints retain their recorded version.
-VERSION = "alien-vector-v5-waypoint-commitment"
+VERSION = "alien-vector-v6-scenario-randomization"
 SEARCH_CONTROL = "continue_cancel_waypoint_commitment_v1"
 ACTION_COUNT = 32
 WAIT = 30

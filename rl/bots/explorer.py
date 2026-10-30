@@ -42,6 +42,8 @@ class ExplorerBot:
         self.last_command_reason = None
         for obj in view.visible_objects:
             self.known[obj.object_id] = obj
+        for object_id in view.ruled_out:
+            self.known.pop(object_id, None)
         wanted = "exit" if view.has_keycard else "keycard"
         discovered = [obj for obj in self.known.values() if obj.kind == wanted]
         mission = (

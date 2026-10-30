@@ -1,6 +1,6 @@
 """Single immutable geometry source for collision and future rendering."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import floor, isfinite, pi
 
 
@@ -27,6 +27,7 @@ class WorldMap:
     objects: tuple[MapObject, ...] = ()
     alien_spawn: tuple[float, float, float] | None = None
     patrol_waypoints: tuple[tuple[float, float], ...] = ()
+    alien_spawn_options: tuple[tuple[float, float, float], ...] = ()  # beside alien_spawn
 
     def __post_init__(self):
         # Own immutable copies even when a caller supplies lists.
@@ -44,6 +45,13 @@ class WorldMap:
             if len(self.alien_spawn) != 3 or not all(isfinite(v) for v in self.alien_spawn):
                 raise ValueError("Alien spawn must contain finite x/y/yaw")
         object.__setattr__(self, "patrol_waypoints", tuple(tuple(p) for p in self.patrol_waypoints))
+        object.__setattr__(
+            self, "alien_spawn_options", tuple(tuple(p) for p in self.alien_spawn_options)
+        )
+        if self.alien_spawn_options and self.alien_spawn is None:
+            raise ValueError("Alien spawn options need a primary Alien spawn")
+        if any(len(p) != 3 or not all(isfinite(v) for v in p) for p in self.alien_spawn_options):
+            raise ValueError("Alien spawn must contain finite x/y/yaw")
         if any(len(p) != 2 or not all(isfinite(v) for v in p) for p in self.patrol_waypoints):
             raise ValueError("Patrol waypoint must contain finite x/y")
         if not self.rows or not self.rows[0]:
@@ -106,17 +114,18 @@ def small_test_map() -> WorldMap:
 
 
 DEFAULT_SCENARIO = "small_test_map_v1"
-SCENARIOS = (DEFAULT_SCENARIO, "occluded_loop_dev_v1")
+RANDOM_SCENARIO = "occluded_loop_random_v1"
+SCENARIOS = (DEFAULT_SCENARIO, "occluded_loop_dev_v1", RANDOM_SCENARIO)
 
 
 def scenario_map(name=DEFAULT_SCENARIO) -> WorldMap:
     """Explicit opt-in scene factory; the playable default remains small_test_map."""
     if name == DEFAULT_SCENARIO:
         return small_test_map()
-    if name != "occluded_loop_dev_v1":
+    if name not in SCENARIOS:
         raise ValueError(f"Unknown scenario: {name!r}")
     # Reviewed fixed DEV world. Keep object/order/waypoint identity exact.
-    return WorldMap(
+    world = WorldMap(
         (
             "################",
             "#..............#",
@@ -146,4 +155,21 @@ def scenario_map(name=DEFAULT_SCENARIO) -> WorldMap:
             (4.5, 11.5),
             (11.5, 11.5),
         ),
+    )
+    if name != RANDOM_SCENARIO:
+        return world
+    # Same walls and waypoints. Each reset keeps one card and one working exit.
+    return replace(
+        world,
+        spawn_points=((2.5, 11.5), (2.5, 13.5), (13.5, 11.5)),
+        objects=(
+            MapObject("keycard_west", "keycard", 2.5, 7.5),
+            MapObject("keycard_north", "keycard", 7.5, 2.5),
+            MapObject("keycard_east", "keycard", 13.5, 7.5),
+            MapObject("keycard_south", "keycard", 7.5, 12.5),
+            MapObject("exit_northwest", "exit", 2.5, 2.5),
+            MapObject("exit_northeast", "exit", 13.5, 2.5),
+            MapObject("exit_southeast", "exit", 13.5, 13.5),
+        ),
+        alien_spawn_options=((2.5, 2.5, 0.0),),
     )
