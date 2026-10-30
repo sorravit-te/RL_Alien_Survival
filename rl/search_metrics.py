@@ -9,14 +9,9 @@ from copy import deepcopy
 from math import atan2, hypot, pi
 
 from game.interaction import segment_clear
-from rl.contract import (
-    CONTINUE_CANCEL_TRACKING,
-    LEGACY_SEARCH_CONTROL,
-    restricts_search,
-    validate_search_control,
-)
+from rl.search_control_metrics import SearchControlMetrics
 
-VERSION = "wall-search-metrics-v1"
+VERSION = "wall-search-metrics-v3-pursuit-tracking"
 
 
 def ratio(numerator, denominator):
@@ -39,13 +34,8 @@ def wall_only_loss(before):
 
 
 class SearchMetrics:
-    def __init__(self, search_control=LEGACY_SEARCH_CONTROL):
-        self.search_control = validate_search_control(search_control)
-        self.control = None
-        if restricts_search(search_control):
-            from rl.search_control_metrics import SearchControlMetrics
-
-            self.control = SearchControlMetrics(tracking=search_control == CONTINUE_CANCEL_TRACKING)
+    def __init__(self):
+        self.control = SearchControlMetrics()
         self.losses = 0
         self.windows = []
         self.current = None
@@ -53,8 +43,7 @@ class SearchMetrics:
         self.finished = False
 
     def tick(self, before, after):
-        if self.control is not None:
-            self.control.tick(before, after)
+        self.control.tick(before, after)
         if before.perception.visible and not after.perception.visible:
             self.losses += 1
             if wall_only_loss(before):
@@ -93,14 +82,13 @@ class SearchMetrics:
         self.previous_target = None
 
     def decision(self, before, after, eligible21, action, *, requested_action=None):
-        if self.control is not None:
-            self.control.decision(
-                before,
-                after,
-                eligible21,
-                action,
-                action if requested_action is None else requested_action,
-            )
+        self.control.decision(
+            before,
+            after,
+            eligible21,
+            action,
+            action if requested_action is None else requested_action,
+        )
         w = self.current
         if w is None or before.perception.visible:
             return
@@ -138,11 +126,7 @@ class SearchMetrics:
             return sum(w[key] for w in windows)
 
         result = {
-            "version": VERSION
-            if self.control is None
-            else "wall-search-metrics-v3-pursuit-tracking"
-            if self.control.tracking
-            else "wall-search-metrics-v2-continue-cancel",
+            "version": VERSION,
             "confirmed_losses": self.losses,
             "wall_loss_opportunities": len(windows),
             "eligible_action21": ratio(total("action21_choices"), total("eligible_choices")),
@@ -154,9 +138,8 @@ class SearchMetrics:
             ),
             "target_switching": ratio(total("target_switches"), total("target_comparisons")),
             "windows": windows,
+            "control": self.control.finish(snapshot),
         }
-        if self.control is not None:
-            result["control"] = self.control.finish(snapshot)
         return result
 
 
@@ -187,24 +170,21 @@ def summarize_search(episodes):
         result[key] = ratio(
             sum(m[key]["numerator"] for m in metrics), sum(m[key]["denominator"] for m in metrics)
         )
-    controls = [m.get("control") for m in metrics]
-    if any(c is not None for c in controls):
-        if not all(c is not None for c in controls):
-            raise ValueError("Cannot pool legacy and continue/cancel metric populations")
-        result["control"] = {
-            "version": "continue-cancel-audit-v1",
-            "counts": {k: sum(c["counts"][k] for c in controls) for k in controls[0]["counts"]},
-            "attempts": sum(len(c["attempts"]) for c in controls),
-            "actual_retarget_delays_ticks": [
-                r["actual_delay_ticks"]
-                for c in controls
-                for r in c["retargets"]
-                if "actual_delay_ticks" in r
-            ],
-            "outcomes": {
-                name: sum(c["outcome"] == name for c in controls)
-                for name in ("captured", "escaped", "unresolved")
-            },
-        }
+    controls = [m["control"] for m in metrics]
+    result["control"] = {
+        "version": SearchControlMetrics.version,
+        "counts": {k: sum(c["counts"][k] for c in controls) for k in SearchControlMetrics().counts},
+        "attempts": sum(len(c["attempts"]) for c in controls),
+        "actual_retarget_delays_ticks": [
+            r["actual_delay_ticks"]
+            for c in controls
+            for r in c["retargets"]
+            if "actual_delay_ticks" in r
+        ],
+        "outcomes": {
+            name: sum(c["outcome"] == name for c in controls)
+            for name in ("captured", "escaped", "unresolved")
+        },
+    }
     result["note"] = "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
     return result

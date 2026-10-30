@@ -6,8 +6,9 @@ from rl.contract import DECISION_TICKS
 
 
 class SearchControlMetrics:
-    def __init__(self, *, tracking=False):
-        self.tracking = tracking
+    version = "continue-cancel-audit-v2-pursuit-tracking"
+
+    def __init__(self):
         self.counts = dict.fromkeys(
             (
                 "starts",
@@ -20,11 +21,10 @@ class SearchControlMetrics:
                 "helper_after_completion",
                 "completed_sweeps",
                 "active_but_unrestricted",
+                "helper_pursuit_handoffs",
             ),
             0,
         )
-        if tracking:
-            self.counts["helper_pursuit_handoffs"] = 0
         self.seen = set()
         self.events = []
         self.attempt = None
@@ -151,8 +151,7 @@ class SearchControlMetrics:
             )
             self.end(after.tick, reason, after.outcome)
         if (
-            self.tracking
-            and after.alien_target_source == "visible_handoff"
+            after.alien_target_source == "visible_handoff"
             and before.alien_target_source != "visible_handoff"
         ):
             # Written helper chase after reacquisition; never counted as a policy action.
@@ -190,9 +189,7 @@ class SearchControlMetrics:
             self.finished = True
         return deepcopy(
             {
-                "version": "continue-cancel-audit-v2-pursuit-tracking"
-                if self.tracking
-                else "continue-cancel-audit-v1",
+                "version": self.version,
                 "counts": self.counts,
                 "events": self.events,
                 "attempts": self.attempts,

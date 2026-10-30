@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from ai.controller import ControllerState, choose_target
 from rl.candidates import build_candidates, search_is_restricted
-from rl.contract import WAIT, restricts_search
+from rl.contract import WAIT
 
 
 class HeuristicSelector:
@@ -40,6 +40,6 @@ class HeuristicSelector:
             action = 21
         else:
             action = self.state.patrol_index if view.waypoints else WAIT
-        if restricts_search(view.search_control) and not build_candidates(view)[action].valid:
+        if not build_candidates(view)[action].valid:
             return WAIT
         return action

@@ -171,7 +171,7 @@ def test_cli_debug_flag_is_off_by_default_and_pygame_closes(monkeypatch, enabled
 
 def test_old_source_metadata_rejected_before_any_model_loading(tmp_path, monkeypatch):
     import rl.pipeline as pipeline
-    from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, VERSION
+    from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, SEARCH_CONTROL, VERSION
 
     config = {"manifest_seed": 123, "manifest_counts": {"train": 1, "validation": 1, "test": 1}}
     old = "7ff359178fed37db2d48e6149761ad7c9e6820633c875fe50221251db800e424"
@@ -179,6 +179,7 @@ def test_old_source_metadata_rejected_before_any_model_loading(tmp_path, monkeyp
     assert current["source_sha256"] != old
     metadata = {
         "contract_version": VERSION,
+        "search_control": SEARCH_CONTROL,
         "observation_shape": [OBSERVATION_SIZE],
         "action_n": ACTION_COUNT,
         "config_sha256": pipeline.digest(config),

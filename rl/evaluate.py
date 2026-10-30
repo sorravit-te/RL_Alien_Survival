@@ -12,9 +12,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from rl.contract import LEGACY_SEARCH_CONTROL, WAIT, restricts_search
+from rl.contract import WAIT
 from rl.pipeline import load_checkpoint, make_env, parameter_hash, read_run, write_json
 from rl.scripted_controllers import HeuristicSelector as HeuristicSelector
+from rl.search_metrics import summarize_search
 
 
 def wilson(successes, count):
@@ -114,11 +115,8 @@ def evaluate(
         "escape",
         "first_sight",
         "action_sha256",
+        "search_metrics",
     ]
-    if config.get("search_metrics") or restricts_search(
-        config.get("search_control", LEGACY_SEARCH_CONTROL)
-    ):
-        fields += ["search_metrics"]
     if explicit:
         fields += [
             "controller",
@@ -195,11 +193,8 @@ def evaluate(
                     "elapsed_ticks": info["elapsed_ticks"],
                     **components,
                     "action_sha256": actions.hexdigest(),
+                    "search_metrics": info["search_metrics"],
                 }
-                if config.get("search_metrics") or restricts_search(
-                    config.get("search_control", LEGACY_SEARCH_CONTROL)
-                ):
-                    row["search_metrics"] = info["search_metrics"]
                 if explicit:
                     row.update(
                         controller=controller_name,
@@ -351,16 +346,11 @@ def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
             )
             rows.extend(repeat_rows)
         summaries[name] = summarize_cases(rows, inference)
-        if config.get("search_metrics") or restricts_search(
-            config.get("search_control", LEGACY_SEARCH_CONTROL)
-        ):
-            from rl.search_metrics import summarize_search
-
-            summaries[name]["search"] = summarize_search(rows)
-            for case_summary in summaries[name]["per_case"]:
-                case_summary["search"] = summarize_search(
-                    [r for r in rows if r["id"] == case_summary["id"]]
-                )
+        summaries[name]["search"] = summarize_search(rows)
+        for case_summary in summaries[name]["per_case"]:
+            case_summary["search"] = summarize_search(
+                [r for r in rows if r["id"] == case_summary["id"]]
+            )
         summaries[name]["evaluation_role"] = rows[0]["evaluation_role"]
         all_rows[name] = rows
     write_json(output_dir / "summary.json", summaries)

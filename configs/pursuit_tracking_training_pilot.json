@@ -45,7 +45,6 @@
   },
   "evaluation_protocol": "configs/pursuit_tracking_evaluation.json",
   "scenario": "occluded_loop_dev_v1",
-  "search_metrics": true,
   "fresh_run": true,
   "defer_final_test": true,
   "scenario_sha256": "c01c4cacc21c8c0b8342dc0f86e194cf6b066163bc2aac52b2123e723b33a730",

@@ -39,7 +39,7 @@ def zero_learning(monkeypatch):
 
 @pytest.fixture
 def prepared(tmp_path):
-    config = read_json("configs/evasive_training_pilot.json")
+    config = read_json("configs/pursuit_tracking_training_pilot.json")
     protocol = read_json(config["evaluation_protocol"])
     # Distinct tiny synthetic split, not any reviewed population or future evaluation cases.
     config.update(
@@ -49,6 +49,7 @@ def prepared(tmp_path):
         evaluation_interval=16,
         progress_interval=16,
         max_episode_seconds=1,
+        defer_final_test=False,
     )
     protocol.update(
         manifest_seed=config["manifest_seed"], manifest_counts=config["manifest_counts"]
@@ -148,7 +149,7 @@ def test_frozen_input_mutation_rejected(prepared, name):
     ],
 )
 def test_invalid_protocol_fails_before_run_creation(tmp_path, bad):
-    c = read_json("configs/evasive_training_pilot.json")
+    c = read_json("configs/pursuit_tracking_training_pilot.json")
     p = read_json(c["evaluation_protocol"])
     if bad == "availability":
         p["controllers"][1]["available"] = "fallback"
@@ -187,7 +188,7 @@ def test_invalid_protocol_fails_before_run_creation(tmp_path, bad):
 
 
 def test_actual_review_config_validates_without_running_it():
-    c = read_json("configs/evasive_training_pilot.json")
+    c = read_json("configs/pursuit_tracking_training_pilot.json")
     validate_protocol(c, read_json(c["evaluation_protocol"]))
     with pytest.raises(ValueError, match="prepared frozen"):
         frozen_protocol(c)

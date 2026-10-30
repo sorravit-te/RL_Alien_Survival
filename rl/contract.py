@@ -8,14 +8,16 @@ Action21 snapshots confirmed evidence revision, walks, then performs a bounded
 stationary inspection. Exhausted revision masks21; fresh evidence re-enables it.
 Base23..31 now carry investigation state instead of previously unused reservations.
 Age scaling is physical clue/visit age, never the external episode countdown.
-Mode continue_cancel_tracking_v1 keeps the action/observation layout but Core retargets
-action20 to each confirmed sensor point and hands reacquisition during action21 to chase.
+While action21's current clue is active, only 21 (continue) and 30 (cancel) are valid.
+Core retargets action20 to each confirmed sensor point and hands reacquisition during
+action21 to a written helper chase until the next decision.
 No unconfirmed sight confidence/count is exposed. An unreachable observed floor
 point may have no path; navigation never substitutes a heuristic target.
 """
 
 # Schema identifier for new runs; archived checkpoints retain their recorded version.
-VERSION = "alien-vector-v2"
+VERSION = "alien-vector-v4-pursuit-tracking"
+SEARCH_CONTROL = "continue_cancel_tracking_v1"
 ACTION_COUNT = 32
 WAIT = 30
 DECISION_TICKS = 15
@@ -77,41 +79,11 @@ OBSERVATION_SIZE = len(BASE_FIELDS) + ACTION_COUNT * len(CANDIDATE_FIELDS) + ACT
 assert OBSERVATION_SIZE == 352
 
 
-LEGACY_SEARCH_CONTROL = "legacy"
-CONTINUE_CANCEL = "continue_cancel_v1"
-CONTINUE_CANCEL_VERSION = "alien-vector-v3-continue-cancel"
-# Same continue/cancel restriction plus the tracking pursuit helper in Core.
-CONTINUE_CANCEL_TRACKING = "continue_cancel_tracking_v1"
-CONTINUE_CANCEL_TRACKING_VERSION = "alien-vector-v4-pursuit-tracking"
-CONTRACT_VERSIONS = {
-    LEGACY_SEARCH_CONTROL: VERSION,
-    CONTINUE_CANCEL: CONTINUE_CANCEL_VERSION,
-    CONTINUE_CANCEL_TRACKING: CONTINUE_CANCEL_TRACKING_VERSION,
-}
-
-
-def validate_search_control(mode):
-    if type(mode) is not str or mode not in CONTRACT_VERSIONS:
-        raise ValueError("Unknown search_control mode")
-    return mode
-
-
-def restricts_search(mode):
-    """Modes whose active last-seen primitive limits the policy to continue/cancel."""
-    return validate_search_control(mode) in (CONTINUE_CANCEL, CONTINUE_CANCEL_TRACKING)
-
-
-def core_pursuit(mode):
-    """Core pursuit helper for a mode; older modes keep decision-time chase snapshots."""
-    return "tracking" if validate_search_control(mode) == CONTINUE_CANCEL_TRACKING else "snapshot"
-
-
-def search_contract(mode=LEGACY_SEARCH_CONTROL):
-    """Static/public identity; equal dimensions do not imply equal semantics."""
-    validate_search_control(mode)
+def search_contract():
+    """Static/public identity recorded with runs and checkpoints."""
     return {
-        "search_control": mode,
-        "contract_version": CONTRACT_VERSIONS[mode],
+        "search_control": SEARCH_CONTROL,
+        "contract_version": VERSION,
         "observation_shape": [OBSERVATION_SIZE],
         "action_n": ACTION_COUNT,
         "decision_ticks": DECISION_TICKS,

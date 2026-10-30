@@ -3,23 +3,12 @@
 from types import SimpleNamespace
 
 import numpy as np
-import pytest
 
-from app.rl_controller import HumanRLController
-from game.core import GameCore
 from game.map import WorldMap
 from game.perception import PerceptionSnapshot
 from game.state import SurvivorCommand, SurvivorState
 from rl.candidates import build_candidates
-from rl.contract import (
-    CONTINUE_CANCEL,
-    CONTINUE_CANCEL_TRACKING,
-    CONTINUE_CANCEL_TRACKING_VERSION,
-    LEGACY_SEARCH_CONTROL,
-    core_pursuit,
-    restricts_search,
-    search_contract,
-)
+from rl.contract import SEARCH_CONTROL, VERSION, search_contract
 from rl.env import AlienEnv
 from rl.observations import build_observation
 
@@ -35,8 +24,8 @@ def arena(survivor=(17.5, 17.5)):
     )
 
 
-def make_env(mode, survivor=(9.5, 5.5)):
-    e = AlienEnv(arena(survivor), bot_kind="stationary_debug", search_control=mode)
+def make_env(survivor=(9.5, 5.5)):
+    e = AlienEnv(arena(survivor), bot_kind="stationary_debug")
     e.reset(seed=3)
     return e
 
@@ -63,34 +52,15 @@ def strafing_bot():
     )
 
 
-def test_contract_identity_and_mode_routing():
-    assert search_contract(CONTINUE_CANCEL_TRACKING)["contract_version"] == (
-        CONTINUE_CANCEL_TRACKING_VERSION
-    )
-    assert search_contract(CONTINUE_CANCEL_TRACKING)["observation_shape"] == [352]
-    assert restricts_search(CONTINUE_CANCEL_TRACKING) and restricts_search(CONTINUE_CANCEL)
-    assert not restricts_search(LEGACY_SEARCH_CONTROL)
-    assert [core_pursuit(m) for m in (LEGACY_SEARCH_CONTROL, CONTINUE_CANCEL)] == ["snapshot"] * 2
-    assert core_pursuit(CONTINUE_CANCEL_TRACKING) == "tracking"
-    for mode in (LEGACY_SEARCH_CONTROL, CONTINUE_CANCEL, CONTINUE_CANCEL_TRACKING):
-        e = make_env(mode)
-        try:
-            assert e.core.pursuit == core_pursuit(mode)
-        finally:
-            e.close()
-    with pytest.raises(ValueError, match="Pursuit"):
-        GameCore(arena(), pursuit="predictive")
+def test_contract_identity():
+    contract = search_contract()
+    assert contract["search_control"] == SEARCH_CONTROL == "continue_cancel_tracking_v1"
+    assert contract["contract_version"] == VERSION == "alien-vector-v4-pursuit-tracking"
+    assert contract["observation_shape"] == [352] and contract["action_n"] == 32
 
 
-def test_human_controller_rejects_core_pursuit_mismatch():
-    core = GameCore(arena(), alien_control="external")
-    with pytest.raises(ValueError, match="pursuit"):
-        HumanRLController(core, None, 1, search_control=CONTINUE_CANCEL_TRACKING)
-
-
-@pytest.mark.parametrize("mode", [CONTINUE_CANCEL, CONTINUE_CANCEL_TRACKING])
-def test_visible_chase_target_follows_confirmed_points_only_when_tracking(mode, monkeypatch):
-    e = make_env(mode)
+def test_visible_chase_target_follows_each_confirmed_point(monkeypatch):
+    e = make_env()
     try:
         e.step(30)  # stationary Survivor in view: confirm sight before the chase block
         assert e.core.snapshot().perception.visible and 20 in np.flatnonzero(e.action_masks())
@@ -99,18 +69,15 @@ def test_visible_chase_target_follows_confirmed_points_only_when_tracking(mode, 
         e.step(20)
         targets = [a.alien_target for _, a in records]
         assert all(a.perception.visible for _, a in records)
-        if mode == CONTINUE_CANCEL_TRACKING:
-            # Each tick's target is that tick's pre-motion confirmed sample.
-            assert all(a.alien_target == a.perception.last_seen for _, a in records)
-            assert len(set(targets)) == len(targets)
-        else:
-            assert len(set(targets)) == 1
+        # Each tick's target is that tick's pre-motion confirmed sample.
+        assert all(a.alien_target == a.perception.last_seen for _, a in records)
+        assert len(set(targets)) == len(targets)
     finally:
         e.close()
 
 
 def test_tracking_stops_at_last_confirmed_point_after_sight_loss(monkeypatch):
-    e = make_env(CONTINUE_CANCEL_TRACKING)
+    e = make_env()
     try:
         e.step(30)
         e.bot = strafing_bot()
@@ -131,9 +98,7 @@ def test_tracking_stops_at_last_confirmed_point_after_sight_loss(monkeypatch):
 
 
 def test_reacquisition_hands_off_to_helper_chase_without_freezing(monkeypatch):
-    e = AlienEnv(
-        arena((8.5, 5.5)), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL_TRACKING
-    )
+    e = AlienEnv(arena((8.5, 5.5)), bot_kind="stationary_debug")
     try:
         e.reset(seed=1)
         e.core._perception = PerceptionSnapshot(last_seen=CLUE, last_seen_age_ticks=300, revision=1)
@@ -160,25 +125,8 @@ def test_reacquisition_hands_off_to_helper_chase_without_freezing(monkeypatch):
         e.close()
 
 
-def test_snapshot_mode_keeps_frozen_reacquisition_and_audit_version():
-    e = AlienEnv(arena((8.5, 5.5)), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL)
-    try:
-        e.reset(seed=1)
-        e.core._perception = PerceptionSnapshot(last_seen=CLUE, last_seen_age_ticks=300, revision=1)
-        _, _, _, _, info = e.step(21)
-        s = e.core.snapshot()
-        assert s.alien_target_source == "last_seen" and not s.navigation_path
-        assert "helper_pursuit_handoffs" not in e.metrics.control.counts
-        assert e.metrics.finish(s)["control"]["version"] == "continue-cancel-audit-v1"
-    finally:
-        e.close()
-
-
 def test_hidden_survivor_position_does_not_change_tracking_views():
-    envs = [
-        AlienEnv(arena(p), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL_TRACKING)
-        for p in ((17.5, 17.5), (16.5, 17.5))
-    ]
+    envs = [AlienEnv(arena(p), bot_kind="stationary_debug") for p in ((17.5, 17.5), (16.5, 17.5))]
     try:
         for e in envs:
             e.reset(seed=7)

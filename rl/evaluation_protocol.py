@@ -6,7 +6,7 @@ from math import ceil, isfinite
 
 import numpy as np
 
-from rl.contract import LEGACY_SEARCH_CONTROL, search_contract
+from rl.contract import search_contract
 from rl.evasive_survivor import EvasionConfig
 
 CONTROLLER_SPECS = {
@@ -37,21 +37,11 @@ def positive_integer(value):
 
 def validate_protocol(training, evaluation):
     try:
-        train_contract = search_contract(training.get("search_control", LEGACY_SEARCH_CONTROL))
-        eval_contract = search_contract(evaluation.get("search_control", LEGACY_SEARCH_CONTROL))
-        if train_contract != eval_contract:
-            raise ValueError("Training and evaluation search_control mismatch")
+        contract = search_contract()
         for spec in (training, evaluation):
-            if (
-                "contract_version" in spec
-                and spec["contract_version"] != train_contract["contract_version"]
-            ):
-                raise ValueError("Training/evaluation contract_version mismatch")
-        if (
-            train_contract["search_control"] != LEGACY_SEARCH_CONTROL
-            and evaluation.get("contract_version") != train_contract["contract_version"]
-        ):
-            raise ValueError("New search protocol requires explicit contract_version")
+            for key in ("search_control", "contract_version"):
+                if spec.get(key) != contract[key]:
+                    raise ValueError(f"Sampled protocol requires the current explicit {key}")
         if "scenario" in training or "scenario" in evaluation:
             from game.map import DEFAULT_SCENARIO
             from rl.pipeline import configured_map_identity

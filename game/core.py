@@ -29,15 +29,10 @@ class GameCore:
         config: CoreConfig | None = None,
         *,
         alien_control: str = "heuristic",
-        pursuit: str = "snapshot",
     ):
         if alien_control not in ("heuristic", "external"):
             raise ValueError("Alien control must be heuristic or external")
-        if pursuit not in ("snapshot", "tracking"):
-            raise ValueError("Pursuit must be snapshot or tracking")
         self.alien_control = alien_control
-        # snapshot: chase targets stay as chosen; tracking: written pursuit helper below.
-        self.pursuit = pursuit
         self.world_map = world_map if world_map is not None else small_test_map()
         self.config = config if config is not None else CoreConfig()
         for x, y in self.world_map.spawn_points:
@@ -215,8 +210,7 @@ class GameCore:
             self._navigator.set_target(
                 self.world_map, (self._alien.x, self._alien.y), None, self.config.alien_radius
             )
-        if self.pursuit == "tracking":
-            hold = self._track_confirmed_sighting(hold)
+        hold = self._track_confirmed_sighting(hold)
         if hold:
             self._alien = replace(self._alien, yaw=(self._alien.yaw + turn) % (2 * pi))
             return (0.0, 0.0)

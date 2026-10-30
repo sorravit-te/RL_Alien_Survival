@@ -22,7 +22,7 @@ from game.map import MapObject, WorldMap
 from game.perception import PerceptionSnapshot, update_perception
 from game.state import AlienState, CoreConfig, SurvivorCommand, SurvivorState
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
-from rl.contract import BASE_FIELDS, VERSION, WAIT
+from rl.contract import BASE_FIELDS, SEARCH_CONTROL, VERSION, WAIT
 from rl.env import AlienEnv
 from rl.observations import build_observation
 
@@ -204,6 +204,9 @@ def test_fresh_same_position_reenables_exhausted_clue_after_actual_confirmed_sen
     s = advance(core, 6)
     assert s.perception.visible and s.perception.revision == 2 and s.perception.last_seen == CLUE
     assert s.investigation.investigated_revision == 1
+    assert not candidate_masks(build_candidates(view(core)))[21]  # visible: chase, not search
+    core._survivor = SurvivorState(17.5, 17.5)
+    advance(core, 1)
     assert candidate_masks(build_candidates(view(core)))[21]
     select(core)
     assert (
@@ -213,7 +216,7 @@ def test_fresh_same_position_reenables_exhausted_clue_after_actual_confirmed_sen
 
 
 @pytest.mark.parametrize("phase", ["travelling", "sweeping"])
-def test_reacquisition_cancels_immediately_retains_chosen_revision_and_never_forces_chase(phase):
+def test_reacquisition_cancels_immediately_and_hands_off_to_helper_chase(phase):
     scene = world(survivor=(8.5, 5.5) if phase == "travelling" else (5.5, 8.5))
     core = make_core(scene=scene, target=(10.5, 5.5) if phase == "travelling" else CLUE)
     select(core)
@@ -225,19 +228,16 @@ def test_reacquisition_cancels_immediately_retains_chosen_revision_and_never_for
             assert s.investigation.phase == "cancelled" and s.investigation.revision == 1
             assert s.perception.revision == 2
             assert s.investigation.investigated_revision is None
-            assert s.alien_target == before.alien_target and s.alien_target_source == "last_seen"
-            assert (s.alien.x, s.alien.y, s.alien.yaw) == (
-                before.alien.x,
-                before.alien.y,
-                before.alien.yaw,
-            )
-            assert s.navigation_path == ()
+            assert s.alien_target == s.perception.last_seen
+            assert s.alien_target_source == "visible_handoff"
+            assert s.navigation_path and (s.alien.x, s.alien.y) != (before.alien.x, before.alien.y)
             break
     else:
         pytest.fail("never reacquired")
     later = advance(core, 3)
     assert later.investigation.revision == 1 and later.perception.revision > 2
-    assert (later.alien.x, later.alien.y, later.alien.yaw) == (s.alien.x, s.alien.y, s.alien.yaw)
+    assert later.alien_target_source == "visible_handoff"
+    assert (later.alien.x, later.alien.y) != (s.alien.x, s.alien.y)
     with pytest.raises(ValueError, match="current confirmed"):
         core.set_alien_target(s.alien_target, source="last_seen", evidence_revision=1)
 
@@ -302,7 +302,7 @@ def test_observation_mapping_exposes_phase_target_progress_current_revision_and_
     select(core)
     advance(core, 45)
     values = dict(zip(BASE_FIELDS, build_observation(view(core))[:32]))
-    assert VERSION == "alien-vector-v2" and len(values) == 32
+    assert VERSION == "alien-vector-v4-pursuit-tracking" and len(values) == 32
     assert values["investigation_active"] == values["investigation_sweeping"] == 1
     assert values["investigation_progress"] == 0.5 and values["investigation_target_valid"] == 1
     assert values["investigation_revision_current"] == 1 and values["last_seen_investigated"] == 0
@@ -522,6 +522,7 @@ def test_legacy_rejection_before_model_load_even_with_same_dimensions(
     source = pipeline.source_state()
     metadata = {
         "contract_version": VERSION,
+        "search_control": SEARCH_CONTROL,
         "observation_shape": [OBSERVATION_SIZE],
         "action_n": ACTION_COUNT,
         "config_sha256": pipeline.digest(config),

@@ -197,9 +197,9 @@ def test_unknown_bot_wrong_settings_and_unfrozen_config_rejected(tmp_path):
         AlienEnv(bot_kind="secret")
     with pytest.raises(ValueError, match="require evasive"):
         AlienEnv(evasion_settings=EvasionConfig())
-    config = read_json("configs/evasive_training_pilot.json")
+    config = read_json("configs/pursuit_tracking_training_pilot.json")
     env = make_env(config)
-    assert env.bot_kind == "evasive_explorer" and env.bot.settings == EvasionConfig()
+    assert env.bot_kind == "evasive_mix" and env.bot.settings == EvasionConfig()
     env.close()
     from rl.evaluation_protocol import frozen_protocol
 
@@ -216,44 +216,6 @@ def test_unknown_bot_wrong_settings_and_unfrozen_config_rejected(tmp_path):
 def test_bot_rejects_world_truth_as_command_input():
     with pytest.raises(TypeError, match="filtered"):
         bot().command(GameCore(arena()).snapshot())
-
-
-def test_sampled_protocol_validates_modes_seeds_and_keeps_legacy_explicit(tmp_path):
-    from copy import deepcopy
-
-    from tools.check_survivor_bots import prepare, validate_protocol
-
-    training = read_json("configs/evasive_training_pilot.json")
-    protocol = read_json("configs/sampled_policy_evaluation.json")
-    validate_protocol(training, protocol)
-    original = read_json("configs/training_pilot.json")
-    assert (
-        training["ppo"] == original["ppo"]
-        and training["requested_steps"] == original["requested_steps"]
-    )
-    for mutate in ("primary", "repeat_seed", "controller_mode"):
-        changed = deepcopy(protocol)
-        if mutate == "primary":
-            changed["primary_inference"] = "deterministic_argmax"
-        elif mutate == "repeat_seed":
-            changed["sampling_repeat_seeds"] = [1, 1, 2]
-        else:
-            changed["controllers"][1]["inference"] = "argmax_masked"
-        with pytest.raises(ValueError):
-            validate_protocol(training, changed)
-    output = tmp_path / "protocol"
-    prepare(output)
-    assert read_json(output / "smoke_protocol.json")["episodes"] == 120
-    assert len(read_json(output / "future_manifest.json")["splits"]["test"]) == 50
-    assert (
-        read_json(output / "evaluation_protocol.json")["status"]
-        == "integrated_pending_runner_review"
-    )
-    with pytest.raises(FileExistsError):
-        prepare(output)
-    supported = {k: v for k, v in training.items() if k != "evaluation_protocol"}
-    prepare_run(tmp_path / "supported_bot", supported)
-    assert read_json(tmp_path / "supported_bot/config.json")["bot_kind"] == "evasive_explorer"
 
 
 def test_retreat_around_obstacle_uses_clearance_and_core_collision():

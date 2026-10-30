@@ -20,14 +20,10 @@ from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
 from rl.contract import (
     ACTION_COUNT,
     DECISION_TICKS,
-    LEGACY_SEARCH_CONTROL,
     OBSERVATION_SIZE,
+    VERSION,
     WAIT,
     WORLD_SCALE,
-    core_pursuit,
-    restricts_search,
-    search_contract,
-    validate_search_control,
 )
 from rl.evasive_survivor import (
     EvasiveExplorerBot,
@@ -37,6 +33,7 @@ from rl.evasive_survivor import (
 )
 from rl.observations import build_observation
 from rl.rewards import RewardTracker
+from rl.search_metrics import SearchMetrics
 from rl.survivor_bots import ExplorerBot, StationaryDebugBot, observe_survivor
 
 BOT_KINDS = ("explorer", "evasive_explorer", "stationary_debug", "wall_loop_evasive", "evasive_mix")
@@ -61,16 +58,10 @@ class AlienEnv(gym.Env):
         bot_kind="explorer",
         evasion_settings=None,
         scenario=None,
-        search_metrics=False,
-        search_control=LEGACY_SEARCH_CONTROL,
     ):
         if world_map is not None and scenario is not None:
             raise ValueError("Use a named scenario or a custom world, never both")
-        if type(search_metrics) is not bool:
-            raise ValueError("search_metrics must be boolean")
         self.scenario = DEFAULT_SCENARIO if world_map is None and scenario is None else scenario
-        self.search_control = validate_search_control(search_control)
-        self.search_metrics = search_metrics
         self.metrics = None
         self.world = (
             world_map
@@ -86,12 +77,7 @@ class AlienEnv(gym.Env):
             raise ValueError("Current contract permits at most20 waypoints")
         if not self.config.alien_enabled or self.world.alien_spawn is None:
             raise ValueError("RL environment requires an active Alien")
-        self.core = GameCore(
-            self.world,
-            self.config,
-            alien_control="external",
-            pursuit=core_pursuit(self.search_control),
-        )
+        self.core = GameCore(self.world, self.config, alien_control="external")
         start = self.world.alien_spawn[:2]
         for point in self.world.patrol_waypoints:
             if not find_path(self.world, start, point, self.config.alien_radius):
@@ -138,7 +124,6 @@ class AlienEnv(gym.Env):
             bool(snapshot.navigation_path),
             memory.revision,
             snapshot.investigation,
-            self.search_control,
         )
 
     def action_masks(self):
@@ -163,16 +148,11 @@ class AlienEnv(gym.Env):
         self.reward_tracker = RewardTracker()
         self.last_action = WAIT
         self.visit_ticks = [None] * len(self.world.patrol_waypoints)
-        if self.search_metrics or restricts_search(self.search_control):
-            from rl.search_metrics import SearchMetrics
-
-            self.metrics = SearchMetrics(self.search_control)
+        self.metrics = SearchMetrics()
         self.elapsed_ticks = 0
         self._done = False
         return build_observation(self._allowed_view()), {
-            "contract_version": search_contract(
-                getattr(self, "search_control", LEGACY_SEARCH_CONTROL)
-            )["contract_version"],
+            "contract_version": VERSION,
             "scenario_seed": self.scenario_seed,
             "bot_seed": self.bot_seed,
             "bot": self.bot.label,
@@ -192,7 +172,7 @@ class AlienEnv(gym.Env):
         applied = WAIT if invalid else action
         self.last_action = applied
         chosen = candidates[applied]
-        before_selection = self.core.snapshot() if self.metrics is not None else None
+        before_selection = self.core.snapshot()
         self.core.set_alien_target(
             chosen.target,
             source=(
@@ -206,14 +186,13 @@ class AlienEnv(gym.Env):
             ),
             evidence_revision=chosen.evidence_revision,
         )
-        if self.metrics is not None:
-            self.metrics.decision(
-                before_selection,
-                self.core.snapshot(),
-                candidates[21].valid,
-                applied,
-                requested_action=action,
-            )
+        self.metrics.decision(
+            before_selection,
+            self.core.snapshot(),
+            candidates[21].valid,
+            applied,
+            requested_action=action,
+        )
         components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
         ticks = 0
         snapshot = self.core.snapshot()
@@ -229,8 +208,7 @@ class AlienEnv(gym.Env):
             )
             command = self.bot.command(view)
             snapshot = self.core.step(command)
-            if self.metrics is not None:
-                self.metrics.tick(before, snapshot)
+            self.metrics.tick(before, snapshot)
             ticks += 1
             self.elapsed_ticks += 1
             for name, value in self.reward_tracker.collect(
@@ -249,9 +227,7 @@ class AlienEnv(gym.Env):
         truncated = not terminated and self.elapsed_ticks >= self.cap_ticks
         self._done = terminated or truncated
         info = {
-            "contract_version": search_contract(
-                getattr(self, "search_control", LEGACY_SEARCH_CONTROL)
-            )["contract_version"],
+            "contract_version": VERSION,
             "bot": self.bot.label,
             "requested_action": action,
             "applied_action": applied,
@@ -263,7 +239,7 @@ class AlienEnv(gym.Env):
             "truncation_reason": "external_time_cap" if truncated else None,
             "action_masks": self.action_masks(),
         }
-        if self.metrics is not None and self._done:
+        if self._done:
             info["search_metrics"] = self.metrics.finish(snapshot)
         return (
             build_observation(self._allowed_view()),

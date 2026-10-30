@@ -15,19 +15,14 @@ from game.perception import PerceptionSnapshot
 from game.state import SurvivorCommand, SurvivorState
 from rl import pipeline
 from rl.candidates import build_candidates, candidate_masks, search_is_restricted
-from rl.contract import (
-    CONTINUE_CANCEL,
-    CONTINUE_CANCEL_VERSION,
-    LEGACY_SEARCH_CONTROL,
-    VERSION,
-    search_contract,
-)
+from rl.contract import SEARCH_CONTROL, VERSION, search_contract
 from rl.env import AlienEnv
 from rl.observations import build_observation
 from rl.scripted_controllers import HeuristicSelector
 from rl.search_metrics import summarize_search
 
 CLUE = (5.5, 5.5)
+PILOT_CONFIG = "configs/pursuit_tracking_training_pilot.json"
 
 
 def arena(survivor=(17.5, 17.5), objects=()):
@@ -42,9 +37,7 @@ def arena(survivor=(17.5, 17.5), objects=()):
 
 @pytest.fixture
 def env():
-    e = AlienEnv(
-        arena(), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL, max_episode_seconds=10
-    )
+    e = AlienEnv(arena(), bot_kind="stationary_debug", max_episode_seconds=10)
     e.reset(seed=914, options={"scenario_seed": 199, "bot_seed": 297})
     e.core._perception = PerceptionSnapshot(last_seen=CLUE, last_seen_age_ticks=300, revision=1)
     yield e
@@ -136,7 +129,7 @@ def test_final_rotation_sample_then_completion_and_reset(env):
 
 @pytest.mark.parametrize("travelling", [False, True])
 def test_reacquisition_interrupts_at_tick6_not_policy_boundary(travelling, monkeypatch):
-    e = AlienEnv(arena((8.5, 5.5)), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL)
+    e = AlienEnv(arena((8.5, 5.5)), bot_kind="stationary_debug")
     try:
         e.reset(seed=1)
         seed(e.core, (10.5, 5.5) if travelling else CLUE)
@@ -153,10 +146,12 @@ def test_reacquisition_interrupts_at_tick6_not_policy_boundary(travelling, monke
         e.step(21)
         b, a = next((b, a) for b, a in records if a.investigation.phase == "cancelled")
         assert a.tick == 6 and a.tick % 15 != 0
-        assert (a.alien.x, a.alien.y, a.alien.yaw) == (b.alien.x, b.alien.y, b.alien.yaw)
-        assert not a.navigation_path and a.alien_target_source == "last_seen"
+        # The old primitive stops at once; the written helper chases the confirmed point.
+        assert a.alien_target_source == "visible_handoff" and a.alien_target == (8.5, 5.5)
+        assert (a.alien.x, a.alien.y) != (b.alien.x, b.alien.y)
         assert 0 in mask(e) and 20 in mask(e) and 21 not in mask(e)
-        assert e.metrics.control.events[-1]["reason"] == "confirmed_visible"
+        cancel = next(x for x in e.metrics.control.events if x["kind"] == "helper_cancel")
+        assert cancel["reason"] == "confirmed_visible"
     finally:
         e.close()
 
@@ -237,10 +232,7 @@ def test_invalid_or_stale_active_clue_never_forces_continuation(env, change):
 
 
 def test_public_hidden_world_and_adapter_mask_observation_parity():
-    envs = [
-        AlienEnv(arena(p), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL)
-        for p in ((17.5, 17.5), (16.5, 17.5))
-    ]
+    envs = [AlienEnv(arena(p), bot_kind="stationary_debug") for p in ((17.5, 17.5), (16.5, 17.5))]
     try:
         for e in envs:
             e.reset(seed=7)
@@ -254,7 +246,6 @@ def test_public_hidden_world_and_adapter_mask_observation_parity():
             app.config = envs[0].config
             app.last_action = envs[0].last_action
             app.visit_ticks = envs[0].visit_ticks
-            app.search_control = CONTINUE_CANCEL
             np.testing.assert_array_equal(app.observation(), build_observation(views[0]))
             np.testing.assert_array_equal(app.action_masks(), envs[0].action_masks())
             np.testing.assert_array_equal(app.observation()[-32:].astype(bool), app.action_masks())
@@ -267,9 +258,7 @@ def test_public_hidden_world_and_adapter_mask_observation_parity():
 
 def test_terminal_freezes_and_audit_closes_then_reset_clears():
     objects = (MapObject("card", "keycard", 17.5, 17.5), MapObject("exit", "exit", 17.5, 17.5))
-    e = AlienEnv(
-        arena(objects=objects), bot_kind="stationary_debug", search_control=CONTINUE_CANCEL
-    )
+    e = AlienEnv(arena(objects=objects), bot_kind="stationary_debug")
     try:
         e.reset(seed=2)
         seed(e.core)
@@ -297,13 +286,9 @@ def test_terminal_freezes_and_audit_closes_then_reset_clears():
         e.close()
 
 
-def test_legacy_mode_stays_unrestricted_and_waypoint_arrival_does_not_scan(env):
+def test_waypoint_arrival_after_cancel_does_not_scan(env):
     env.step(21)
-    v = replace(env._allowed_view(), search_control=LEGACY_SEARCH_CONTROL)
-    assert np.flatnonzero(candidate_masks(build_candidates(v))).tolist() == [0, 21, 30]
     assert search_contract()["contract_version"] == VERSION
-    assert search_contract(CONTINUE_CANCEL)["contract_version"] == CONTINUE_CANCEL_VERSION
-    assert search_contract(CONTINUE_CANCEL)["observation_shape"] == [352]
     env.step(30)
     for _ in range(5):
         env.step(0)
@@ -324,15 +309,17 @@ def test_heuristic_and_uniform_valid_controls_share_public_binary_choice(env):
     assert 30 in valid  # Wait cancels; no forced-only continuation
 
 
-@pytest.mark.parametrize("bad", [None, "wrong", True, 1])
-def test_mode_validation_before_actors(bad, monkeypatch):
+@pytest.mark.parametrize("key", ["search_control", "contract_version"])
+def test_old_contract_names_rejected_before_actors(key, monkeypatch):
     monkeypatch.setattr("rl.env.GameCore", lambda *a, **k: pytest.fail("actor must not construct"))
-    with pytest.raises(ValueError, match="search_control"):
-        AlienEnv(search_control=bad)
+    cfg = pipeline.read_json(PILOT_CONFIG)
+    cfg[key] = "legacy" if key == "search_control" else "alien-vector-v2"
+    with pytest.raises(ValueError, match=key):
+        pipeline.make_env(cfg)
 
 
 def prepared(tmp_path):
-    cfg = pipeline.read_json("configs/continue_cancel_training_pilot.json")
+    cfg = pipeline.read_json(PILOT_CONFIG)
     run = tmp_path / "new_run"
     pipeline.prepare_run(run, cfg)
     return run, *pipeline.read_run(run)
@@ -342,11 +329,11 @@ def test_static_prepare_protocol_and_identity_no_actor(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "AlienEnv", lambda **kw: kw)
     run, cfg, manifest, source = prepared(tmp_path)
     identity = pipeline.read_json(run / "run_identity.json")
-    assert identity["semantic_contract"] == search_contract(CONTINUE_CANCEL)
-    assert pipeline.make_env(cfg)["search_control"] == CONTINUE_CANCEL
-    assert cfg["frozen_evaluation"]["protocol"]["search_control"] == CONTINUE_CANCEL
+    assert identity["semantic_contract"] == search_contract()
+    assert pipeline.make_env(cfg)["bot_kind"] == "evasive_mix"
+    assert cfg["frozen_evaluation"]["protocol"]["search_control"] == SEARCH_CONTROL
     bad = deepcopy(identity)
-    bad["semantic_contract"]["contract_version"] = VERSION
+    bad["semantic_contract"]["contract_version"] = "alien-vector-v2"
     pipeline.write_json(run / "run_identity.json", bad)
     with pytest.raises(ValueError, match="semantic"):
         pipeline.read_run(run)
@@ -356,16 +343,16 @@ def test_static_prepare_protocol_and_identity_no_actor(tmp_path, monkeypatch):
 def test_protocol_mismatch_rejected(tmp_path, field):
     from rl.evaluation_protocol import validate_protocol
 
-    cfg = pipeline.read_json("configs/continue_cancel_training_pilot.json")
+    cfg = pipeline.read_json(PILOT_CONFIG)
     p = pipeline.read_json(cfg["evaluation_protocol"])
     p["search_control" if field == "mode" else "contract_version"] = (
-        "legacy" if field == "mode" else VERSION
+        "legacy" if field == "mode" else "alien-vector-v3-continue-cancel"
     )
     with pytest.raises(ValueError):
         validate_protocol(cfg, p)
 
 
-@pytest.mark.parametrize("bad", ["contract", "mode", "source", "env_mode"])
+@pytest.mark.parametrize("bad", ["contract", "mode", "source"])
 def test_checkpoint_identity_fails_closed_before_real_load(tmp_path, monkeypatch, bad):
     _, cfg, _, source = prepared(tmp_path)
     model = SimpleNamespace(
@@ -376,12 +363,9 @@ def test_checkpoint_identity_fails_closed_before_real_load(tmp_path, monkeypatch
     monkeypatch.setattr(pipeline, "parameter_hash", lambda m: "fake-hash")
     path = tmp_path / "fake.zip"
     meta = pipeline.save_checkpoint(path, model, cfg, source, role="untrained")
-    assert (
-        meta["search_control"] == CONTINUE_CANCEL
-        and meta["contract_version"] == CONTINUE_CANCEL_VERSION
-    )
+    assert meta["search_control"] == SEARCH_CONTROL and meta["contract_version"] == VERSION
     if bad == "contract":
-        meta["contract_version"] = VERSION
+        meta["contract_version"] = "alien-vector-v3-continue-cancel"
     if bad == "mode":
         meta["search_control"] = "legacy"
     if bad == "source":
@@ -390,18 +374,8 @@ def test_checkpoint_identity_fails_closed_before_real_load(tmp_path, monkeypatch
     monkeypatch.setattr(
         pipeline.MaskablePPO, "load", lambda *a, **k: pytest.fail("real load forbidden")
     )
-    e = None
-    try:
-        if bad == "env_mode":
-            legacy = deepcopy(cfg)
-            legacy.pop("search_control")
-            legacy.pop("contract_version")
-            e = pipeline.make_env(legacy)
-        with pytest.raises(ValueError):
-            pipeline.load_checkpoint(path, cfg, source, e)
-    finally:
-        if e:
-            e.close()
+    with pytest.raises(ValueError):
+        pipeline.load_checkpoint(path, cfg, source)
 
 
 def test_metadata_mock_roundtrip_keeps_new_mode(tmp_path, monkeypatch):
@@ -417,9 +391,7 @@ def test_metadata_mock_roundtrip_keeps_new_mode(tmp_path, monkeypatch):
     calls = []
     monkeypatch.setattr(pipeline.MaskablePPO, "load", lambda *a, **k: calls.append((a, k)) or model)
     loaded, meta = pipeline.load_checkpoint(path, cfg, source)
-    assert (
-        loaded is model and len(calls) == 1 and meta["contract_version"] == CONTINUE_CANCEL_VERSION
-    )
+    assert loaded is model and len(calls) == 1 and meta["contract_version"] == VERSION
 
 
 def test_versioned_control_metrics_summary_and_idempotent_finish(env):
@@ -428,14 +400,11 @@ def test_versioned_control_metrics_summary_and_idempotent_finish(env):
     _, _, _, done, info = env.step(30)
     assert done
     m = info["search_metrics"]
-    assert m["version"] == "wall-search-metrics-v2-continue-cancel"
+    assert m["version"] == "wall-search-metrics-v3-pursuit-tracking"
+    assert m["control"]["version"] == "continue-cancel-audit-v2-pursuit-tracking"
     assert env.metrics.finish(env.core.snapshot()) == m
     summary = summarize_search([{"search_metrics": m}])
     assert summary["control"]["counts"]["policy_cancels"] == 1
-    legacy = deepcopy(m)
-    legacy.pop("control")
-    with pytest.raises(ValueError, match="populations"):
-        summarize_search([{"search_metrics": m}, {"search_metrics": legacy}])
 
 
 def test_new_revision_helper_audit_at_tick16(env, monkeypatch):
@@ -459,7 +428,7 @@ def test_headless_loader_routes_mode_and_named_world_with_mocked_load(monkeypatc
     from app.rl_controller import load_human_rl
     from game.map import scenario_map
 
-    cfg = pipeline.read_json("configs/continue_cancel_training_pilot.json")
+    cfg = pipeline.read_json(PILOT_CONFIG)
     fake = SimpleNamespace(policy=SimpleNamespace(set_training_mode=lambda value: None))
     meta = {"role": "best_validation", "actual_steps": 123, "optimizer_update_epochs": 10}
     selection = {
@@ -473,12 +442,11 @@ def test_headless_loader_routes_mode_and_named_world_with_mocked_load(monkeypatc
     monkeypatch.setattr(pipeline, "read_json", lambda path: selection)
     monkeypatch.setattr(pipeline, "file_hash", lambda path: "fake")
     driver = load_human_rl("synthetic-run", "synthetic-checkpoint", 123)
-    assert driver.search_control == CONTINUE_CANCEL
     assert driver.core.world_map == scenario_map(cfg["scenario"])
     assert driver.observation().shape == (352,)
 
 
-def test_new_mode_evaluation_serializes_audit_even_flag_false(env, tmp_path, monkeypatch):
+def test_evaluation_rows_serialize_search_audit(env, tmp_path, monkeypatch):
     from rl import evaluate as evaluation
 
     env.cap_ticks = 1
@@ -491,7 +459,7 @@ def test_new_mode_evaluation_serializes_audit_even_flag_false(env, tmp_path, mon
         close=lambda: None,
     )
     monkeypatch.setattr(evaluation, "make_env", lambda cfg: fake)
-    cfg = {"search_control": CONTINUE_CANCEL, "search_metrics": False}
+    cfg = {}
     case = {
         "id": "synthetic_0",
         "scenario_seed": 1,
@@ -500,5 +468,8 @@ def test_new_mode_evaluation_serializes_audit_even_flag_false(env, tmp_path, mon
         "selector_seed": 4,
     }
     _, rows = evaluation.evaluate("wait", cfg, [case], tmp_path / "fake.csv")
-    assert rows[0]["search_metrics"]["control"]["version"] == "continue-cancel-audit-v1"
+    assert (
+        rows[0]["search_metrics"]["control"]["version"]
+        == "continue-cancel-audit-v2-pursuit-tracking"
+    )
     assert "control" in (tmp_path / "fake.csv").read_text()

@@ -11,6 +11,7 @@ from game.map import DEFAULT_SCENARIO, scenario_map, small_test_map
 from game.perception import PerceptionSnapshot
 from game.state import AlienState, CoreConfig, SurvivorState, WorldSnapshot
 from rl import pipeline
+from rl.contract import SEARCH_CONTROL, VERSION
 from rl.env import AlienEnv
 from rl.evaluation_protocol import evaluation_budget, trained_score, validate_protocol
 from rl.search_metrics import SearchMetrics, summarize_search
@@ -85,7 +86,7 @@ def forbid_runtime(monkeypatch):
 
 @pytest.fixture
 def config():
-    return pipeline.read_json("configs/occluded_loop_training_pilot.json")
+    return pipeline.read_json("configs/pursuit_tracking_training_pilot.json")
 
 
 def test_exact_reviewed_world_and_default_backward_identity():
@@ -106,15 +107,11 @@ def test_unknown_scene_fails_closed(name):
         scenario_map(name)
 
 
-def test_factory_routes_once_with_explicit_scene_and_legacy_default(config, monkeypatch):
+def test_factory_routes_once_with_explicit_scene(config, monkeypatch):
     calls = []
     monkeypatch.setattr(pipeline, "AlienEnv", lambda **kw: calls.append(kw) or kw)
     assert pipeline.make_env(config)["scenario"] == "occluded_loop_dev_v1"
-    legacy = pipeline.read_json("configs/training_pilot.json")
-    assert pipeline.make_env(legacy)["scenario"] == DEFAULT_SCENARIO
-    assert len(calls) == 2
-    assert calls[0]["search_metrics"] is True
-    assert calls[1]["search_metrics"] is False
+    assert len(calls) == 1
 
 
 def test_protocol_budgets_and_static_settings(config):
@@ -189,7 +186,8 @@ def test_checkpoint_scene_mismatch_rejected_before_any_load(config, tmp_path, mo
                 config["manifest_seed"], config["manifest_counts"], config["scenario"]
             )
         ),
-        "contract_version": "alien-vector-v2",
+        "contract_version": VERSION,
+        "search_control": SEARCH_CONTROL,
         "observation_shape": [352],
         "action_n": 32,
         "dependencies": {},
@@ -555,8 +553,7 @@ def test_environment_constructor_routing_with_mocked_actors_only(name, monkeypat
         ENV_INIT(SimpleNamespace(), world_map=small_test_map(), scenario="occluded_loop_dev_v1")
 
 
-@pytest.mark.parametrize("collect", [False, True])
-def test_environment_step_wiring_with_fake_core_only(collect, monkeypatch):
+def test_environment_step_wiring_with_fake_core_only(monkeypatch):
     from types import SimpleNamespace
 
     import numpy as np
@@ -590,7 +587,7 @@ def test_environment_step_wiring_with_fake_core_only(collect, monkeypatch):
         _allowed_view=lambda: object(),
         core=fake_core,
         config=CoreConfig(),
-        metrics=SearchMetrics() if collect else None,
+        metrics=SearchMetrics(),
         world=before.world_map,
         bot_kind="explorer",
         bot=SimpleNamespace(command=lambda view: command, label="synthetic"),
@@ -604,10 +601,7 @@ def test_environment_step_wiring_with_fake_core_only(collect, monkeypatch):
     assert len(calls) == 1 and calls[0] is command
     assert obs.shape == (352,) and reward == 1 and terminated and not truncated
     assert assembly.elapsed_ticks == 1 and assembly._done
-    if collect:
-        assert info["search_metrics"]["wall_loss_opportunities"] == 1
-        window = info["search_metrics"]["windows"][0]
-        assert window["loss_tick"] == 185 and window["snapshot_tick"] == 186
-        assert window["episode_outcome"] == "captured"
-    else:
-        assert "search_metrics" not in info
+    assert info["search_metrics"]["wall_loss_opportunities"] == 1
+    window = info["search_metrics"]["windows"][0]
+    assert window["loss_tick"] == 185 and window["snapshot_tick"] == 186
+    assert window["episode_outcome"] == "captured"

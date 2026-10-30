@@ -11,15 +11,7 @@ import torch
 from game.core import GameCore
 from game.map import DEFAULT_SCENARIO, scenario_map
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
-from rl.contract import (
-    ACTION_COUNT,
-    DECISION_TICKS,
-    LEGACY_SEARCH_CONTROL,
-    OBSERVATION_SIZE,
-    WAIT,
-    core_pursuit,
-    validate_search_control,
-)
+from rl.contract import ACTION_COUNT, DECISION_TICKS, OBSERVATION_SIZE, WAIT
 from rl.observations import build_observation
 
 
@@ -91,13 +83,9 @@ class HumanRLController:
         sampling_seed,
         *,
         label="RL sampled",
-        search_control=LEGACY_SEARCH_CONTROL,
     ):
         if core.alien_control != "external" or core.snapshot().alien is None:
             raise ValueError("RL play requires an active external-control Alien")
-        self.search_control = validate_search_control(search_control)
-        if getattr(core, "pursuit", "snapshot") != core_pursuit(search_control):
-            raise ValueError("Core pursuit helper does not match the policy search_control")
         self.core, self.model = core, model
         self.config = core.config
         self.controller_label = label
@@ -143,7 +131,6 @@ class HumanRLController:
             bool(snapshot.navigation_path),
             memory.revision,
             snapshot.investigation,
-            self.search_control,
         )
 
     def observation(self):
@@ -215,21 +202,12 @@ def load_human_rl(run_dir, checkpoint, sampling_seed, scenario_seed=0):
     ):
         raise ValueError("RL play requires the selected, replay-verified best checkpoint")
     model.policy.set_training_mode(False)
-    search_control = config.get("search_control", LEGACY_SEARCH_CONTROL)
     core = GameCore(
-        scenario_map(config.get("scenario", DEFAULT_SCENARIO)),
-        alien_control="external",
-        pursuit=core_pursuit(search_control),
+        scenario_map(config.get("scenario", DEFAULT_SCENARIO)), alien_control="external"
     )
     core.reset(scenario_seed)
     label = f"RL sampled | {run_dir.name}/{checkpoint.name} | {metadata['actual_steps']} steps | seed {sampling_seed}"
-    driver = HumanRLController(
-        core,
-        model,
-        sampling_seed,
-        label=label,
-        search_control=search_control,
-    )
+    driver = HumanRLController(core, model, sampling_seed, label=label)
     # Copy provenance returned by the strict loader, without a second policy load/draw.
     driver.checkpoint_identity = {
         "run_dir": str(run_dir.resolve()),

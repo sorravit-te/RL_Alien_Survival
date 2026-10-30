@@ -6,13 +6,7 @@ from math import isfinite
 import numpy as np
 
 from game.investigation import InvestigationSnapshot
-from rl.contract import (
-    ACTION_COUNT,
-    LEGACY_SEARCH_CONTROL,
-    WAIT,
-    restricts_search,
-    validate_search_control,
-)
+from rl.contract import ACTION_COUNT, WAIT
 
 
 @dataclass(frozen=True)
@@ -29,7 +23,6 @@ class AllowedAlienView:
     navigation_active: bool
     clue_revision: int | None = None
     investigation: InvestigationSnapshot = InvestigationSnapshot()
-    search_control: str = LEGACY_SEARCH_CONTROL
 
 
 @dataclass(frozen=True)
@@ -43,7 +36,7 @@ class Candidate:
 
 
 def current_search_clue(view):
-    """New-mode eligibility uses only confirmed public clue/primitive fields."""
+    """Action21 eligibility uses only confirmed public clue/primitive fields."""
     point, revision, state = view.last_seen, view.clue_revision, view.investigation
     return (
         not view.visible
@@ -59,8 +52,7 @@ def current_search_clue(view):
 
 def search_is_restricted(view):
     return (
-        restricts_search(view.search_control)
-        and current_search_clue(view)
+        current_search_clue(view)
         and view.investigation.active
         and view.investigation.revision == view.clue_revision
         and view.investigation.target == view.last_seen
@@ -70,7 +62,6 @@ def search_is_restricted(view):
 def build_candidates(view: AllowedAlienView):
     if not isinstance(view, AllowedAlienView):
         raise TypeError("Candidates require AllowedAlienView, not full world state")
-    validate_search_control(view.search_control)
     if len(view.waypoints) > 20 or len(view.visit_ages) != len(view.waypoints):
         raise ValueError("Waypoint/visit contract mismatch")
     slots = [Candidate() for _ in range(ACTION_COUNT)]
@@ -78,11 +69,7 @@ def build_candidates(view: AllowedAlienView):
         slots[index] = Candidate(True, 0, point, 0.0, view.visit_ages[index])
     if view.visible and view.last_seen is not None:
         slots[20] = Candidate(True, 1, view.last_seen)
-    if (
-        view.last_seen is not None
-        and view.clue_revision is not None
-        and view.clue_revision != view.investigation.investigated_revision
-    ):
+    if current_search_clue(view):
         slots[21] = Candidate(
             True,
             2,
@@ -90,13 +77,11 @@ def build_candidates(view: AllowedAlienView):
             view.last_seen_age_seconds or 0.0,
             evidence_revision=view.clue_revision,
         )
-    if restricts_search(view.search_control):
-        if not current_search_clue(view):
-            slots[21] = Candidate()
-        if search_is_restricted(view):
-            continuation = slots[21]
-            slots = [Candidate() for _ in range(ACTION_COUNT)]
-            slots[21] = continuation
+    if search_is_restricted(view):
+        # An active search on the current clue may only continue (21) or cancel (30).
+        continuation = slots[21]
+        slots = [Candidate() for _ in range(ACTION_COUNT)]
+        slots[21] = continuation
     slots[WAIT] = Candidate(True, 6)
     return tuple(slots)
 

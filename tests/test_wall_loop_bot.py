@@ -8,7 +8,6 @@ import pytest
 from game.interaction import segment_clear
 from game.map import scenario_map
 from game.state import CoreConfig
-from rl.contract import CONTINUE_CANCEL, CONTINUE_CANCEL_TRACKING
 from rl.env import AlienEnv
 from rl.evasive_survivor import (
     EvasionConfig,
@@ -100,8 +99,8 @@ def rollout(env, bot_seed, steps=40):
 
 
 def test_plain_mix_episode_replays_plain_evasive_bot_exactly():
-    mix = AlienEnv(scenario=SCENE, bot_kind="evasive_mix", search_control=CONTINUE_CANCEL)
-    plain = AlienEnv(scenario=SCENE, bot_kind="evasive_explorer", search_control=CONTINUE_CANCEL)
+    mix = AlienEnv(scenario=SCENE, bot_kind="evasive_mix")
+    plain = AlienEnv(scenario=SCENE, bot_kind="evasive_explorer")
     try:
         seed = next(
             s for s in range(50) if np.random.default_rng([s, 1]).random() >= 0.5
@@ -114,10 +113,8 @@ def test_plain_mix_episode_replays_plain_evasive_bot_exactly():
         plain.close()
 
 
-def heuristic_outcomes(mode, seeds):
-    env = AlienEnv(
-        scenario=SCENE, bot_kind="wall_loop_evasive", search_control=mode, max_episode_seconds=60
-    )
+def heuristic_outcomes(seeds):
+    env = AlienEnv(scenario=SCENE, bot_kind="wall_loop_evasive", max_episode_seconds=60)
     outcomes = []
     try:
         for i in seeds:
@@ -143,7 +140,7 @@ def test_pipeline_accepts_evasive_mix_pilot_config_and_rejects_debug_bot():
     validate_environment_config(config)
     env = make_env(config)
     try:
-        assert env.bot_kind == "evasive_mix" and env.core.pursuit == "tracking"
+        assert env.bot_kind == "evasive_mix"
         assert env.bot.settings == EvasionConfig(**config["survivor_threat_settings"])
     finally:
         env.close()
@@ -153,7 +150,6 @@ def test_pipeline_accepts_evasive_mix_pilot_config_and_rejects_debug_bot():
         validate_protocol({**config, "bot_kind": "explorer"}, protocol)
 
 
-def test_tracking_pursuit_catches_wall_loop_bot_that_beats_snapshot_pursuit():
-    seeds = range(3)
-    assert "captured" not in heuristic_outcomes(CONTINUE_CANCEL, seeds)
-    assert heuristic_outcomes(CONTINUE_CANCEL_TRACKING, seeds) == ["captured"] * 3
+def test_tracking_pursuit_catches_wall_loop_bot():
+    # Before tracking pursuit the heuristic caught 0/20 wall-loop episodes (plan.md v1.6).
+    assert heuristic_outcomes(range(3)) == ["captured"] * 3
