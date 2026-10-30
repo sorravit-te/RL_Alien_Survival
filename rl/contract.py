@@ -11,13 +11,15 @@ Age scaling is physical clue/visit age, never the external episode countdown.
 While action21's current clue is active, only 21 (continue) and 30 (cancel) are valid.
 Core retargets action20 to each confirmed sensor point and hands reacquisition during
 action21 to a written helper chase until the next decision.
+A waypoint action holds as the only valid action until arrival, a dead path or new
+confirmed evidence; the mask carries this, so the observation shape is unchanged.
 No unconfirmed sight confidence/count is exposed. An unreachable observed floor
 point may have no path; navigation never substitutes a heuristic target.
 """
 
 # Schema identifier for new runs; archived checkpoints retain their recorded version.
-VERSION = "alien-vector-v4-pursuit-tracking"
-SEARCH_CONTROL = "continue_cancel_tracking_v1"
+VERSION = "alien-vector-v5-waypoint-commitment"
+SEARCH_CONTROL = "continue_cancel_waypoint_commitment_v1"
 ACTION_COUNT = 32
 WAIT = 30
 DECISION_TICKS = 15

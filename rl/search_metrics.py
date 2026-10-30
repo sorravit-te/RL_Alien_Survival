@@ -9,9 +9,10 @@ from copy import deepcopy
 from math import atan2, hypot
 
 from game.interaction import angle_difference, segment_clear
+from rl.patrol_metrics import PatrolMetrics
 from rl.search_control_metrics import SearchControlMetrics
 
-VERSION = "wall-search-metrics-v3-pursuit-tracking"
+VERSION = "wall-search-metrics-v4-waypoint-commitment"
 
 
 def ratio(numerator, denominator):
@@ -36,6 +37,7 @@ def wall_only_loss(before):
 class SearchMetrics:
     def __init__(self):
         self.control = SearchControlMetrics()
+        self.patrol = PatrolMetrics()
         self.losses = 0
         self.windows = []
         self.current = None
@@ -44,6 +46,7 @@ class SearchMetrics:
 
     def tick(self, before, after):
         self.control.tick(before, after)
+        self.patrol.tick(before, after)
         if before.perception.visible and not after.perception.visible:
             self.losses += 1
             if wall_only_loss(before):
@@ -81,7 +84,10 @@ class SearchMetrics:
         self.current = None
         self.previous_target = None
 
-    def decision(self, before, after, eligible21, action, *, requested_action=None):
+    def decision(
+        self, before, after, eligible21, action, *, requested_action=None, committed=False
+    ):
+        self.patrol.decision(after, action, committed)
         self.control.decision(
             before,
             after,
@@ -139,6 +145,7 @@ class SearchMetrics:
             "target_switching": ratio(total("target_switches"), total("target_comparisons")),
             "windows": windows,
             "control": self.control.finish(snapshot),
+            "patrol": self.patrol.finish(),
         }
         return result
 
@@ -185,6 +192,14 @@ def summarize_search(episodes):
             name: sum(c["outcome"] == name for c in controls)
             for name in ("captured", "escaped", "unresolved")
         },
+    }
+    patrols = [m["patrol"] for m in metrics]
+    result["patrol"] = {
+        "version": PatrolMetrics.version,
+        "counts": {k: sum(p["counts"][k] for p in patrols) for k in PatrolMetrics().counts},
+        "distinct_waypoints_reached_per_episode": [
+            p["distinct_waypoints_reached"] for p in patrols
+        ],
     }
     result["note"] = "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
     return result

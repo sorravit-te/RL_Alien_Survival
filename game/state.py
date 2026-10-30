@@ -31,7 +31,7 @@ class CoreConfig:
     sight_confirmation_seconds: float = 0.2
     chase_hold_seconds: float = 2.0
     alien_decision_seconds: float = 0.5
-    investigation_turn_speed: float = 2 * pi / 3  # rad/s; a 360-degree sweep takes 3s
+    investigation_turn_speed: float = 4 * pi / 3  # rad/s; a 360-degree sweep takes 1.5s
     target_arrival_distance: float = 0.15
     capture_padding: float = 0.0  # contact distance = both radii + this explicit padding
     minimum_spawn_distance: float = 2.0
@@ -123,3 +123,4 @@ class WorldSnapshot:
     alien_target_source: str = "patrol"
     navigation_path: tuple[tuple[float, float], ...] = ()
     investigation: InvestigationSnapshot = InvestigationSnapshot()
+    alien_target_revision: int | None = None

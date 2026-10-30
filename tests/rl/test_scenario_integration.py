@@ -85,7 +85,7 @@ def forbid_runtime(monkeypatch):
 
 @pytest.fixture
 def config():
-    return pipeline.read_json("configs/pursuit_tracking_training_pilot.json")
+    return pipeline.read_json("configs/waypoint_commitment_training_pilot.json")
 
 
 def test_exact_reviewed_world_and_default_backward_identity():
@@ -575,6 +575,7 @@ def test_environment_step_wiring_with_fake_core_only(monkeypatch):
     )
     candidates = [SimpleNamespace(valid=True, target=None, evidence_revision=None)] * 32
     monkeypatch.setattr(environment, "build_candidates", lambda view: candidates)
+    monkeypatch.setattr(environment, "committed_waypoint", lambda view: None)
     monkeypatch.setattr(environment, "build_observation", lambda view: np.zeros(352, np.float32))
     monkeypatch.setattr(environment, "observe_survivor", lambda *args: "filtered-fake-view")
     command = SurvivorCommand()

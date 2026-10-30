@@ -22,7 +22,7 @@ from rl.scripted_controllers import HeuristicSelector
 from rl.search_metrics import summarize_search
 
 CLUE = (5.5, 5.5)
-PILOT_CONFIG = "configs/pursuit_tracking_training_pilot.json"
+PILOT_CONFIG = "configs/waypoint_commitment_training_pilot.json"
 
 
 def arena(survivor=(17.5, 17.5), objects=()):
@@ -103,23 +103,23 @@ def test_partial_restart_loses_progress_without_marking_completed(env):
 
 
 def test_final_rotation_sample_then_completion_and_reset(env):
-    env.cap_ticks = 105
-    for _ in range(6):
+    env.cap_ticks = 60
+    for _ in range(3):
         env.step(21)
     s = env.core.snapshot()
     assert (
-        s.tick == 90
-        and s.investigation.rotation_ticks == 90
+        s.tick == 45
+        and s.investigation.rotation_ticks == 45
         and s.investigation.phase == "sweeping"
     )
     assert mask(env) == [21, 30]
     _, _, terminal, truncated, info = env.step(21)
     assert not terminal and truncated
-    assert s.tick == 90 and env.core.snapshot().investigation.phase == "completed"
+    assert s.tick == 45 and env.core.snapshot().investigation.phase == "completed"
     assert env.core.snapshot().investigation.investigated_revision == 1 and mask(env) == [0, 30]
     audit = info["search_metrics"]["control"]
-    assert audit["counts"]["completed_sweeps"] == 1 and audit["events"][-1]["tick"] == 91
-    assert audit["attempts"][0]["duration_ticks"] == 91
+    assert audit["counts"]["completed_sweeps"] == 1 and audit["events"][-1]["tick"] == 46
+    assert audit["attempts"][0]["duration_ticks"] == 46
     with pytest.raises(RuntimeError):
         env.step(21)
     env.reset(seed=914)
@@ -171,20 +171,20 @@ def test_end_rotation_reacquisition_precedes_completion(env, monkeypatch):
 
     def insert(command):
         s = env.core.snapshot()
-        if s.tick == 85:
+        if s.tick == 40:
             env.core._survivor = SurvivorState(
                 CLUE[0] + 3 * cos(s.alien.yaw), CLUE[1] + 3 * sin(s.alien.yaw)
             )
         return original(command)
 
     monkeypatch.setattr(env.core, "step", insert)
-    for _ in range(7):
+    for _ in range(4):
         env.step(21)
     assert env.core.snapshot().investigation.phase == "cancelled"
     assert env.core.snapshot().investigation.investigated_revision is None
     assert env.metrics.control.counts["completed_sweeps"] == 0
     event = next(e for e in env.metrics.control.events if e["kind"] == "helper_cancel")
-    assert event["tick"] == 91
+    assert event["tick"] == 46
 
 
 @pytest.mark.parametrize(
@@ -400,7 +400,7 @@ def test_versioned_control_metrics_summary_and_idempotent_finish(env):
     _, _, _, done, info = env.step(30)
     assert done
     m = info["search_metrics"]
-    assert m["version"] == "wall-search-metrics-v3-pursuit-tracking"
+    assert m["version"] == "wall-search-metrics-v4-waypoint-commitment"
     assert m["control"]["version"] == "continue-cancel-audit-v2-pursuit-tracking"
     assert env.metrics.finish(env.core.snapshot()) == m
     summary = summarize_search([{"search_metrics": m}])

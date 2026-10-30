@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from ai.controller import ControllerState, choose_target
-from rl.candidates import build_candidates, search_is_restricted
+from rl.candidates import build_candidates, committed_waypoint, search_is_restricted
 from rl.contract import WAIT
 
 
@@ -22,6 +22,9 @@ class HeuristicSelector:
     def choose(self, view):
         if search_is_restricted(view):
             return 21
+        committed = committed_waypoint(view)
+        if committed is not None:
+            return committed
         alien = SimpleNamespace(x=view.position[0], y=view.position[1])
         perception = SimpleNamespace(
             visible=view.visible, last_seen=view.last_seen, revision=view.clue_revision

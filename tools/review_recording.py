@@ -39,6 +39,7 @@ class EpisodeReview:
     actions: Counter = field(default_factory=Counter)
     restricted: Counter = field(default_factory=Counter)
     route: Counter = field(default_factory=Counter)  # unseen, en-route waypoint decisions
+    reached: set = field(default_factory=set)  # waypoint actions walked to arrival
     waits: list = field(default_factory=list)  # Survivor still and unseen
     parked_run: int = 0
     open_wait: dict | None = None
@@ -60,6 +61,8 @@ class EpisodeReview:
             return
         target = dict(zip("xy", previous["chosen_target"]))
         if distance(record["alien_before"], target) <= CONFIG.target_arrival_distance:
+            self.reached.add(previous["action"])
+            self.route["arrived"] += 1
             return  # arrived: choosing a new waypoint is not an abandoned route
         kept = record["action"] == previous["action"]
         self.route["kept" if kept else "switched" if record["action"] < 20 else "other"] += 1
@@ -143,7 +146,8 @@ def print_report(reviews):
         )
         place = "-" if r.parked_at is None else f"({r.parked_at[0]:.1f}, {r.parked_at[1]:.1f})"
         print(
-            f"  patrol: en route kept {r.route['kept']}, switched {r.route['switched']}, "
+            f"  patrol: arrived {r.route['arrived']} times at {len(r.reached)} waypoints; "
+            f"en route kept {r.route['kept']}, switched {r.route['switched']}, "
             f"other {r.route['other']}; longest parked {seconds(r.longest_parked_ticks):.1f}s "
             f"at {place}"
         )
@@ -156,7 +160,7 @@ def print_report(reviews):
                 f"still {wait['alien_still_ticks']}/{wait['ticks']} ticks"
             )
     route = sum((r.route for r in reviews), Counter())
-    decisions = sum(route.values())
+    decisions = route["kept"] + route["switched"] + route["other"]
     if decisions:
         print(
             f"all episodes, {decisions} unseen en-route decisions: "

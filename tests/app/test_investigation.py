@@ -86,20 +86,20 @@ def view(core):
 def test_complete_sweep_samples_final_orientation_before_exhausting_only_that_revision():
     core = make_core()
     select(core)
-    for n in range(1, 91):
+    for n in range(1, 46):
         if n % 15 == 1:
             select(core)  # Same-revision action21 must not restart.
         s = advance(core, 1)
         assert s.investigation.phase == "sweeping" and s.investigation.rotation_ticks == n
         assert s.investigation.investigated_revision is None
-        assert s.investigation.progress == pytest.approx(n / 90)
+        assert s.investigation.progress == pytest.approx(n / 45)
         assert (s.alien.x, s.alien.y) == CLUE
-        assert ((s.alien.yaw - n * 2 * pi / 90 + pi) % (2 * pi) - pi) == pytest.approx(0, abs=1e-12)
+        assert ((s.alien.yaw - n * 2 * pi / 45 + pi) % (2 * pi) - pi) == pytest.approx(0, abs=1e-12)
         assert s.perception.revision == 1 and s.perception.last_seen_age_ticks == 300 + n
         assert candidate_masks(build_candidates(view(core)))[21]
     assert s.investigation.progress == 1 and s.investigation.phase != "completed"
     s = advance(core, 1)
-    assert s.tick == 91 and s.investigation.phase == "completed"
+    assert s.tick == 46 and s.investigation.phase == "completed"
     assert s.investigation.investigated_revision == 1 and s.perception.last_seen == CLUE
     masks = candidate_masks(build_candidates(view(core)))
     assert not masks[21] and masks[0] and masks[WAIT] and masks.any()
@@ -195,7 +195,7 @@ def test_revision_is_generated_only_by_confirmed_samples_and_same_coordinate_is_
 def test_fresh_same_position_reenables_exhausted_clue_after_actual_confirmed_sensing():
     core = make_core()
     select(core)
-    advance(core, 91)
+    advance(core, 46)
     assert not candidate_masks(build_candidates(view(core)))[21]
     core.set_alien_target((8.5, 5.5), source="waypoint")
     advance(core, 45)
@@ -242,13 +242,13 @@ def test_reacquisition_cancels_immediately_and_hands_off_to_helper_chase(phase):
         core.set_alien_target(s.alien_target, source="last_seen", evidence_revision=1)
 
 
-@pytest.mark.parametrize("insertion_tick", [20, 85])
+@pytest.mark.parametrize("insertion_tick", [20, 40])
 def test_confirmation_before_end_or_on_final_sample_wins_completion(insertion_tick):
     core = make_core()
     select(core)
     advance(core, insertion_tick)
     angle = core.snapshot().alien.yaw
-    # At85 ticks yaw340deg; a point at that bearing remains within FOV through final sample91.
+    # At40 ticks yaw320deg; a point at that bearing remains within FOV through final sample46.
     core._survivor = SurvivorState(CLUE[0] + 3 * cos(angle), CLUE[1] + 3 * sin(angle))
     for i in range(6):
         s = advance(core, 1)
@@ -257,14 +257,14 @@ def test_confirmation_before_end_or_on_final_sample_wins_completion(insertion_ti
             assert not s.perception.visible
     assert s.perception.visible and s.investigation.phase == "cancelled"
     assert s.tick == insertion_tick + 6
-    if insertion_tick == 85:
-        assert s.tick == 91  # Last sample, not an earlier shortcut/hidden-truth check.
+    if insertion_tick == 40:
+        assert s.tick == 46  # Last sample, not an earlier shortcut/hidden-truth check.
 
 
 def test_sensor_observes_pre_rotation_fov_and_wall_prevents_reacquisition():
     core = make_core(scene=world(survivor=(5.5, 8.5)))
     select(core)
-    for _ in range(8):
+    for _ in range(4):
         s = advance(core, 1)
         assert s.perception.confirmation_ticks == 0
     s = advance(core, 1)
@@ -274,7 +274,7 @@ def test_sensor_observes_pre_rotation_fov_and_wall_prevents_reacquisition():
         scene=world(survivor=(8.5, 5.5), rows=tuple(".......#............" for _ in range(20)))
     )
     select(wall)
-    s = advance(wall, 91)
+    s = advance(wall, 46)
     assert not s.perception.visible and s.perception.revision == 1
     assert s.investigation.phase == "completed"  # No hidden-coordinate shortcut through wall.
 
@@ -300,13 +300,14 @@ def test_paired_hidden_worlds_have_identical_full_observations_masks_and_helper_
 def test_observation_mapping_exposes_phase_target_progress_current_revision_and_exhaustion():
     core = make_core()
     select(core)
-    advance(core, 45)
+    advance(core, 22)
     values = dict(zip(BASE_FIELDS, build_observation(view(core))[:32]))
-    assert VERSION == "alien-vector-v4-pursuit-tracking" and len(values) == 32
+    assert VERSION == "alien-vector-v5-waypoint-commitment" and len(values) == 32
     assert values["investigation_active"] == values["investigation_sweeping"] == 1
-    assert values["investigation_progress"] == 0.5 and values["investigation_target_valid"] == 1
+    assert values["investigation_progress"] == pytest.approx(22 / 45)
+    assert values["investigation_target_valid"] == 1
     assert values["investigation_revision_current"] == 1 and values["last_seen_investigated"] == 0
-    advance(core, 46)
+    advance(core, 24)
     values = dict(zip(BASE_FIELDS, build_observation(view(core))[:32]))
     assert values["investigation_complete"] == values["last_seen_investigated"] == 1
     assert values["investigation_active"] == 0 and values["investigation_progress"] == 1
@@ -370,17 +371,17 @@ def test_recorder_on_off_parity_full_primitive_rng_truth_separation_and_command_
     rec.close(completed=True, reason="synthetic_end")
     records = list(read_records(rec.directory))
     ticks = [r for r in records if r["type"] == "tick"]
-    assert ticks[89]["investigation_after"]["phase"] == "sweeping"
-    assert ticks[90]["investigation_after"]["phase"] == "completed"
+    assert ticks[44]["investigation_after"]["phase"] == "sweeping"
+    assert ticks[45]["investigation_after"]["phase"] == "completed"
     decisions = [r for r in records if r["type"] == "decision"]
     assert [r["tick"] for r in decisions] == list(range(0, 120, 15))
-    assert [r["action"] for r in decisions] == [21] * 7 + [0]
+    assert [r["action"] for r in decisions] == [21] * 4 + [0] * 4
     assert apps[0].decisions == apps[1].decisions == 8
     assert all("diagnostic_truth_only" not in r["allowed_view"] for r in decisions)
     assert all("survivor_after" not in r["allowed_view"] for r in decisions)
     assert all(r["allowed_view"]["clue_revision"] == 1 for r in decisions)
-    assert ticks[90]["sensor_before_movement"]["sample_tick_start"] == 90
-    assert "survivor_after" in ticks[90]["diagnostic_truth_only"]
+    assert ticks[45]["sensor_before_movement"]["sample_tick_start"] == 45
+    assert "survivor_after" in ticks[45]["diagnostic_truth_only"]
     assert (
         json.loads((rec.directory / "manifest.json").read_text())["format"]
         == "human-rl-command-recording-v2"
@@ -462,16 +463,14 @@ def test_actual_env_human_adapter_full_obs_mask_and_snapshot_parity_at_decisions
 
 
 @pytest.mark.parametrize("fps", [30, 60, 144])
-def test_clock_independent_sweep_completion_at_tick91(fps):
+def test_clock_independent_sweep_completion_at_tick46(fps):
     app = app_driver()
     loop = FixedStepLoop(app)
     for _ in range(fps * 4):
         loop.advance(1 / fps)
     assert loop.current.tick == 120 and app.decisions == 8
     assert loop.current.investigation.investigated_revision == 1
-    assert (
-        loop.current.alien_target_source == "waypoint"
-    )  # Chosen by fake policy at105, not helper.
+    assert loop.current.alien_target_source == "waypoint"  # Chosen by fake policy at60, not helper.
 
 
 def test_pause_focus_resume_and_reset_freeze_sweep_no_time_or_rng_and_clear_input(monkeypatch):
@@ -525,7 +524,7 @@ def test_heuristic_uses_same_sweep_then_explicit_selector_patrol_and_fresh_revis
 
     core = GameCore(world(), alien_control="heuristic")
     seed_clue(core)
-    advance(core, 90)
+    advance(core, 45)
     assert core.snapshot().investigation.phase == "sweeping"
     advance(core, 1)
     assert core.snapshot().investigation.phase == "completed"
@@ -544,7 +543,7 @@ def test_env_exhausted_action21_is_masked_invalid_applies_wait_without_penalty()
     env.reset(seed=1, options={"scenario_seed": 7799301, "bot_seed": 7799302})
     seed_clue(env.core)
     try:
-        for _ in range(7):
+        for _ in range(4):
             env.step(21)
         assert env.core.snapshot().investigation.phase == "completed" and not env.action_masks()[21]
         before = env.core.snapshot().alien

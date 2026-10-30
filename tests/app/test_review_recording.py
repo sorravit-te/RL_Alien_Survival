@@ -61,7 +61,8 @@ def test_route_counts_abandoned_waypoints_but_not_arrivals_or_sightings(capsys):
         decision(1, b),
     ]
     review = review_records(records)[0]
-    assert review.route == {"switched": 1, "kept": 1, "other": 1}
+    assert review.route == {"switched": 1, "kept": 1, "other": 1, "arrived": 1}
+    assert review.reached == {0}
     print_report([review])
     assert "3 unseen en-route decisions: kept 33%, switched 33%, other 33%" in (
         capsys.readouterr().out

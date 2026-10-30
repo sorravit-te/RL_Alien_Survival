@@ -1,5 +1,5 @@
 {
-  "name": "pursuit_tracking_training_pilot_v1",
+  "name": "waypoint_commitment_training_pilot_v1",
   "training_seed": 2026103001,
   "manifest_seed": 2026103002,
   "manifest_counts": {
@@ -43,11 +43,11 @@
     "target_hold_seconds": 1.0,
     "threat_clearance": 0.8
   },
-  "evaluation_protocol": "configs/pursuit_tracking_evaluation.json",
+  "evaluation_protocol": "configs/waypoint_commitment_evaluation.json",
   "scenario": "occluded_loop_dev_v1",
   "fresh_run": true,
   "defer_final_test": true,
   "scenario_sha256": "c01c4cacc21c8c0b8342dc0f86e194cf6b066163bc2aac52b2123e723b33a730",
-  "search_control": "continue_cancel_tracking_v1",
-  "contract_version": "alien-vector-v4-pursuit-tracking"
+  "search_control": "continue_cancel_waypoint_commitment_v1",
+  "contract_version": "alien-vector-v5-waypoint-commitment"
 }

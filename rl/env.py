@@ -21,7 +21,7 @@ from rl.bots.evasive import EvasiveExplorerBot
 from rl.bots.explorer import ExplorerBot, StationaryDebugBot
 from rl.bots.views import observe_survivor, observe_threat
 from rl.bots.wall_loop import EvasiveMixBot, WallLoopEvasiveBot
-from rl.candidates import build_candidates, candidate_masks
+from rl.candidates import build_candidates, candidate_masks, committed_waypoint
 from rl.contract import (
     ACTION_COUNT,
     DECISION_TICKS,
@@ -144,7 +144,8 @@ class AlienEnv(gym.Env):
         if not self.action_space.contains(action):
             raise ValueError("Action is outside Discrete(32)")
         action = int(action)
-        candidates = build_candidates(self._allowed_view())
+        view = self._allowed_view()
+        candidates = build_candidates(view)
         invalid = not candidates[action].valid
         applied = WAIT if invalid else action
         self.last_action = applied
@@ -161,6 +162,7 @@ class AlienEnv(gym.Env):
             candidates[21].valid,
             applied,
             requested_action=action,
+            committed=committed_waypoint(view) is not None,
         )
         components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
         ticks = 0

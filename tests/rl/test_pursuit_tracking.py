@@ -54,8 +54,8 @@ def strafing_bot():
 
 def test_contract_identity():
     contract = search_contract()
-    assert contract["search_control"] == SEARCH_CONTROL == "continue_cancel_tracking_v1"
-    assert contract["contract_version"] == VERSION == "alien-vector-v4-pursuit-tracking"
+    assert contract["search_control"] == SEARCH_CONTROL == "continue_cancel_waypoint_commitment_v1"
+    assert contract["contract_version"] == VERSION == "alien-vector-v5-waypoint-commitment"
     assert contract["observation_shape"] == [352] and contract["action_n"] == 32
 
 

@@ -100,6 +100,7 @@ class GameCore:
             self._controller.source,
             self._navigator.path,
             self._investigation.state,
+            self._controller.clue_revision,
         )
 
     def set_alien_target(self, target, *, source="external", evidence_revision=None):
@@ -139,7 +140,12 @@ class GameCore:
             self._investigation.select(target, evidence_revision)
         else:
             self._investigation.cancel()
-        self._controller = replace(self._controller, target=target, source=source)
+        self._controller = replace(
+            self._controller,
+            target=target,
+            source=source,
+            clue_revision=self._perception.revision,
+        )
         self._navigator.set_target(
             self.world_map, (self._alien.x, self._alien.y), target, self.config.alien_radius
         )

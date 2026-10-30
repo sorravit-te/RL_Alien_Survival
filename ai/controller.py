@@ -9,6 +9,7 @@ class ControllerState:
     target: tuple[float, float] | None = None
     source: str = "patrol"
     patrol_index: int = 0
+    clue_revision: int | None = None  # confirmed evidence when this target was assigned
 
 
 def choose_target(

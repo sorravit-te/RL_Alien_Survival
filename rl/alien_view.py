@@ -10,6 +10,14 @@ from rl.candidates import AllowedAlienView
 from rl.contract import WAIT
 
 
+def still_travelling(snapshot):
+    """Core prunes a finished path one tick late, so arrival uses its target distance."""
+    alien, target = snapshot.alien, snapshot.alien_target
+    return bool(snapshot.navigation_path) and (
+        hypot(alien.x - target[0], alien.y - target[1]) > snapshot.config.target_arrival_distance
+    )
+
+
 def allowed_view(snapshot, last_action, visit_ticks):
     alien, memory, tick_hz = snapshot.alien, snapshot.perception, snapshot.config.tick_hz
     return AllowedAlienView(
@@ -24,9 +32,10 @@ def allowed_view(snapshot, last_action, visit_ticks):
         tuple(
             (snapshot.tick - tick) / tick_hz if tick is not None else None for tick in visit_ticks
         ),
-        bool(snapshot.navigation_path),
+        still_travelling(snapshot),
         memory.revision,
         snapshot.investigation,
+        snapshot.alien_target_revision,
     )
 
 

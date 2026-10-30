@@ -23,6 +23,7 @@ class AllowedAlienView:
     navigation_active: bool
     clue_revision: int | None = None
     investigation: InvestigationSnapshot = InvestigationSnapshot()
+    target_revision: int | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,18 @@ def search_is_restricted(view):
     )
 
 
+def committed_waypoint(view):
+    """Waypoint action still being walked; only arrival, a dead path or new evidence ends it."""
+    if (
+        view.current_action < len(view.waypoints)
+        and view.navigation_active
+        and not view.visible
+        and view.clue_revision == view.target_revision
+    ):
+        return view.current_action
+    return None
+
+
 def build_candidates(view: AllowedAlienView):
     if not isinstance(view, AllowedAlienView):
         raise TypeError("Candidates require AllowedAlienView, not full world state")
@@ -82,6 +95,13 @@ def build_candidates(view: AllowedAlienView):
         continuation = slots[21]
         slots = [Candidate() for _ in range(ACTION_COUNT)]
         slots[21] = continuation
+    committed = committed_waypoint(view)
+    if committed is not None:
+        # Between decisions nothing new is known, so stopping or switching has no basis.
+        continuation = slots[committed]
+        slots = [Candidate() for _ in range(ACTION_COUNT)]
+        slots[committed] = continuation
+        return tuple(slots)
     slots[WAIT] = Candidate(True, 6)
     return tuple(slots)
 
