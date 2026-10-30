@@ -16,6 +16,35 @@
       "args": ["-m", "tools.prepare_assets"],
       "options": {"cwd": "${workspaceFolder}"},
       "problemMatcher": []
+    },
+    {
+      "label": "Alien RL: Run tests",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "args": ["-m", "pytest", "-q"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    },
+    {
+      "label": "Alien RL: Play against trained Alien",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "args": [
+        "-B", "-m", "app.play", "--controller", "rl",
+        "--run-dir", "experiments/${input:run}/run",
+        "--checkpoint", "experiments/${input:run}/run/checkpoints/best.zip",
+        "--sampling-seed", "310003", "--scenario-seed", "310001", "--fps-limit", "60"
+      ],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "run",
+      "type": "promptString",
+      "description": "Run folder inside experiments/",
+      "default": "pursuit_tracking_pilot_v2"
     }
   ]
 }
