@@ -29,10 +29,15 @@ class GameCore:
         config: CoreConfig | None = None,
         *,
         alien_control: str = "heuristic",
+        pursuit: str = "snapshot",
     ):
         if alien_control not in ("heuristic", "external"):
             raise ValueError("Alien control must be heuristic or external")
+        if pursuit not in ("snapshot", "tracking"):
+            raise ValueError("Pursuit must be snapshot or tracking")
         self.alien_control = alien_control
+        # snapshot: chase targets stay as chosen; tracking: written pursuit helper below.
+        self.pursuit = pursuit
         self.world_map = world_map if world_map is not None else small_test_map()
         self.config = config if config is not None else CoreConfig()
         for x, y in self.world_map.spawn_points:
@@ -210,6 +215,8 @@ class GameCore:
             self._navigator.set_target(
                 self.world_map, (self._alien.x, self._alien.y), None, self.config.alien_radius
             )
+        if self.pursuit == "tracking":
+            hold = self._track_confirmed_sighting(hold)
         if hold:
             self._alien = replace(self._alien, yaw=(self._alien.yaw + turn) % (2 * pi))
             return (0.0, 0.0)
@@ -217,6 +224,32 @@ class GameCore:
         return self._navigator.displacement(
             (self._alien.x, self._alien.y), speed / self.config.tick_hz
         )
+
+    def _track_confirmed_sighting(self, hold):
+        """Written pursuit helper; reads only this tick's pre-motion confirmed sample.
+
+        A chase target follows each confirmed point. Reacquisition that cancelled a
+        last-seen primitive becomes a helper chase until the next decision. After sight
+        is lost the target stays at the last confirmed point, never the hidden Survivor.
+        """
+        memory, source = self._perception, self._controller.source
+        if (
+            memory.visible
+            and source == "last_seen"
+            and self._investigation.state.phase == "cancelled"
+        ):
+            source = "visible_handoff"
+        if source not in ("visible", "visible_handoff"):
+            return hold
+        if memory.visible:
+            self._controller = replace(self._controller, target=memory.last_seen, source=source)
+            self._navigator.set_target(
+                self.world_map,
+                (self._alien.x, self._alien.y),
+                memory.last_seen,
+                self.config.alien_radius,
+            )
+        return False if source == "visible_handoff" else hold
 
     def _move_both(self, survivor_delta, alien_delta, yaw):
         s = (self._survivor.x, self._survivor.y)

@@ -19,12 +19,13 @@ from game.state import CoreConfig
 from rl.candidates import AllowedAlienView, build_candidates, candidate_masks
 from rl.contract import (
     ACTION_COUNT,
-    CONTINUE_CANCEL,
     DECISION_TICKS,
     LEGACY_SEARCH_CONTROL,
     OBSERVATION_SIZE,
     WAIT,
     WORLD_SCALE,
+    core_pursuit,
+    restricts_search,
     search_contract,
     validate_search_control,
 )
@@ -73,7 +74,12 @@ class AlienEnv(gym.Env):
             raise ValueError("Current contract permits at most20 waypoints")
         if not self.config.alien_enabled or self.world.alien_spawn is None:
             raise ValueError("RL environment requires an active Alien")
-        self.core = GameCore(self.world, self.config, alien_control="external")
+        self.core = GameCore(
+            self.world,
+            self.config,
+            alien_control="external",
+            pursuit=core_pursuit(self.search_control),
+        )
         start = self.world.alien_spawn[:2]
         for point in self.world.patrol_waypoints:
             if not find_path(self.world, start, point, self.config.alien_radius):
@@ -142,7 +148,7 @@ class AlienEnv(gym.Env):
         self.reward_tracker = RewardTracker()
         self.last_action = WAIT
         self.visit_ticks = [None] * len(self.world.patrol_waypoints)
-        if self.search_metrics or self.search_control == CONTINUE_CANCEL:
+        if self.search_metrics or restricts_search(self.search_control):
             from rl.search_metrics import SearchMetrics
 
             self.metrics = SearchMetrics(self.search_control)

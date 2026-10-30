@@ -8,9 +8,9 @@ import numpy as np
 from game.investigation import InvestigationSnapshot
 from rl.contract import (
     ACTION_COUNT,
-    CONTINUE_CANCEL,
     LEGACY_SEARCH_CONTROL,
     WAIT,
+    restricts_search,
     validate_search_control,
 )
 
@@ -59,7 +59,7 @@ def current_search_clue(view):
 
 def search_is_restricted(view):
     return (
-        view.search_control == CONTINUE_CANCEL
+        restricts_search(view.search_control)
         and current_search_clue(view)
         and view.investigation.active
         and view.investigation.revision == view.clue_revision
@@ -90,7 +90,7 @@ def build_candidates(view: AllowedAlienView):
             view.last_seen_age_seconds or 0.0,
             evidence_revision=view.clue_revision,
         )
-    if view.search_control == CONTINUE_CANCEL:
+    if restricts_search(view.search_control):
         if not current_search_clue(view):
             slots[21] = Candidate()
         if search_is_restricted(view):

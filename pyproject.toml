@@ -3,5 +3,9 @@ target-version = "py312"
 line-length = 100
 extend-exclude = ["Flat", "90s Style", "Materials", "assets", ".venv"]
 
+[tool.pytest.ini_options]
+# experiments/ holds frozen review scripts and conftests; never collect them by default.
+testpaths = ["tests"]
+
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]

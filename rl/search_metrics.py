@@ -9,7 +9,12 @@ from copy import deepcopy
 from math import atan2, hypot, pi
 
 from game.interaction import segment_clear
-from rl.contract import CONTINUE_CANCEL, LEGACY_SEARCH_CONTROL, validate_search_control
+from rl.contract import (
+    CONTINUE_CANCEL_TRACKING,
+    LEGACY_SEARCH_CONTROL,
+    restricts_search,
+    validate_search_control,
+)
 
 VERSION = "wall-search-metrics-v1"
 
@@ -37,10 +42,10 @@ class SearchMetrics:
     def __init__(self, search_control=LEGACY_SEARCH_CONTROL):
         self.search_control = validate_search_control(search_control)
         self.control = None
-        if search_control == CONTINUE_CANCEL:
+        if restricts_search(search_control):
             from rl.search_control_metrics import SearchControlMetrics
 
-            self.control = SearchControlMetrics()
+            self.control = SearchControlMetrics(tracking=search_control == CONTINUE_CANCEL_TRACKING)
         self.losses = 0
         self.windows = []
         self.current = None
@@ -135,6 +140,8 @@ class SearchMetrics:
         result = {
             "version": VERSION
             if self.control is None
+            else "wall-search-metrics-v3-pursuit-tracking"
+            if self.control.tracking
             else "wall-search-metrics-v2-continue-cancel",
             "confirmed_losses": self.losses,
             "wall_loss_opportunities": len(windows),
