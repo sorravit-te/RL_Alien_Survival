@@ -2,7 +2,6 @@
 
 import random
 from copy import deepcopy
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -36,10 +35,8 @@ from rl.train import baselines, pilot
 @pytest.fixture
 def base_config(tmp_path):
     """Tiny unprepared pilot config with its own synthetic evaluation protocol file."""
-    result = read_json(
-        Path(__file__).resolve().parents[1] / "configs/pursuit_tracking_training_pilot.json"
-    )
-    protocol = read_json(result["evaluation_protocol"])
+    result = read_json(ROOT / "configs/pursuit_tracking_training_pilot.json")
+    protocol = read_json(ROOT / result["evaluation_protocol"])
     counts = {"train": 4, "validation": 2, "test": 2}
     result.update(
         manifest_seed=9100329,
