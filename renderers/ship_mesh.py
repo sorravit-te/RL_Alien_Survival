@@ -390,7 +390,7 @@ def add_walls(mesh, theme):
         if key == "D":
             wall.flat(0, wall.length, 0, top, "walltrim1", repeat=(wall.length * 2, 1.0), shade=0.7)
         elif is_block:
-            add_block(wall, FURNITURE.get(key, "cabinet"))
+            add_block(wall, FURNITURE[key])
             continue
         elif key == "B" and dy < 0 and line <= 4:
             add_viewport(wall)
@@ -413,14 +413,11 @@ def add_block(wall, kind):
         wall.flat(0, length, 0, 0.5, "wall12", repeat=(length, 0.4), shade=0.8)
         wall.flat(0, length, 0.5, 1.5, "rack1", repeat=(length, 1.0))
         wall.flat(0, length, 1.5, wall.top, "columna2", repeat=(length / 2, 1.0), shade=0.8)
-    elif kind == "column":
+    else:
         # The ship's centre: glowing conduits ringed by plate, seen from every corridor.
         wall.flat(0, length, 0, 0.5, "columna1", repeat=(length, 1.0), shade=0.9)
         wall.flat(0, length, 0.5, 1.7, "wall12", repeat=(length, 1.0))
         wall.flat(0, length, 1.7, wall.top + RAISED, "columna2", repeat=(length, 1.0), shade=0.9)
-    else:
-        wall.flat(0, length, 0, 0.2, "floor_trim2", repeat=(length, 1.0), shade=0.8)
-        wall.flat(0, length, 0.2, wall.top, "wall11", repeat=(length, 1.0))
 
 
 def add_viewport(wall):

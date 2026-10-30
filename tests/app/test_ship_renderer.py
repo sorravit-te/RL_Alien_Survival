@@ -18,7 +18,7 @@ from renderers.raycasting import cast_ray
 from renderers.ship_kernels import SKY
 from renderers.ship_mesh import DOOR_TOP, PILLAR_PROUD, WALL_TOP, build_mesh
 from renderers.ship_renderer import ShipRenderer
-from renderers.ship_theme import ZONES, ShipTheme
+from renderers.ship_theme import FACES, ZONES, ShipTheme
 from tools.bake_ship_textures import MATERIALS, texture_names
 
 WORLD = scenario_map(SHIP_SCENARIO)
@@ -121,10 +121,20 @@ def test_nothing_stands_where_the_player_could_walk_into_it():
 
 
 def test_furniture_is_only_what_stands_inside_a_room(theme):
-    assert theme.blocks[17, 24]  # mess table
+    assert theme.blocks[32, 8]  # cargo crates
     assert theme.blocks[33, 27]  # reactor core
     assert theme.blocks[20, 19]  # plaza column
     assert not theme.blocks[20, 22]  # the wall between plaza and mess
+
+
+def test_small_rooms_stand_open(theme):
+    faced = {
+        theme.zone_at(x + dx, y + dy)
+        for y, x in zip(*theme.blocks.nonzero(), strict=True)
+        for dx, dy in FACES
+        if theme.is_open(x + dx, y + dy)
+    }
+    assert faced == set("CRZ")
 
 
 def test_depth_matches_the_plain_ray_caster(renderer, snapshot):
