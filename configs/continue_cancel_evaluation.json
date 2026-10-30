@@ -1,0 +1,80 @@
+{
+  "name": "continue_cancel_sampled_evaluation_v1",
+  "status": "implementation_only_runtime_requires_separate_authorization",
+  "primary_inference": "sampled_masked_policy",
+  "secondary_inference": "deterministic_argmax_diagnostic",
+  "manifest_seed": 2026102802,
+  "manifest_counts": {
+    "train": 200,
+    "validation": 50,
+    "test": 50
+  },
+  "sampling_repeat_seeds": [
+    2311,
+    4621,
+    6947
+  ],
+  "selector_seed_rule": "SeedSequence([case.selector_seed, repeat_seed]).generate_state(1)[0]; seed once per episode; isolate and restore global RNG streams",
+  "controllers": [
+    {
+      "name": "random_valid_mask",
+      "inference": "uniform_valid",
+      "repeats": 3,
+      "available": "baseline"
+    },
+    {
+      "name": "untrained_sampled",
+      "inference": "sampled_masked",
+      "repeats": 3,
+      "available": "new compatible initial policy"
+    },
+    {
+      "name": "untrained_deterministic",
+      "inference": "argmax_masked",
+      "repeats": 1,
+      "available": "new compatible initial policy"
+    },
+    {
+      "name": "heuristic",
+      "inference": "scripted_catalog",
+      "repeats": 1,
+      "available": "baseline"
+    },
+    {
+      "name": "wait",
+      "inference": "constant_wait",
+      "repeats": 1,
+      "available": "baseline"
+    },
+    {
+      "name": "trained_sampled",
+      "inference": "sampled_masked",
+      "repeats": 3,
+      "available": "future compatible checkpoint only"
+    },
+    {
+      "name": "trained_deterministic",
+      "inference": "argmax_masked",
+      "repeats": 1,
+      "available": "future compatible checkpoint only"
+    }
+  ],
+  "selection": {
+    "split": "validation",
+    "primary": "case_mean_sampled_catch_rate",
+    "tie_1": "min_sampled_unresolved_rate",
+    "tie_2": "earliest_trained_checkpoint",
+    "exclude": "test outcomes and untrained baseline cannot select trained best"
+  },
+  "statistics": {
+    "unit": "case cluster; retain all3 action-sampling repeats together",
+    "paired": "same cases/selector seed list per controller",
+    "warning": "Three sampling repeats are not training seeds; fixed layout/two spawns and seed changes can repeat routes; no unseen-layout generalization."
+  },
+  "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
+  "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
+  "scenario": "occluded_loop_dev_v1",
+  "scenario_sha256": "c01c4cacc21c8c0b8342dc0f86e194cf6b066163bc2aac52b2123e723b33a730",
+  "search_control": "continue_cancel_v1",
+  "contract_version": "alien-vector-v3-continue-cancel"
+}

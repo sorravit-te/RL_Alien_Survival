@@ -18,7 +18,12 @@ from sb3_contrib import MaskablePPO
 
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
-from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, VERSION
+from rl.contract import (
+    ACTION_COUNT,
+    LEGACY_SEARCH_CONTROL,
+    OBSERVATION_SIZE,
+    search_contract,
+)
 from rl.env import AlienEnv
 from rl.evasive_survivor import EvasionConfig
 
@@ -98,6 +103,13 @@ def configured_map_identity(config):
     return identity
 
 
+def configured_search_contract(config):
+    identity = search_contract(config.get("search_control", LEGACY_SEARCH_CONTROL))
+    if "contract_version" in config and config["contract_version"] != identity["contract_version"]:
+        raise ValueError("Configured search contract version mismatch")
+    return identity
+
+
 def make_manifest(seed, counts, scenario=DEFAULT_SCENARIO):
     rng = np.random.default_rng(seed)
     used = set()
@@ -141,6 +153,7 @@ def validate_environment_config(config):
 
     from ai.navigation import find_path
 
+    configured_search_contract(config)
     configured_map_identity(config)
     world = scenario_map(config.get("scenario", DEFAULT_SCENARIO))
     core = CoreConfig()
@@ -173,6 +186,7 @@ def validate_environment_config(config):
 
 
 def make_env(config):
+    configured_search_contract(config)
     configured_map_identity(config)
     settings = config.get("survivor_threat_settings")
     return AlienEnv(
@@ -181,6 +195,7 @@ def make_env(config):
         evasion_settings=EvasionConfig(**settings) if settings is not None else None,
         scenario=config.get("scenario", DEFAULT_SCENARIO),
         search_metrics=config.get("search_metrics", False),
+        search_control=config.get("search_control", LEGACY_SEARCH_CONTROL),
     )
 
 
@@ -242,6 +257,7 @@ def save_checkpoint(
 ):
     from rl.evaluation_protocol import frozen_protocol
 
+    configured_search_contract(config)
     configured_map_identity(config)
     protocol = frozen_protocol(config)
     path = Path(path)
@@ -266,7 +282,7 @@ def save_checkpoint(
                 config.get("scenario", DEFAULT_SCENARIO),
             )
         ),
-        "contract_version": VERSION,
+        "contract_version": configured_search_contract(config)["contract_version"],
         "observation_shape": [OBSERVATION_SIZE],
         "action_n": ACTION_COUNT,
         "map": configured_map_identity(config),
@@ -281,6 +297,8 @@ def save_checkpoint(
         "checkpoint_sha256": file_hash(path),
         "policy_sha256": parameter_hash(model),
     }
+    if config.get("search_control", LEGACY_SEARCH_CONTROL) != LEGACY_SEARCH_CONTROL:
+        metadata["search_control"] = config["search_control"]
     if protocol is not None:
         metadata["evaluation_identity"] = config["frozen_evaluation"]
         metadata["evaluated_at_decision_steps"] = int(model.num_timesteps) if validation else None
@@ -295,12 +313,17 @@ def save_checkpoint(
 def load_checkpoint(path, config, fingerprint, env=None):
     from rl.evaluation_protocol import frozen_protocol
 
+    configured_search_contract(config)
     configured_map_identity(config)
     protocol = frozen_protocol(config)
     path = Path(path)
     metadata = read_json(path.with_suffix(".metadata.json"))
+    if "search_control" in metadata and metadata["search_control"] != config.get(
+        "search_control", LEGACY_SEARCH_CONTROL
+    ):
+        raise ValueError("Checkpoint metadata mismatch: search_control")
     expected = {
-        "contract_version": VERSION,
+        "contract_version": configured_search_contract(config)["contract_version"],
         "observation_shape": [OBSERVATION_SIZE],
         "action_n": ACTION_COUNT,
         "config_sha256": digest(config),
@@ -315,6 +338,8 @@ def load_checkpoint(path, config, fingerprint, env=None):
         "dependencies": dependencies(),
         "format": CHECKPOINT_FORMAT,
     }
+    if config.get("search_control", LEGACY_SEARCH_CONTROL) != LEGACY_SEARCH_CONTROL:
+        expected["search_control"] = config["search_control"]
     if protocol is not None:
         expected["evaluation_identity"] = config["frozen_evaluation"]
     for name, value in expected.items():
@@ -326,6 +351,10 @@ def load_checkpoint(path, config, fingerprint, env=None):
         raise ValueError("Checkpoint metadata mismatch: map")
     if env is not None:
         actual_env = env.unwrapped
+        if getattr(actual_env, "search_control", LEGACY_SEARCH_CONTROL) != config.get(
+            "search_control", LEGACY_SEARCH_CONTROL
+        ):
+            raise ValueError("Checkpoint metadata mismatch: environment search_control")
         if digest(asdict(actual_env.world)) != metadata["map"][
             "sha256"
         ] or actual_env.scenario != config.get("scenario", DEFAULT_SCENARIO):
@@ -402,6 +431,8 @@ def prepare_run(run_dir, config):
         if protocol
         else "legacy_deterministic_argmax",
     }
+    if config.get("search_control", LEGACY_SEARCH_CONTROL) != LEGACY_SEARCH_CONTROL:
+        identity["semantic_contract"] = configured_search_contract(config)
     if protocol is not None:
         (run_dir / "evaluation_protocol.json").write_bytes(protocol_bytes)
         write_json(run_dir / "sampling_schedule.json", schedule)
@@ -429,7 +460,14 @@ def read_run(run_dir):
         or digest(manifest) != identity["manifest_sha256"]
     ):
         raise ValueError("Frozen run config/manifest changed")
+    configured_search_contract(config)
     configured_map_identity(config)
+    if (
+        "semantic_contract" in identity
+        or config.get("search_control", LEGACY_SEARCH_CONTROL) != LEGACY_SEARCH_CONTROL
+    ):
+        if identity.get("semantic_contract") != configured_search_contract(config):
+            raise ValueError("Frozen search semantic contract changed")
     expected_manifest = make_manifest(
         config["manifest_seed"], config["manifest_counts"], config.get("scenario", DEFAULT_SCENARIO)
     )

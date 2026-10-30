@@ -73,3 +73,26 @@ CANDIDATE_FIELDS = (
 )
 OBSERVATION_SIZE = len(BASE_FIELDS) + ACTION_COUNT * len(CANDIDATE_FIELDS) + ACTION_COUNT
 assert OBSERVATION_SIZE == 352
+
+
+LEGACY_SEARCH_CONTROL = "legacy"
+CONTINUE_CANCEL = "continue_cancel_v1"
+CONTINUE_CANCEL_VERSION = "alien-vector-v3-continue-cancel"
+
+
+def validate_search_control(mode):
+    if type(mode) is not str or mode not in (LEGACY_SEARCH_CONTROL, CONTINUE_CANCEL):
+        raise ValueError("Unknown search_control mode")
+    return mode
+
+
+def search_contract(mode=LEGACY_SEARCH_CONTROL):
+    """Static/public identity; equal dimensions do not imply equal semantics."""
+    validate_search_control(mode)
+    return {
+        "search_control": mode,
+        "contract_version": VERSION if mode == LEGACY_SEARCH_CONTROL else CONTINUE_CANCEL_VERSION,
+        "observation_shape": [OBSERVATION_SIZE],
+        "action_n": ACTION_COUNT,
+        "decision_ticks": DECISION_TICKS,
+    }

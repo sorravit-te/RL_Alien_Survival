@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from rl.contract import WAIT
+from rl.contract import CONTINUE_CANCEL, WAIT
 from rl.pipeline import load_checkpoint, make_env, parameter_hash, read_run, write_json
 from rl.scripted_controllers import HeuristicSelector as HeuristicSelector
 
@@ -115,7 +115,7 @@ def evaluate(
         "first_sight",
         "action_sha256",
     ]
-    if config.get("search_metrics"):
+    if config.get("search_metrics") or config.get("search_control") == CONTINUE_CANCEL:
         fields += ["search_metrics"]
     if explicit:
         fields += [
@@ -194,7 +194,7 @@ def evaluate(
                     **components,
                     "action_sha256": actions.hexdigest(),
                 }
-                if config.get("search_metrics"):
+                if config.get("search_metrics") or config.get("search_control") == CONTINUE_CANCEL:
                     row["search_metrics"] = info["search_metrics"]
                 if explicit:
                     row.update(
@@ -347,7 +347,7 @@ def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
             )
             rows.extend(repeat_rows)
         summaries[name] = summarize_cases(rows, inference)
-        if config.get("search_metrics"):
+        if config.get("search_metrics") or config.get("search_control") == CONTINUE_CANCEL:
             from rl.search_metrics import summarize_search
 
             summaries[name]["search"] = summarize_search(rows)

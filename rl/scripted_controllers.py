@@ -3,7 +3,8 @@
 from types import SimpleNamespace
 
 from ai.controller import ControllerState, choose_target
-from rl.contract import WAIT
+from rl.candidates import build_candidates, search_is_restricted
+from rl.contract import CONTINUE_CANCEL, WAIT
 
 
 class HeuristicSelector:
@@ -19,6 +20,8 @@ class HeuristicSelector:
         self.arrival_distance = arrival_distance
 
     def choose(self, view):
+        if search_is_restricted(view):
+            return 21
         alien = SimpleNamespace(x=view.position[0], y=view.position[1])
         perception = SimpleNamespace(
             visible=view.visible, last_seen=view.last_seen, revision=view.clue_revision
@@ -32,7 +35,11 @@ class HeuristicSelector:
             view.investigation.investigated_revision,
         )
         if self.state.source == "visible":
-            return 20
-        if self.state.source == "last_seen":
-            return 21
-        return self.state.patrol_index if view.waypoints else WAIT
+            action = 20
+        elif self.state.source == "last_seen":
+            action = 21
+        else:
+            action = self.state.patrol_index if view.waypoints else WAIT
+        if view.search_control == CONTINUE_CANCEL and not build_candidates(view)[action].valid:
+            return WAIT
+        return action
