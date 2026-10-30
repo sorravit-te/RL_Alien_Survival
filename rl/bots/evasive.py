@@ -66,10 +66,12 @@ class EvasiveExplorerBot:
     retry_path_limit = 4
     replan_on_arrival = False  # plain bot waits the hold time at a reached retreat point
 
+    explorer_runs = False
+
     label = "evasive_explorer_scripted"
 
     def __init__(self, rows, config, settings=None, *, doors=()):
-        self.explorer = ExplorerBot(rows, config, doors=doors)
+        self.explorer = ExplorerBot(rows, config, doors=doors, running=self.explorer_runs)
         self.config = config
         self.settings = settings if settings is not None else EvasionConfig()
         if (
@@ -617,3 +619,10 @@ class EvasiveExplorerBot:
         turn = max(-self.explorer.turn_per_tick, min(self.explorer.turn_per_tick, error))
         # Local backward/strafe movement retreats immediately while turning.
         return move_command(dx, dy, mission.yaw, turn, self.config, running=True)
+
+
+class RunnerEvasiveBot(EvasiveExplorerBot):
+    """Rushes its search at run speed, so the Alien gets noise to follow before any sighting."""
+
+    label = "runner_evasive_scripted"
+    explorer_runs = True

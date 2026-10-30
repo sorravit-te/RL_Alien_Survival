@@ -15,7 +15,7 @@ ROUTE_JITTER = 8.0  # steps a station may lose to a nearer one, so routes differ
 class ExplorerBot:
     label = "explorer_scripted"
 
-    def __init__(self, rows, config, *, doors=()):
+    def __init__(self, rows, config, *, doors=(), running=False):
         # Copy geometry only. No undiscovered object positions, spawn list or Alien state.
         floors = tuple(
             (x + 0.5, y + 0.5)
@@ -27,6 +27,8 @@ class ExplorerBot:
             raise ValueError("Explorer needs walkable geometry")
         self.geometry = WorldMap(tuple(rows), (floors[0],))
         self.config = config
+        self.running = running
+        self.speed = config.run_speed if running else config.walk_speed
         self.points = tuple(p for p in floors if not self.geometry.overlaps(*p, config.radius))
         # A deck with doors is searched room by room; other scenes roam every floor point.
         self.stations, self.walk_steps = (
@@ -109,7 +111,7 @@ class ExplorerBot:
                 return SurvivorCommand(yaw_delta=self.turn_per_tick)
             target = self.explore_target
         self.navigator.set_target(self.geometry, position, target, self.config.radius)
-        dx, dy = self.navigator.displacement(position, self.config.walk_speed / self.config.tick_hz)
+        dx, dy = self.navigator.displacement(position, self.speed / self.config.tick_hz)
         if hypot(dx, dy) < 1e-12:
             if mission is not None and hypot(target[0] - view.x, target[1] - view.y) < 1e-8:
                 # Navigator can prune a tiny final segment before the yaw requirement is met.
@@ -128,13 +130,14 @@ class ExplorerBot:
         self.last_command_reason = "aligned" if aligned else "turning"
         if move_while_turning:
             # Preserve the navigator's global walk displacement while turning.
-            return move_command(dx, dy, view.yaw, turn, self.config)
+            return move_command(dx, dy, view.yaw, turn, self.config, running=self.running)
         if not aligned:
             return SurvivorCommand(yaw_delta=turn)
         distance = hypot(dx, dy)
         return SurvivorCommand(
-            forward=min(1.0, distance * self.config.tick_hz / self.config.walk_speed),
+            forward=min(1.0, distance * self.config.tick_hz / self.speed),
             yaw_delta=turn,
+            running=self.running,
         )
 
 

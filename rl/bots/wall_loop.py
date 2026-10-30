@@ -1,4 +1,4 @@
-"""Wall-looping retreat and the per-episode plain/wall-loop training mix."""
+"""Wall-looping retreat and the per-episode training mixes of scripted bots."""
 
 from dataclasses import replace
 from math import atan2, ceil, hypot
@@ -7,7 +7,7 @@ import numpy as np
 
 from ai.navigation import find_path
 from game.interaction import segment_clear
-from rl.bots.evasive import EvasiveExplorerBot
+from rl.bots.evasive import EvasiveExplorerBot, RunnerEvasiveBot
 
 
 class WallLoopEvasiveBot(EvasiveExplorerBot):
@@ -82,3 +82,20 @@ class EvasiveMixBot:
 
     def command(self, view):
         return self.active.command(view)
+
+
+class RunnerMixBot(EvasiveMixBot):
+    """One episode in three goes to the Runner; the rest replay EvasiveMixBot exactly."""
+
+    runner_probability = 1 / 3
+
+    def __init__(self, rows, config, settings=None, *, doors=()):
+        super().__init__(rows, config, settings, doors=doors)
+        self.runner = RunnerEvasiveBot(rows, config, settings, doors=doors)
+
+    def reset(self, rng, *, bot_seed):
+        if np.random.default_rng([bot_seed, 2]).random() < self.runner_probability:
+            self.active = self.runner
+            self.active.reset(rng)
+        else:
+            super().reset(rng, bot_seed=bot_seed)

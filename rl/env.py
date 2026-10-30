@@ -18,10 +18,10 @@ from game.doors import sight_world
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
 from rl.alien_view import allowed_view, record_waypoint_visits, target_source
-from rl.bots.evasive import EvasiveExplorerBot
+from rl.bots.evasive import EvasiveExplorerBot, RunnerEvasiveBot
 from rl.bots.explorer import ExplorerBot, StationaryDebugBot
 from rl.bots.views import observe_survivor, observe_threat
-from rl.bots.wall_loop import EvasiveMixBot, WallLoopEvasiveBot
+from rl.bots.wall_loop import EvasiveMixBot, RunnerMixBot, WallLoopEvasiveBot
 from rl.candidates import build_candidates, candidate_masks, committed_waypoint
 from rl.contract import (
     ACTION_COUNT,
@@ -35,13 +35,23 @@ from rl.observations import build_observation
 from rl.rewards import RewardTracker
 from rl.search_metrics import SearchMetrics
 
-BOT_KINDS = ("explorer", "evasive_explorer", "stationary_debug", "wall_loop_evasive", "evasive_mix")
+MIX_BOT_KINDS = ("evasive_mix", "runner_mix")
+BOT_KINDS = (
+    "explorer",
+    "evasive_explorer",
+    "stationary_debug",
+    "wall_loop_evasive",
+    "runner_evasive",
+    *MIX_BOT_KINDS,
+)
 # Bots that receive the LoS-filtered threat view and accept EvasionConfig.
-THREAT_BOT_KINDS = ("evasive_explorer", "wall_loop_evasive", "evasive_mix")
+THREAT_BOT_KINDS = ("evasive_explorer", "wall_loop_evasive", "runner_evasive", *MIX_BOT_KINDS)
 THREAT_BOTS = {
     "evasive_explorer": EvasiveExplorerBot,
     "wall_loop_evasive": WallLoopEvasiveBot,
+    "runner_evasive": RunnerEvasiveBot,
     "evasive_mix": EvasiveMixBot,
+    "runner_mix": RunnerMixBot,
 }
 
 
@@ -121,7 +131,7 @@ class AlienEnv(gym.Env):
         if min(self.scenario_seed, self.bot_seed) < 0:
             raise ValueError("Seeds must be nonnegative")
         self.core.reset(self.scenario_seed)
-        if self.bot_kind == "evasive_mix":
+        if self.bot_kind in MIX_BOT_KINDS:
             self.bot.reset(np.random.default_rng(self.bot_seed), bot_seed=self.bot_seed)
         else:
             self.bot.reset(np.random.default_rng(self.bot_seed))
