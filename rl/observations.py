@@ -30,7 +30,14 @@ def build_observation(view: AllowedAlienView):
         dy,
         min(1.0, (view.last_seen_age_seconds or 0.0) / AGE_SCALE_SECONDS),
     ]
-    values += [0.0] * 9  # last heard4,Director3,interaction2
+    heard = view.last_heard
+    values += [
+        float(heard is not None),
+        (heard[0] - view.position[0]) / WORLD_SCALE if heard else 0.0,
+        (heard[1] - view.position[1]) / WORLD_SCALE if heard else 0.0,
+        min(1.0, (view.last_heard_age_seconds or 0.0) / AGE_SCALE_SECONDS),
+    ]
+    values += [0.0] * 5  # Director3,interaction2
     state = view.investigation
     target = state.target
     values += [

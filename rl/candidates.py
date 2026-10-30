@@ -24,6 +24,11 @@ class AllowedAlienView:
     clue_revision: int | None = None
     investigation: InvestigationSnapshot = InvestigationSnapshot()
     target_revision: int | None = None
+    last_heard: tuple[float, float] | None = None
+    last_heard_age_seconds: float | None = None
+    heard_checked: bool = False
+    heard_revision: int = 0
+    target_heard_revision: int = 0
 
 
 @dataclass(frozen=True)
@@ -67,6 +72,7 @@ def committed_waypoint(view):
         and view.navigation_active
         and not view.visible
         and view.clue_revision == view.target_revision
+        and view.heard_revision == view.target_heard_revision
     ):
         return view.current_action
     return None
@@ -90,6 +96,8 @@ def build_candidates(view: AllowedAlienView):
             view.last_seen_age_seconds or 0.0,
             evidence_revision=view.clue_revision,
         )
+    if view.last_heard is not None and not view.heard_checked:
+        slots[22] = Candidate(True, 3, view.last_heard, view.last_heard_age_seconds or 0.0)
     if search_is_restricted(view):
         # An active search on the current clue may only continue (21) or cancel (30).
         continuation = slots[21]

@@ -121,6 +121,7 @@ def alien_debug_labels(snapshot):
     """Opt-in privileged diagnostics from the current Core tick, never policy input."""
     if snapshot.alien is None:
         return ["DEBUG Alien disabled"]
+    heard = snapshot.heard
     sensor_time = (
         f"sample tick start {snapshot.tick - 1}" if snapshot.tick else "initial; not sampled"
     )
@@ -129,6 +130,7 @@ def alien_debug_labels(snapshot):
         "(0=E 90=S 180=W 270=N)",
         f"DEBUG sensor | confirmed-visible={snapshot.perception.visible} "
         f"({sensor_time}; BEFORE movement)",
+        f"DEBUG heard | {heard.point} checked={heard.checked} count={heard.revision}",
     ]
 
 

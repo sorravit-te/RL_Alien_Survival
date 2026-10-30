@@ -36,11 +36,14 @@ class HeuristicSelector:
             self.state,
             self.arrival_distance,
             view.investigation.investigated_revision,
+            SimpleNamespace(point=view.last_heard, checked=view.heard_checked),
         )
         if self.state.source == "visible":
             action = 20
         elif self.state.source == "last_seen":
             action = 21
+        elif self.state.source == "sound":
+            action = 22
         else:
             action = self.state.patrol_index if view.waypoints else WAIT
         if not build_candidates(view)[action].valid:

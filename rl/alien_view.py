@@ -20,6 +20,7 @@ def still_travelling(snapshot):
 
 def allowed_view(snapshot, last_action, visit_ticks):
     alien, memory, tick_hz = snapshot.alien, snapshot.perception, snapshot.config.tick_hz
+    heard = snapshot.heard
     return AllowedAlienView(
         (alien.x, alien.y),
         alien.yaw,
@@ -36,6 +37,11 @@ def allowed_view(snapshot, last_action, visit_ticks):
         memory.revision,
         snapshot.investigation,
         snapshot.alien_target_revision,
+        heard.point,
+        heard.age_ticks / tick_hz if heard.age_ticks is not None else None,
+        heard.checked,
+        heard.revision,
+        snapshot.alien_target_heard_revision,
     )
 
 
@@ -44,6 +50,8 @@ def target_source(action):
         return "wait"
     if action < 20:
         return "waypoint"
+    if action == 22:
+        return "sound"
     return "visible" if action == 20 else "last_seen"
 
 

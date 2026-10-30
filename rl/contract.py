@@ -1,7 +1,7 @@
 """Frozen vector observation and target-action contract. Change VERSION for semantics/ordering/shape/normalization changes.
 
 Actions0..19 static waypoints,20 confirmed visible snapshot,21 investigate last-seen,
-22 sound,23 Director,24..29 lockers,30 wait,31 guard departure. Unimplemented
+22 last heard region,23 Director,24..29 lockers,30 wait,31 guard departure. Unimplemented
 slots are masked, never removed. A masked action is applied as wait, penalty0;
 a value outside Discrete(32) raises ValueError. One decision is15 ticks at30Hz.
 Action21 snapshots confirmed evidence revision, walks, then performs a bounded
@@ -11,8 +11,10 @@ Age scaling is physical clue/visit age, never the external episode countdown.
 While action21's current clue is active, only 21 (continue) and 30 (cancel) are valid.
 Core retargets action20 to each confirmed sensor point and hands reacquisition during
 action21 to a written helper chase until the next decision.
-A waypoint action holds as the only valid action until arrival, a dead path or new
-confirmed evidence; the mask carries this, so the observation shape is unchanged.
+A waypoint action holds as the only valid action until arrival, a dead path, a new
+noise or new confirmed evidence; the mask carries this, so the observation shape
+is unchanged. Action22 walks to the coarse region of the latest noise that reached
+the Alien along the floor; standing at that point masks it until the next noise.
 Scenario objects are never policy input: spawns, the card and the working exit vary
 by scenario seed, and the Alien learns them only through what it senses.
 No unconfirmed sight confidence/count is exposed. An unreachable observed floor
@@ -20,7 +22,7 @@ point may have no path; navigation never substitutes a heuristic target.
 """
 
 # Schema identifier for new runs; archived checkpoints retain their recorded version.
-VERSION = "alien-vector-v6-scenario-randomization"
+VERSION = "alien-vector-v7-heard-clues"
 SEARCH_CONTROL = "continue_cancel_waypoint_commitment_v1"
 ACTION_COUNT = 32
 WAIT = 30

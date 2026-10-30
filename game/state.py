@@ -11,6 +11,7 @@ from math import isfinite, pi
 from game.investigation import InvestigationSnapshot
 from game.map import MapObject, WorldMap
 from game.perception import PerceptionSnapshot
+from game.sound import HeardSnapshot
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,10 @@ class CoreConfig:
     door_reach: float = 1.7  # how far up its passage a body opens a door
     door_lateral: float = 0.9
     door_seconds: float = 0.35
+    run_sound_range: float = 8.0  # walking cells a running footfall carries
+    sound_step_seconds: float = 0.5
+    sound_door_cost: float = 3.0  # cells a shut door takes off that reach
+    sound_region: int = 4  # the Alien learns a noise's region, this many cells wide
 
     def __post_init__(self):
         if self.tick_hz != 30:
@@ -62,9 +67,14 @@ class CoreConfig:
             self.door_reach,
             self.door_lateral,
             self.door_seconds,
+            self.run_sound_range,
+            self.sound_step_seconds,
+            self.sound_door_cost,
         )
         if not all(isfinite(v) and v > 0 for v in values):
             raise ValueError("Alien distances, speeds and times must be finite and positive")
+        if type(self.sound_region) is not int or self.sound_region <= 0:
+            raise ValueError("Sound region must be a positive whole number of cells")
         if not isfinite(self.alien_fov) or not 0 < self.alien_fov <= 2 * pi:
             raise ValueError("Alien FOV must be in (0, 2*pi]")
         if self.alien_near_range > self.alien_sight_range:
@@ -133,3 +143,5 @@ class WorldSnapshot:
     ruled_out_exits: tuple[str, ...] = ()  # Survivor knowledge, never Alien input
     door_open: tuple[float, ...] = ()  # 0 shut to 1 open, in world_map.doors order
     closed_doors: tuple[tuple[int, int], ...] = ()
+    heard: HeardSnapshot = HeardSnapshot()
+    alien_target_heard_revision: int = 0

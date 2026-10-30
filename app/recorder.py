@@ -254,6 +254,7 @@ class GameplayRecorder:
             investigation_before=asdict(before.investigation),
             investigation_after=asdict(after.investigation),
             outcome=after.outcome,
+            heard_after_movement=asdict(after.heard),
             sensor_before_movement={
                 "sample_tick_start": before.tick,
                 **asdict(after.perception),

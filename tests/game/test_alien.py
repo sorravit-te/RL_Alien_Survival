@@ -113,7 +113,8 @@ def test_heuristic_selects_only_every_half_second(monkeypatch):
     for _ in range(31):
         core.step(SurvivorCommand())
     assert len(calls) == 3  # pre-ticks 0,15,30
-    assert all(len(args) == 6 for args in calls)  # adds only investigated revision, no truth
+    # Adds only the investigated revision and heard memory, no truth.
+    assert all(len(args) == 7 for args in calls)
 
 
 def test_path_detours_and_no_diagonal_corner_cutting():

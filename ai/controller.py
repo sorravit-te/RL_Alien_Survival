@@ -10,10 +10,17 @@ class ControllerState:
     source: str = "patrol"
     patrol_index: int = 0
     clue_revision: int | None = None  # confirmed evidence when this target was assigned
+    heard_revision: int = 0  # noise already known when this target was assigned
 
 
 def choose_target(
-    alien, perception, waypoints, previous, arrival_distance, investigated_revision=None
+    alien,
+    perception,
+    waypoints,
+    previous,
+    arrival_distance,
+    investigated_revision=None,
+    heard=None,
 ):
     if perception.visible:
         return ControllerState(perception.last_seen, "visible", previous.patrol_index)
@@ -24,6 +31,8 @@ def choose_target(
     ):
         # Arrival alone does not mean inspected: Core owns the bounded sweep.
         return ControllerState(perception.last_seen, "last_seen", previous.patrol_index)
+    if heard is not None and heard.point is not None and not heard.checked:
+        return ControllerState(heard.point, "sound", previous.patrol_index)
     if not waypoints:
         return ControllerState((alien.x, alien.y), "patrol", 0)
     index = previous.patrol_index % len(waypoints)

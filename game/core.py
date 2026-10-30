@@ -13,6 +13,7 @@ from game.investigation import LastSeenInvestigation
 from game.map import WorldMap, small_test_map
 from game.motion import sweep_axis
 from game.perception import PerceptionSnapshot, update_perception
+from game.sound import HeardSnapshot, listen
 from game.state import (
     AlienState,
     CoreConfig,
@@ -91,6 +92,7 @@ class GameCore:
             else None
         )
         self._perception = PerceptionSnapshot()
+        self._heard = HeardSnapshot()
         self._controller = ControllerState()
         self._navigator = Navigator()
         self._investigation = LastSeenInvestigation(self.config)
@@ -122,6 +124,8 @@ class GameCore:
             self._ruled_out_exits,
             self._doors.openness,
             self._doors.closed,
+            self._heard,
+            self._controller.heard_revision,
         )
 
     def set_alien_target(self, target, *, source="external", evidence_revision=None):
@@ -166,6 +170,7 @@ class GameCore:
             target=target,
             source=source,
             clue_revision=self._perception.revision,
+            heard_revision=self._heard.revision,
         )
         self._navigator.set_target(
             self.world_map, (self._alien.x, self._alien.y), target, self.config.alien_radius
@@ -186,11 +191,13 @@ class GameCore:
             (cos(yaw) * command.forward - sin(yaw) * command.strafe) * distance,
             (sin(yaw) * command.forward + cos(yaw) * command.strafe) * distance,
         )
+        start = self._survivor
         captured = self._move_both(survivor_delta, alien_delta, yaw)
         bodies = [(self._survivor.x, self._survivor.y)]
         if self._alien is not None:
             bodies.append((self._alien.x, self._alien.y))
         self._doors.update(bodies)
+        self._hear(start, command.running)
         self._tick += 1
         if captured:
             self._outcome = "captured"
@@ -199,6 +206,22 @@ class GameCore:
             # E resolves at the end of the tick; any earlier/simultaneous capture wins.
             self._interact(command)
         return self.snapshot()
+
+    def _hear(self, start, running):
+        """A running footfall lands on a fixed beat; running into a wall makes none."""
+        if self._alien is None:
+            return
+        period = max(1, ceil(self.config.sound_step_seconds * self.config.tick_hz - 1e-12))
+        moved = hypot(self._survivor.x - start.x, self._survivor.y - start.y) > 1e-9
+        self._heard = listen(
+            self.world_map,
+            frozenset(self._doors.closed),
+            self._alien,
+            self._survivor,
+            self._heard,
+            self.config,
+            noisy=running and moved and self._tick % period == 0,
+        )
 
     def _alien_displacement(self):
         if self._alien is None:
@@ -221,6 +244,7 @@ class GameCore:
                 self._controller,
                 self.config.target_arrival_distance,
                 self._investigation.state.investigated_revision,
+                self._heard,
             )
             self._assign_alien_target(
                 self._controller.target,
