@@ -133,6 +133,26 @@ def heuristic_outcomes(mode, seeds):
     return outcomes
 
 
+def test_pipeline_accepts_evasive_mix_pilot_config_and_rejects_debug_bot():
+    from rl.evaluation_protocol import validate_protocol
+    from rl.pipeline import make_env, read_json, validate_environment_config
+
+    config = read_json("configs/pursuit_tracking_training_pilot.json")
+    protocol = read_json(config["evaluation_protocol"])
+    validate_protocol(config, protocol)
+    validate_environment_config(config)
+    env = make_env(config)
+    try:
+        assert env.bot_kind == "evasive_mix" and env.core.pursuit == "tracking"
+        assert env.bot.settings == EvasionConfig(**config["survivor_threat_settings"])
+    finally:
+        env.close()
+    with pytest.raises(ValueError, match="mission bot"):
+        validate_environment_config({**config, "bot_kind": "stationary_debug"})
+    with pytest.raises(ValueError, match="evasive mission bot"):
+        validate_protocol({**config, "bot_kind": "explorer"}, protocol)
+
+
 def test_tracking_pursuit_catches_wall_loop_bot_that_beats_snapshot_pursuit():
     seeds = range(3)
     assert "captured" not in heuristic_outcomes(CONTINUE_CANCEL, seeds)

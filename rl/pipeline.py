@@ -24,8 +24,11 @@ from rl.contract import (
     OBSERVATION_SIZE,
     search_contract,
 )
-from rl.env import AlienEnv
+from rl.env import THREAT_BOT_KINDS, AlienEnv
 from rl.evasive_survivor import EvasionConfig
+
+# Mission bots a training run may use; stationary_debug is a mechanics fixture only.
+TRAINING_BOT_KINDS = ("explorer", *THREAT_BOT_KINDS)
 
 ROOT = Path(__file__).resolve().parents[1]
 # New checkpoints use this format; loading requires an exact match.
@@ -160,7 +163,7 @@ def validate_environment_config(config):
     cap = config["max_episode_seconds"]
     if isinstance(cap, bool) or not isfinite(cap) or cap <= 0:
         raise ValueError("Episode cap must be finite and positive")
-    if config["bot_kind"] not in ("explorer", "evasive_explorer"):
+    if config["bot_kind"] not in TRAINING_BOT_KINDS:
         raise ValueError("Training requires a mission bot")
     if type(config.get("search_metrics", False)) is not bool:
         raise ValueError("search_metrics must be boolean")
@@ -169,8 +172,8 @@ def validate_environment_config(config):
             raise ValueError(f"{flag} must be boolean")
     settings = config.get("survivor_threat_settings")
     if settings is not None:
-        if config["bot_kind"] != "evasive_explorer":
-            raise ValueError("Evasion settings require evasive_explorer")
+        if config["bot_kind"] not in THREAT_BOT_KINDS:
+            raise ValueError("Evasion settings require evasive bot kinds")
         EvasionConfig(**settings)
     if max(world.width, world.height) > 40 or len(world.patrol_waypoints) > 20:
         raise ValueError("World exceeds observation contract")
@@ -384,7 +387,7 @@ def load_checkpoint(path, config, fingerprint, env=None):
 
 
 def prepare_run(run_dir, config):
-    if config["n_envs"] != 1 or config["bot_kind"] not in ("explorer", "evasive_explorer"):
+    if config["n_envs"] != 1 or config["bot_kind"] not in TRAINING_BOT_KINDS:
         raise ValueError(
             "Training requires one environment and an explicitly supported mission bot"
         )

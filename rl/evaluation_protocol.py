@@ -63,8 +63,10 @@ def validate_protocol(training, evaluation):
                 or evaluation.get("scenario_sha256") != identity["sha256"]
             ):
                 raise ValueError("Training and evaluation scenario mismatch")
+        from rl.env import THREAT_BOT_KINDS
+
         if (
-            training["bot_kind"] != "evasive_explorer"
+            training["bot_kind"] not in THREAT_BOT_KINDS
             or type(training["n_envs"]) is not int
             or training["n_envs"] != 1
         ):
