@@ -15,7 +15,9 @@ A waypoint action holds as the only valid action until arrival, a dead path, a n
 noise or new confirmed evidence; the mask carries this, so the observation shape
 is unchanged. Action22 walks to the coarse region of the latest noise that reached
 the Alien along the floor: running, walking or a door the Survivor opened. There it
-sweeps as action21 does; a finished sweep masks 22 until the next noise.
+sweeps as action21 does; a finished sweep masks 22 until the next noise. A noise newer
+than the current target leaves only 21, 22, the current waypoint and wait: the policy
+still chooses, between fewer options, so it cannot miss the noise among twenty others.
 Scenario objects are never policy input: spawns, the card and the working exit vary
 by scenario seed, and the Alien learns them only through what it senses.
 No unconfirmed sight confidence/count is exposed. An unreachable observed floor
@@ -23,7 +25,7 @@ point may have no path; navigation never substitutes a heuristic target.
 """
 
 # Schema identifier for new runs; archived checkpoints retain their recorded version.
-VERSION = "alien-vector-v7-heard-clues"
+VERSION = "alien-vector-v9-focused-hearing"
 SEARCH_CONTROL = "continue_cancel_waypoint_commitment_v1"
 ACTION_COUNT = 32
 WAIT = 30

@@ -15,6 +15,7 @@ from stable_baselines3.common.monitor import Monitor
 
 from rl.evaluate import evaluate_suite, frozen_evaluation
 from rl.evaluation_protocol import trained_score
+from rl.imitation import copy_heuristic
 from rl.pipeline import (
     ManifestEnv,
     digest,
@@ -232,6 +233,37 @@ def validate_fresh_start(config, metadata):
         raise ValueError("Fresh run requires its own zero-step, zero-update untrained policy")
 
 
+def start_from_imitation(run, config, manifest, source, model):
+    """Copy the written Alien before PPO, and score the copy to compare against later."""
+    env = ManifestEnv(config, manifest["splits"]["train"])
+    try:
+        copied = copy_heuristic(
+            model, env, config["imitation"], seed=config["training_seed"],
+            gamma=config["ppo"]["gamma"],
+        )  # fmt: skip
+    finally:
+        env.close()
+    summary, _ = evaluate_suite(
+        config,
+        manifest["splits"]["validation"],
+        run / "validation/imitated",
+        schedule=read_json(run / "sampling_schedule.json")["validation"],
+        models={"trained": model},
+        stage="trained",
+    )
+    save_checkpoint(
+        run / "checkpoints/imitated.zip",
+        model,
+        config,
+        source,
+        role="imitated",
+        validation=summary,
+        evaluation_context="after_imitation_before_learning",
+    )
+    print(f"IMITATION copied {copied} decisions before learning", flush=True)
+    return summary
+
+
 def pilot(run):
     config, manifest, source = read_run(run)
     baseline = read_json(run / "baseline_summary.json")
@@ -249,6 +281,9 @@ def pilot(run):
             run / "checkpoints/untrained.zip", config, source, env
         )
         validate_fresh_start(config, untrained_meta)
+        imitated = None
+        if "imitation" in config:
+            imitated = start_from_imitation(run, config, manifest, source, model)
         model.set_logger(configure(str(run / "tensorboard"), ["csv", "tensorboard"]))
         callback = PilotCallback(run, config, manifest["splits"]["validation"], source)
         expected = (
@@ -280,6 +315,7 @@ def pilot(run):
             baseline,
             started,
             training_seconds,
+            imitated,
         )
     finally:
         if callback is not None:
@@ -350,6 +386,7 @@ def complete_sampled_pilot(
     baseline,
     started,
     training_seconds,
+    imitated=None,
 ):
     if callback.best_score is None:
         raise RuntimeError("No optimizer-updated checkpoint eligible for selection; test forbidden")
@@ -394,6 +431,7 @@ def complete_sampled_pilot(
         "best_steps": callback.best_steps,
         "best_optimizer_update_epochs": metadata["optimizer_update_epochs"],
         "baseline_validation": baseline,
+        "imitated_validation": imitated,
         "best_validation": reproduced,
         "test": test,
         "test_status": "deferred_pending_separate_authorization" if test is None else "complete",
@@ -421,9 +459,13 @@ def main():
         "--config", type=Path, default=Path("configs/scenario_randomization_training_pilot.json")
     )
     parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--training-seed", type=int, help="Prepare only: replaces the seed")
     args = parser.parse_args()
     if args.phase == "prepare":
-        prepare_run(args.run_dir, read_json(args.config))
+        config = read_json(args.config)
+        if args.training_seed is not None:
+            config["training_seed"] = args.training_seed
+        prepare_run(args.run_dir, config)
         print(f"PREPARED config and manifest: {args.run_dir}", flush=True)
         return
     with live_log(args.run_dir / "run.log"):

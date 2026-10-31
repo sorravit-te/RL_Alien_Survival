@@ -6,6 +6,7 @@ from pathlib import Path
 from game.ship_deck import SHIP_SCENARIO
 from rl.contract import SEARCH_CONTROL, VERSION
 from rl.evaluation_protocol import evaluation_budget, validate_protocol
+from rl.imitation import validate_imitation
 from rl.pipeline import ROOT, make_env, validate_environment_config
 
 TRAINING = "configs/ship_deck_training_pilot.json"
@@ -30,6 +31,10 @@ def test_evaluation_protocol_matches_training():
 def test_pilot_environment_uses_the_room_search():
     env = make_env(read(TRAINING))
     assert env.scenario == SHIP_SCENARIO and env.bot.runner.explorer.walk_steps
+
+
+def test_pilot_starts_from_a_copy_of_the_written_alien():
+    validate_imitation(read(TRAINING)["imitation"])
 
 
 def test_pilot_budget_stays_bounded():

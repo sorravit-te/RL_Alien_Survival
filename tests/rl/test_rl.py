@@ -131,8 +131,9 @@ def test_preconfirmation_count_is_not_policy_knowledge():
 
 
 def test_confirmed_and_last_seen_candidates_are_snapshots_with_valid_flags():
-    view = AllowedAlienView((5.5, 5.5), 0, True, 20, True, (7.5, 5.5), 0, (), (), True,
-                            clue_revision=1)
+    view = AllowedAlienView(
+        (5.5, 5.5), 0, True, 20, True, (7.5, 5.5), 0, (), (), True, clue_revision=1
+    )
     candidates = build_candidates(view)
     assert candidates[20].valid and not candidates[21].valid  # visible: chase, not search
     hidden = replace(view, visible=False, last_seen_age_seconds=2)
@@ -192,7 +193,8 @@ def test_first_sight_reward_is_retained_if_sight_is_lost_before_decision_end():
 
     env.bot = ScriptedSensorFixture()
     _, reward, terminated, truncated, info = env.step(WAIT)
-    assert reward == 0.2 and info["reward_components"]["first_sight"] == 0.2
+    components = info["reward_components"]
+    assert components["first_sight"] == 0.2 and reward == sum(components.values())
     assert info["step_ticks"] == 15 and not terminated and not truncated
     assert not env.core.snapshot().perception.visible
     assert env.step(WAIT)[1] == 0
@@ -209,7 +211,7 @@ def test_capture_reward_first_sight_and_early_termination():
     )
     env.reset(seed=1)
     total = 0
-    components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
+    components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0, "coverage": 0.0}
     for _ in range(10):
         _, reward, terminal, truncated, info = env.step(WAIT)
         total += reward
@@ -219,7 +221,7 @@ def test_capture_reward_first_sight_and_early_termination():
             break
     assert terminal and not truncated and info["outcome"] == "captured"
     assert total == pytest.approx(10.2)
-    assert components == {"capture": 10.0, "escape": 0.0, "first_sight": 0.2}
+    assert components == {"capture": 10.0, "escape": 0.0, "first_sight": 0.2, "coverage": 0.0}
     with pytest.raises(RuntimeError):
         env.step(WAIT)
 

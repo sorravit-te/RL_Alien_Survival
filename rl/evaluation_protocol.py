@@ -167,7 +167,7 @@ def evaluation_budget(config):
     counts = config["manifest_counts"]
     rounded = ceil(config["requested_steps"] / config["ppo"]["n_steps"]) * config["ppo"]["n_steps"]
     validations = rounded // config["evaluation_interval"] + 1
-    return {
+    budget = {
         "rollout_rounded_decisions": rounded,
         "baseline_validation_episodes": counts["validation"] * 9,
         "checkpoint_validation_calls": validations,
@@ -176,6 +176,9 @@ def evaluation_budget(config):
         "final_test_episodes": counts["test"] * 13,
         "max_episode_seconds": config["max_episode_seconds"],
     }
+    if "imitation" in config:
+        budget["imitated_validation_episodes"] = counts["validation"] * 4
+    return budget
 
 
 def frozen_protocol(config):

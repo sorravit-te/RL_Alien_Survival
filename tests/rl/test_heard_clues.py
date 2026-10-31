@@ -61,6 +61,30 @@ def test_a_new_noise_releases_a_waypoint_commitment():
     assert committed_waypoint(assigned) == 0
 
 
+def test_a_new_noise_narrows_the_choice_without_making_it():
+    walking = replace(
+        HEARD, current_action=0, navigation_active=True, last_seen=(3.5, 1.5), clue_revision=1
+    )
+    valid = {i for i, slot in enumerate(build_candidates(walking)) if slot.valid}
+    assert valid == {0, 21, SOUND, WAIT}
+
+
+def test_a_new_noise_leaves_at_least_following_or_waiting():
+    valid = {i for i, slot in enumerate(build_candidates(HEARD)) if slot.valid}
+    assert valid == {SOUND, WAIT}
+
+
+def test_an_answered_noise_gives_the_whole_choice_back():
+    answered = replace(HEARD, target_heard_revision=1)
+    valid = {i for i, slot in enumerate(build_candidates(answered)) if slot.valid}
+    assert valid == {0, SOUND, WAIT}
+
+
+def test_seeing_the_survivor_beats_a_new_noise():
+    seen = replace(HEARD, visible=True, last_seen=(3.5, 1.5))
+    assert build_candidates(seen)[0].valid and build_candidates(seen)[20].valid
+
+
 def test_target_source_names_sound():
     assert target_source(SOUND) == "sound"
 

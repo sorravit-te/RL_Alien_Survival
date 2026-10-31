@@ -1,5 +1,5 @@
 {
-  "name": "ship_deck_training_pilot_v1",
+  "name": "ship_deck_training_pilot_v3",
   "training_seed": 2026103101,
   "manifest_seed": 2026103102,
   "manifest_counts": {
@@ -49,5 +49,13 @@
   "defer_final_test": true,
   "scenario_sha256": "7a8e69f43feb6a6bcb61216dcf7f16affb45c1db89f49aa4ec412e62b46a76f4",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v7-heard-clues"
+  "contract_version": "alien-vector-v9-focused-hearing",
+  "imitation": {
+    "decisions": 12000,
+    "random_action_share": 0.2,
+    "epochs": 15,
+    "batch_size": 256,
+    "learning_rate": 0.001,
+    "value_weight": 0.05
+  }
 }

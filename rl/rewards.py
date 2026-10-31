@@ -1,5 +1,17 @@
 """Per-tick event rewards accumulated by the adapter, never inside Game Core."""
 
+COVERAGE_REWARD = 0.1
+COVERAGE_AGE_SECONDS = 60.0
+
+
+def coverage_reward(before, after, tick, tick_hz):
+    """Small pay for reaching a waypoint nobody checked lately, so patrol stays wide."""
+    age = COVERAGE_AGE_SECONDS * tick_hz
+    return COVERAGE_REWARD * sum(
+        new is not None and new != old and (old is None or tick - old >= age)
+        for old, new in zip(before, after, strict=True)
+    )
+
 
 class RewardTracker:
     def __init__(self):

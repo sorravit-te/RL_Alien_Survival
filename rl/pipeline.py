@@ -21,6 +21,7 @@ from game.state import CoreConfig
 from rl.bots.evasive import EvasionConfig
 from rl.contract import ACTION_COUNT, OBSERVATION_SIZE, search_contract
 from rl.env import THREAT_BOT_KINDS, AlienEnv
+from rl.imitation import validate_imitation
 
 # Mission bots a training run may use; stationary_debug is a mechanics fixture only.
 TRAINING_BOT_KINDS = ("explorer", *THREAT_BOT_KINDS)
@@ -170,6 +171,8 @@ def validate_environment_config(config):
     for flag in ("fresh_run", "defer_final_test"):
         if flag in config and type(config[flag]) is not bool:
             raise ValueError(f"{flag} must be boolean")
+    if "imitation" in config:
+        validate_imitation(config["imitation"])
     settings = config.get("survivor_threat_settings")
     if settings is not None:
         if config["bot_kind"] not in THREAT_BOT_KINDS:
@@ -369,6 +372,7 @@ def load_checkpoint(path, config, fingerprint, env=None):
         not in (
             "rollout_callback_before_current_rollout_optimizer_update",
             "after_learning_optimizer_update",
+            "after_imitation_before_learning",
         )
     ):
         raise ValueError("Checkpoint evaluation timing mismatch")

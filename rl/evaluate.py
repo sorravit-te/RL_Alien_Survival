@@ -110,6 +110,7 @@ def evaluate(
         "capture",
         "escape",
         "first_sight",
+        "coverage",
         "action_sha256",
         "search_metrics",
         "controller",
@@ -148,7 +149,7 @@ def evaluate(
                 selector = HeuristicSelector(env.config.target_arrival_distance)
                 rng = np.random.default_rng(seed)
                 total, decisions = 0.0, 0
-                components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
+                components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0, "coverage": 0.0}
                 actions = hashlib.sha256()
                 while True:
                     mask = env.action_masks()

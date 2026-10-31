@@ -69,7 +69,7 @@
       "id": "run",
       "type": "promptString",
       "description": "Run folder inside experiments/",
-      "default": "scenario_randomization_pilot_v1"
+      "default": "ship_deck_pilot_v3_s4"
     }
   ]
 }

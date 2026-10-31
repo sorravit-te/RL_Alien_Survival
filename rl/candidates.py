@@ -78,6 +78,17 @@ def committed_waypoint(view):
     return None
 
 
+def unanswered_noise(view):
+    """A noise newer than the current target; sight and an active search come first."""
+    return (
+        view.last_heard is not None
+        and not view.heard_checked
+        and view.heard_revision != view.target_heard_revision
+        and not view.visible
+        and not search_is_restricted(view)
+    )
+
+
 def build_candidates(view: AllowedAlienView):
     if not isinstance(view, AllowedAlienView):
         raise TypeError("Candidates require AllowedAlienView, not full world state")
@@ -110,6 +121,12 @@ def build_candidates(view: AllowedAlienView):
         slots = [Candidate() for _ in range(ACTION_COUNT)]
         slots[committed] = continuation
         return tuple(slots)
+    if unanswered_noise(view):
+        # The Alien still decides, but between the noise, its clue, walking on and waiting.
+        keep = {21, 22}
+        if view.current_action < len(view.waypoints) and view.navigation_active:
+            keep.add(view.current_action)
+        slots = [slots[i] if i in keep else Candidate() for i in range(ACTION_COUNT)]
     slots[WAIT] = Candidate(True, 6)
     return tuple(slots)
 

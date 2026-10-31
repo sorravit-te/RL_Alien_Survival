@@ -39,9 +39,9 @@ class CoreConfig:
     door_reach: float = 1.7  # how far up its passage a body opens a door
     door_lateral: float = 0.9
     door_seconds: float = 0.35
-    run_sound_range: float = 8.0  # cells of floor a footfall carries
-    walk_sound_range: float = 2.0
-    door_sound_range: float = 4.0  # a door the Survivor opens
+    run_sound_range: float = 16.0  # cells of floor a footfall carries
+    walk_sound_range: float = 4.0
+    door_sound_range: float = 8.0  # a door the Survivor opens
     sound_step_seconds: float = 0.5
     sound_door_cost: float = 3.0  # cells a shut door takes off that reach
     sound_region: int = 4  # the Alien learns a noise's region, this many cells wide

@@ -32,7 +32,7 @@ from rl.contract import (
     WORLD_SCALE,
 )
 from rl.observations import build_observation
-from rl.rewards import RewardTracker
+from rl.rewards import RewardTracker, coverage_reward
 from rl.search_metrics import SearchMetrics
 
 MIX_BOT_KINDS = ("evasive_mix", "runner_mix")
@@ -177,7 +177,7 @@ class AlienEnv(gym.Env):
             requested_action=action,
             committed=committed_waypoint(view) is not None,
         )
-        components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0}
+        components = {"capture": 0.0, "escape": 0.0, "first_sight": 0.0, "coverage": 0.0}
         ticks = 0
         snapshot = self.core.snapshot()
         while ticks < DECISION_TICKS and self.elapsed_ticks < self.cap_ticks:
@@ -209,7 +209,11 @@ class AlienEnv(gym.Env):
                 snapshot.perception.visible, snapshot.events
             ).items():
                 components[name] += value
+            visits = list(self.visit_ticks)
             record_waypoint_visits(snapshot, self.visit_ticks)
+            components["coverage"] += coverage_reward(
+                visits, self.visit_ticks, snapshot.tick, self.config.tick_hz
+            )
             if snapshot.outcome is not None:
                 break
         terminated = snapshot.outcome is not None
