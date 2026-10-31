@@ -100,11 +100,14 @@ def test_each_exit_faces_a_different_side():
     assert len(sides) == 3
 
 
+PLAZA, WEST_RING, EAST_RING = (20, 19), (7, 20), (32, 20)
+
+
 @pytest.mark.parametrize("door", [(6, 16), (10, 29), (22, 19), (29, 16), (17, 31), (24, 29)])
 def test_main_rooms_survive_one_blocked_doorway(door):
     """No single door traps the player: every waypoint still connects without it."""
     cells = floor_cells(blocked={door})
-    seen = reachable(cell_of(WAYPOINTS[6]), cells)
+    seen = reachable(PLAZA, cells)
     assert all(cell_of(point) in seen for point in WAYPOINTS)
 
 
@@ -114,8 +117,8 @@ def test_corridors_form_loops():
     east = {(x, 17) for x in (30, 31, 32)}
     for blocked in (west, east):
         cells = floor_cells(blocked=blocked)
-        seen = reachable(cell_of(WAYPOINTS[6]), cells)
-        assert cell_of(WAYPOINTS[8]) in seen and cell_of(WAYPOINTS[12]) in seen
+        seen = reachable(PLAZA, cells)
+        assert WEST_RING in seen and EAST_RING in seen
 
 
 def test_long_halls_have_partitions_to_hide_behind():

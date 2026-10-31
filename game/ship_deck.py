@@ -93,27 +93,28 @@ EXITS = (
     ("exit_cryo", 37.5, 20.5),
     ("exit_shuttle", 19.5, 37.5),
 )
+# Walked in this order: one short loop through every room, about 95 seconds at search speed.
 WAYPOINTS = (
-    (19.5, 4.5),  # bridge
-    (11.5, 7.5),  # west lab
-    (27.5, 7.5),  # east lab
-    (7.5, 12.5),  # north-west ring
-    (32.5, 12.5),  # north-east ring
-    (19.5, 35.5),  # shuttle dock
-    (20.5, 19.5),  # plaza
-    (13.5, 19.5),  # crew corridor
-    (7.5, 20.5),  # west ring
+    (16.5, 16.5),  # north alley
+    (13.5, 16.5),  # north-east cabin
+    (13.5, 23.5),  # south-east cabin
+    (10.5, 23.5),  # south-west cabin
+    (10.5, 16.5),  # north-west cabin
     (3.5, 20.5),  # pods
-    (26.5, 18.5),  # mess
-    (25.5, 22.5),  # medbay
-    (32.5, 20.5),  # east ring
-    (36.5, 20.5),  # cryo
-    (7.5, 27.5),  # south-west ring
-    (32.5, 27.5),  # south-east ring
+    (4.5, 31.5),  # west crawlway
     (7.5, 34.5),  # cargo west
     (15.5, 33.5),  # cargo east
-    (27.5, 30.5),  # reactor north
+    (19.5, 35.5),  # shuttle dock
     (27.5, 36.5),  # reactor south
+    (35.5, 31.5),  # east crawlway
+    (27.5, 30.5),  # reactor north
+    (25.5, 27.5),  # engine ring
+    (36.5, 20.5),  # cryo
+    (25.5, 22.5),  # medbay
+    (26.5, 18.5),  # mess
+    (27.5, 7.5),  # east lab
+    (19.5, 4.5),  # bridge
+    (11.5, 7.5),  # west lab
 )
 # Reserved for the hiding system; nothing reads these until lockers exist.
 LOCKER_SPOTS = (

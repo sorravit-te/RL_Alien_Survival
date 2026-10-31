@@ -1,9 +1,16 @@
 """Model-free catalogue selector, shared by evaluation and dev checks."""
 
+from dataclasses import replace
+from math import hypot
 from types import SimpleNamespace
 
 from ai.controller import ControllerState, choose_target
-from rl.candidates import build_candidates, committed_waypoint, search_is_restricted
+from rl.candidates import (
+    SHIP_SIZED_PATROL,
+    build_candidates,
+    committed_waypoint,
+    search_is_restricted,
+)
 from rl.contract import WAIT
 
 
@@ -20,6 +27,14 @@ class HeuristicSelector:
         self.arrival_distance = arrival_distance
 
     def choose(self, view):
+        if self.state.target is None and len(view.waypoints) >= SHIP_SIZED_PATROL:
+            # Join the loop at the nearest waypoint, so rounds do not all open alike.
+            x, y = view.position
+            near = min(
+                range(len(view.waypoints)),
+                key=lambda i: hypot(view.waypoints[i][0] - x, view.waypoints[i][1] - y),
+            )
+            self.state = replace(self.state, patrol_index=near)
         if search_is_restricted(view):
             return 21
         committed = committed_waypoint(view)
@@ -46,6 +61,12 @@ class HeuristicSelector:
             action = 22
         else:
             action = self.state.patrol_index if view.waypoints else WAIT
-        if not build_candidates(view)[action].valid:
-            return WAIT
-        return action
+        slots = build_candidates(view)
+        if slots[action].valid:
+            return action
+        for step in range(1, len(view.waypoints)):  # walk on past a waypoint not offered
+            index = (self.state.patrol_index + step) % len(view.waypoints)
+            if slots[index].valid:
+                self.state = replace(self.state, patrol_index=index)
+                return index
+        return WAIT

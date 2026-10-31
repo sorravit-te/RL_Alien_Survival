@@ -25,7 +25,7 @@ point may have no path; navigation never substitutes a heuristic target.
 """
 
 # Schema identifier for new runs; archived checkpoints retain their recorded version.
-VERSION = "alien-vector-v10-longer-walking-hearing"
+VERSION = "alien-vector-v11-wide-patrol"
 SEARCH_CONTROL = "continue_cancel_waypoint_commitment_v1"
 ACTION_COUNT = 32
 WAIT = 30

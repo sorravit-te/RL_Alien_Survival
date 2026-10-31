@@ -1,5 +1,5 @@
 {
-  "name": "ship_deck_training_pilot_v3",
+  "name": "ship_deck_training_pilot_v4",
   "training_seed": 2026103101,
   "manifest_seed": 2026103102,
   "manifest_counts": {
@@ -16,7 +16,7 @@
   "bot_kind": "runner_mix",
   "selection": "max validation primary sampled case-mean catch rate, then min unresolved, then earliest trained checkpoint",
   "ppo": {
-    "learning_rate": 0.0003,
+    "learning_rate": 0.0001,
     "gamma": 0.995,
     "n_steps": 256,
     "batch_size": 64,
@@ -47,9 +47,9 @@
   "scenario": "ship_deck_v1",
   "fresh_run": true,
   "defer_final_test": true,
-  "scenario_sha256": "7a8e69f43feb6a6bcb61216dcf7f16affb45c1db89f49aa4ec412e62b46a76f4",
+  "scenario_sha256": "7729a67d40a332200e28c9263d847cd019ae22ab10bafba9f4ab55ada0fdf5a6",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v10-longer-walking-hearing",
+  "contract_version": "alien-vector-v11-wide-patrol",
   "imitation": {
     "decisions": 12000,
     "random_action_share": 0.2,

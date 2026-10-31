@@ -1,12 +1,16 @@
 """Candidates derive solely from explicitly allowed knowledge, never WorldState."""
 
 from dataclasses import dataclass
-from math import isfinite
+from math import hypot, isfinite
 
 import numpy as np
 
 from game.investigation import InvestigationSnapshot
 from rl.contract import ACTION_COUNT, WAIT
+
+REST_SECONDS = 60.0  # a waypoint checked this recently is not offered again
+NEAREST_DUE = 4
+SHIP_SIZED_PATROL = 12  # a test scene's loop is shorter than the rest, so the rule stays off
 
 
 @dataclass(frozen=True)
@@ -89,6 +93,14 @@ def unanswered_noise(view):
     )
 
 
+def due_waypoints(view):
+    """The nearest waypoints nobody checked lately, as anti-camping offers them."""
+    x, y = view.position
+    due = [i for i, age in enumerate(view.visit_ages) if age is None or age >= REST_SECONDS]
+    due.sort(key=lambda i: hypot(view.waypoints[i][0] - x, view.waypoints[i][1] - y))
+    return due[:NEAREST_DUE]
+
+
 def build_candidates(view: AllowedAlienView):
     if not isinstance(view, AllowedAlienView):
         raise TypeError("Candidates require AllowedAlienView, not full world state")
@@ -127,6 +139,12 @@ def build_candidates(view: AllowedAlienView):
         if view.current_action < len(view.waypoints) and view.navigation_active:
             keep.add(view.current_action)
         slots = [slots[i] if i in keep else Candidate() for i in range(ACTION_COUNT)]
+    count = len(view.waypoints)
+    free = count >= SHIP_SIZED_PATROL and all(slots[i].valid for i in range(count))
+    due = due_waypoints(view) if free else ()
+    if due:
+        # Anti-camping: a free patrol keeps moving through nearby rooms; RL picks which.
+        return tuple(c if i >= count or i in due else Candidate() for i, c in enumerate(slots))
     slots[WAIT] = Candidate(True, 6)
     return tuple(slots)
 

@@ -1,5 +1,5 @@
 {
-  "name": "ship_deck_sampled_evaluation_v3",
+  "name": "ship_deck_sampled_evaluation_v4",
   "status": "implementation_only_runtime_requires_separate_authorization",
   "primary_inference": "sampled_masked_policy",
   "secondary_inference": "deterministic_argmax_diagnostic",
@@ -74,8 +74,8 @@
   "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
   "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
   "scenario": "ship_deck_v1",
-  "scenario_sha256": "7a8e69f43feb6a6bcb61216dcf7f16affb45c1db89f49aa4ec412e62b46a76f4",
+  "scenario_sha256": "7729a67d40a332200e28c9263d847cd019ae22ab10bafba9f4ab55ada0fdf5a6",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v10-longer-walking-hearing",
+  "contract_version": "alien-vector-v11-wide-patrol",
   "bot_mix": "runner_mix: per case one third Runner, the rest the 50/50 plain and wall-loop mix, chosen from bot_seed"
 }
