@@ -60,8 +60,8 @@ def test_running_in_range_is_heard():
 
 
 def test_walking_is_heard_only_close_by():
-    assert steps(core_with(HALL, (1.5, 1.5), (7.5, 1.5)), WALK, 20).heard == HeardSnapshot()
-    assert steps(core_with(HALL, (1.5, 1.5), (3.5, 2.5)), WALK, 16).heard.revision >= 1
+    assert steps(core_with(LONG, (1.5, 1.5), (10.5, 1.5)), WALK, 20).heard == HeardSnapshot()
+    assert steps(core_with(LONG, (1.5, 1.5), (7.5, 1.5)), WALK, 16).heard.revision >= 1
 
 
 def test_standing_still_is_silent():

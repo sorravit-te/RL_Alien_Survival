@@ -40,7 +40,7 @@ class CoreConfig:
     door_lateral: float = 0.9
     door_seconds: float = 0.35
     run_sound_range: float = 16.0  # cells of floor a footfall carries
-    walk_sound_range: float = 4.0
+    walk_sound_range: float = 6.0
     door_sound_range: float = 8.0  # a door the Survivor opens
     sound_step_seconds: float = 0.5
     sound_door_cost: float = 3.0  # cells a shut door takes off that reach

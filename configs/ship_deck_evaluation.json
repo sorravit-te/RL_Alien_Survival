@@ -76,6 +76,6 @@
   "scenario": "ship_deck_v1",
   "scenario_sha256": "7a8e69f43feb6a6bcb61216dcf7f16affb45c1db89f49aa4ec412e62b46a76f4",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v9-focused-hearing",
+  "contract_version": "alien-vector-v10-longer-walking-hearing",
   "bot_mix": "runner_mix: per case one third Runner, the rest the 50/50 plain and wall-loop mix, chosen from bot_seed"
 }
