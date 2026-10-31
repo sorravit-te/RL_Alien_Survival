@@ -17,6 +17,7 @@ class FixedStepLoop:
         self.max_frame_time = 0.25
         self.paused = False
         self.dropped_seconds = 0.0
+        self.on_tick = None
         self.synchronize()
 
     def synchronize(self):
@@ -46,6 +47,8 @@ class FixedStepLoop:
             self.previous = self.current
             self.previous_pitch = self.current_pitch
             self.current = self.core.step(self.inputs.consume(self.dt))
+            if self.on_tick is not None:
+                self.on_tick(self.current)
             self.current_pitch = self.inputs.pitch
             self.accumulator = max(0.0, self.accumulator - self.dt)
             count += 1

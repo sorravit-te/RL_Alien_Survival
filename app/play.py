@@ -9,6 +9,7 @@ from time import perf_counter
 
 import pygame
 
+from app.audio import ShipAudio, Speaker
 from app.loop import FixedStepLoop
 from app.recorder import GameplayRecorder, validate_record_directory
 from game.core import GameCore
@@ -223,7 +224,6 @@ def main(argv=None):
             parser.error("RL checkpoint options require --controller rl")
         core = GameCore(scenario_map(args.scenario or DEFAULT_SCENARIO))
         core.reset(args.scenario_seed)
-    # Initialize only graphics/font; the game currently has no audio system.
     recorder = None
     completed, end_reason = False, "exception"
     try:
@@ -261,6 +261,9 @@ def main(argv=None):
         fit = pygame.transform.smoothscale if smooth else pygame.transform.scale
         font = pygame.font.Font(None, 22)
         session = PlaySession(loop)
+        audio = ShipAudio(Speaker())
+        loop.on_tick = audio.hear
+        audio.start()
         clock = pygame.time.Clock()
         start = previous = perf_counter()
         frames, work_times = [], []
@@ -276,6 +279,7 @@ def main(argv=None):
             if not transitioned:
                 loop.advance(elapsed)
             session.after_step()
+            audio.follow(loop.paused, loop.current)
             frame = renderer.render(loop.display_snapshot(), pitch=loop.display_pitch())
             fit(frame, screen.get_size(), screen)
             labels = hud_labels(loop, debug_alien=args.debug_alien)

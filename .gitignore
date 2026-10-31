@@ -17,6 +17,9 @@ __pycache__/
 /GZDoom engine preview.png
 /assets/stradex/
 
+# Baked by tools.bake_ship_sounds from free recordings.
+/assets/sounds/
+
 # Generated experiments and machine-specific reports
 /models/
 /experiments/
