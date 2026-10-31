@@ -305,3 +305,22 @@ def finish_frame(color, vignette, grain, shift, tone, pixels):
             for channel in range(3):
                 level = color[row, column, channel] * scale + noise
                 pixels[column, row, channel] = tone[int(min(max(level, 0.0), 255.0))]
+
+
+@njit(parallel=True, nogil=True, cache=True)
+def draw_sprite(color, inverse_depth, picture, glow, box, nearness, lit):
+    """Blend a billboard over the frame; pixels of a wall in front of it stay as they are."""
+    left, top, width, height = box
+    frame_height, frame_width = color.shape[:2]
+    picture_height, picture_width = picture.shape[:2]
+    for row in prange(max(0, top), min(frame_height, top + height)):
+        y = (row - top) * picture_height // height
+        for column in range(max(0, left), min(frame_width, left + width)):
+            x = (column - left) * picture_width // width
+            shown = picture[y, x, 3] / 255.0
+            if shown == 0.0 or inverse_depth[row, column] >= nearness:
+                continue
+            shine = glow[y, x] / 255.0
+            for channel in range(3):
+                seen = picture[y, x, channel] / 255.0 * (lit[channel] * (1 - shine) + shine * 1.4)
+                color[row, column, channel] += (seen - color[row, column, channel]) * shown

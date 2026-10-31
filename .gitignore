@@ -20,6 +20,9 @@ __pycache__/
 # Baked by tools.bake_ship_sounds from free recordings.
 /assets/sounds/
 
+# Baked by tools.bake_alien_sprites from a free model.
+/assets/alien/
+
 # Generated experiments and machine-specific reports
 /models/
 /experiments/

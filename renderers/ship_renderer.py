@@ -13,6 +13,8 @@ import numba
 import numpy as np
 import pygame
 
+from renderers.alien_sprites import FRAMES as ALIEN_FRAMES
+from renderers.alien_sprites import AlienSprites
 from renderers.ship_kernels import (
     FOG_DENSITY,
     TORCH_BLUE,
@@ -21,6 +23,7 @@ from renderers.ship_kernels import (
     TORCH_POWER,
     TORCH_RED,
     TRI_FIELDS,
+    draw_sprite,
     finish_frame,
     project,
     rasterize,
@@ -38,16 +41,16 @@ SKY_TURNS = 4  # star texture repeats around one full turn of the camera
 
 
 def make_sprite(draw, size):
-    """Self-made sprite: draw(color, glow) paints two surfaces into RGBA and glow arrays."""
+    """Self-made sprite: draw(color, glow) paints two surfaces into RGBA and glow bytes."""
     color = pygame.Surface(size, pygame.SRCALPHA)
     glow = pygame.Surface(size, pygame.SRCALPHA)
     draw(color, glow)
-    rgb = pygame.surfarray.array3d(color).swapaxes(0, 1).astype(np.float32) / 255
-    alpha = pygame.surfarray.array_alpha(color).swapaxes(0, 1).astype(np.float32) / 255
-    shine = pygame.surfarray.array_alpha(glow).swapaxes(0, 1).astype(np.float32) / 255
-    shine_rgb = pygame.surfarray.array3d(glow).swapaxes(0, 1).astype(np.float32) / 255
+    rgb = pygame.surfarray.array3d(color).swapaxes(0, 1)
+    alpha = pygame.surfarray.array_alpha(color).swapaxes(0, 1)
+    shine = pygame.surfarray.array_alpha(glow).swapaxes(0, 1)
+    shine_rgb = pygame.surfarray.array3d(glow).swapaxes(0, 1)
     rgb = np.where(shine[..., None] > 0, shine_rgb, rgb)
-    return rgb, np.maximum(alpha, shine), shine
+    return np.dstack((rgb, np.maximum(alpha, shine))), shine
 
 
 def draw_alien(color, glow):
@@ -78,7 +81,9 @@ def draw_exit(color, glow):
 
 
 class ShipRenderer:
-    def __init__(self, world, texture_path=TEXTURES, size=(960, 540), fov=75):
+    def __init__(
+        self, world, texture_path=TEXTURES, size=(960, 540), fov=75, alien_path=ALIEN_FRAMES
+    ):
         texture_path = Path(texture_path)
         if not texture_path.is_file():
             raise FileNotFoundError(
@@ -128,7 +133,10 @@ class ShipRenderer:
             "keycard": (make_sprite(draw_keycard, (64, 40)), 0.42, 0.26, 0.95),
             "exit": (make_sprite(draw_exit, (64, 50)), 0.62, 0.48, 1.2),
         }
-        self._draw(*self.theme.world.spawn_points[0], 0.0, self.height / 2, 0)  # compile first
+        self.alien_art = AlienSprites(alien_path)
+        spawn = self.theme.world.spawn_points[0]
+        light, *_ = self._draw(*spawn, 0.0, self.height / 2, 0)  # compile first
+        self._draw_sprite(light, self.height / 2, 1.0, 0.0, "exit", *spawn)
 
     def _light_now(self, tick):
         """Blend the light layers; only their strength changes from frame to frame."""
@@ -172,6 +180,9 @@ class ShipRenderer:
         light, fx, fy = self._draw(camera.x, camera.y, camera.yaw, horizon, snapshot.tick)
         middle = self.inverse_depth[self.height // 2]
         self.depth = tuple((1 / np.maximum(middle, 1e-6)).tolist())
+        alien = self.alien_art.sprite(snapshot)
+        if alien is not None:
+            self.sprites["alien"] = alien
         for sprite in self._visible_sprites(snapshot, fx, fy):
             self._draw_sprite(light, horizon, *sprite)
         finish_frame(
@@ -199,25 +210,14 @@ class ShipRenderer:
         return sorted(seen, key=lambda item: item[0], reverse=True)
 
     def _draw_sprite(self, light, horizon, depth, across, kind, x, y):
-        (rgb, alpha, shine), world_w, world_h, base = self.sprites[kind]
+        (picture, glow), world_w, world_h, base = self.sprites[kind]
         width = max(1, round(self.focal_length * world_w / depth))
         height = max(1, round(self.focal_length * world_h / depth))
         left = round(self.width / 2 + self.focal_length * across / depth - width / 2)
         top = round(horizon + self.focal_length * (EYE_HEIGHT - base - world_h) / depth)
-        columns = np.arange(max(0, left), min(self.width, left + width))
-        rows = np.arange(max(0, top), min(self.height, top + height))
-        if columns.size == 0 or rows.size == 0:
-            return
-        tex_y = (rows - top) * rgb.shape[0] // height
-        tex_x = (columns - left) * rgb.shape[1] // width
-        grid = np.ix_(tex_y, tex_x)
-        target = np.ix_(rows, columns)
         spot = light[int(y * LIGHT_GRID), int(x * LIGHT_GRID)]
         fog = exp(-depth * FOG_DENSITY)
         near = TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth) * 0.6
-        lit = spot * fog + near * TORCH_COLOR
-        visible = (self.inverse_depth[target] < 1 / depth)[..., None]
-        shown = alpha[grid][..., None] * visible
-        glow = shine[grid][..., None]
-        picture = rgb[grid] * (lit * (1 - glow) + glow * 1.4)
-        self.color[target] = self.color[target] * (1 - shown) + picture * shown
+        lit = np.asarray(spot * fog + near * TORCH_COLOR, np.float32)
+        box = (left, top, width, height)
+        draw_sprite(self.color, self.inverse_depth, picture, glow, box, 1 / depth, lit)
