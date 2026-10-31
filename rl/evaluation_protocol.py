@@ -25,6 +25,10 @@ SELECTION = {
     "tie_2": "earliest_trained_checkpoint",
     "exclude": "test outcomes and untrained baseline cannot select trained best",
 }
+HUNT_SELECTION = {**SELECTION, "primary": "mean_of_sampled_catch_rate_and_hunt_catch_rates"}
+SELECTION_TIES = "then min unresolved, then earliest trained checkpoint"
+CATCH_RULE = f"max validation primary sampled case-mean catch rate, {SELECTION_TIES}"
+HUNT_RULE = f"max mean of validation sampled catch rate and hunt catch rates, {SELECTION_TIES}"
 SEED_RULE = (
     "SeedSequence([case.selector_seed, repeat_seed]).generate_state(1)[0]; "
     "seed once per episode; isolate and restore global RNG streams"
@@ -90,7 +94,10 @@ def validate_protocol(training, evaluation):
             or any(not positive_integer(c["repeats"]) for c in specs)
         ):
             raise ValueError("Controller availability/inference/repeats mismatch")
-        if evaluation["selection"] != SELECTION or evaluation["selector_seed_rule"] != SEED_RULE:
+        if (
+            evaluation["selection"] not in (SELECTION, HUNT_SELECTION)
+            or evaluation["selector_seed_rule"] != SEED_RULE
+        ):
             raise ValueError("Selection or selector seed rules changed")
         counts = training["manifest_counts"]
         if (
@@ -138,10 +145,8 @@ def validate_protocol(training, evaluation):
             or any(not positive_integer(width) for width in architecture)
         ):
             raise ValueError("Explicit positive MLP architecture required")
-        if training["selection"] != (
-            "max validation primary sampled case-mean catch rate, "
-            "then min unresolved, then earliest trained checkpoint"
-        ):
+        rule = HUNT_RULE if evaluation["selection"] == HUNT_SELECTION else CATCH_RULE
+        if training["selection"] != rule:
             raise ValueError("Training selection disagrees with sampled protocol")
     except (KeyError, TypeError, OverflowError) as exc:
         raise ValueError(f"Incomplete or invalid sampled protocol: {exc}") from exc
@@ -211,4 +216,6 @@ def trained_score(summary, decision_steps, optimizer_epochs):
         raise ValueError("Selection requires nonempty per-case counts")
     catch = sum(Fraction(case["captured"], case["repeats"]) for case in cases) / len(cases)
     unresolved = sum(Fraction(case["unresolved"], case["repeats"]) for case in cases) / len(cases)
+    hunts = summary.get("hunt", {}).values()
+    catch = (catch + sum(Fraction(t["caught"], t["cases"]) for t in hunts)) / (1 + len(hunts))
     return catch, -unresolved, -decision_steps

@@ -99,6 +99,9 @@ class PilotCallback(BaseCallback):
                 "sampled_primary_case_mean_unresolved_rate",
                 "sampled_primary_case_mean_return",
                 "argmax_secondary_case_mean_catch_rate",
+                "hunt_noisy_caught",
+                "hunt_silent_caught",
+                "hunt_hidden_caught",
             ],
         )
         self.curve.writeheader()
@@ -147,6 +150,7 @@ class PilotCallback(BaseCallback):
                 ],
                 "sampled_primary_case_mean_return": primary["case_mean_return"],
                 "argmax_secondary_case_mean_catch_rate": secondary["case_mean_catch_rate"],
+                **{f"hunt_{k}_caught": v["caught"] for k, v in summary.get("hunt", {}).items()},
             }
         )
         self.curve_handle.flush()

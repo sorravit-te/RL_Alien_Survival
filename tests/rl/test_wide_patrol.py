@@ -3,6 +3,8 @@
 from math import hypot
 
 import numpy as np
+import pytest
+from sb3_contrib import MaskablePPO
 
 from ai.navigation import find_path
 from game.map import scenario_map
@@ -17,9 +19,12 @@ from rl.candidates import (
 )
 from rl.contract import WAIT
 from rl.env import AlienEnv
+from rl.evaluate import evaluate
+from rl.pipeline import make_env, read_json
 from rl.scripted_controllers import HeuristicSelector
 
 SMALL = tuple((float(x), 2.5) for x in range(1, 7))
+ONE_CASE = {"id": "ship", "scenario_seed": 1, "bot_seed": 2, "reset_seed": 3, "selector_seed": 4}
 
 
 def view(*, ages=None, waypoints=WAYPOINTS, position=(3.5, 20.5), **fields):
@@ -120,6 +125,39 @@ def test_the_written_alien_only_ever_picks_what_is_offered():
         *_, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
     assert waits == 0
+
+
+def short_ship_config():
+    return {**read_json("configs/ship_deck_training_pilot.json"), "max_episode_seconds": 5}
+
+
+def test_the_wait_baseline_stands_still_where_a_policy_may_not(tmp_path, monkeypatch):
+    made = []
+
+    def remembered_env(config):
+        made.append(make_env(config))
+        return made[-1]
+
+    monkeypatch.setattr("rl.evaluate.make_env", remembered_env)
+    _, rows = evaluate(
+        "wait", short_ship_config(), [ONE_CASE], tmp_path / "wait.csv",
+        inference="constant_wait", episode_seeds=[5], repeat_index=0, controller_name="wait",
+    )  # fmt: skip
+    world, alien = made[0].world, made[0].core.snapshot().alien
+    assert rows[0]["decision_steps"] > 1
+    assert (alien.x, alien.y) in [s[:2] for s in (world.alien_spawn, *world.alien_spawn_options)]
+
+
+def test_a_policy_that_asks_to_wait_on_a_free_patrol_is_refused(tmp_path, monkeypatch):
+    config = short_ship_config()
+    env = make_env(config)
+    model = MaskablePPO("MlpPolicy", env, device="cpu", **config["ppo"])
+    monkeypatch.setattr(model, "predict", lambda obs, **kwargs: (WAIT, None))
+    with pytest.raises(RuntimeError, match="masked action"):
+        evaluate(
+            "trained", config, [ONE_CASE], tmp_path / "policy.csv", model=model,
+            inference="sampled_masked", episode_seeds=[5], repeat_index=0, controller_name="trained",
+        )  # fmt: skip
 
 
 def test_the_route_is_a_short_loop_of_the_ship():

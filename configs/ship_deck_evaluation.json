@@ -61,7 +61,7 @@
   ],
   "selection": {
     "split": "validation",
-    "primary": "case_mean_sampled_catch_rate",
+    "primary": "mean_of_sampled_catch_rate_and_hunt_catch_rates",
     "tie_1": "min_sampled_unresolved_rate",
     "tie_2": "earliest_trained_checkpoint",
     "exclude": "test outcomes and untrained baseline cannot select trained best"

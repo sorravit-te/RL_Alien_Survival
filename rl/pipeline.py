@@ -76,8 +76,12 @@ def source_files():
 
 
 def source_state():
+    # Git rewrites line endings on checkout, which must not orphan a checkpoint.
     source_hash = hashlib.sha256(
-        b"".join(p.relative_to(ROOT).as_posix().encode() + p.read_bytes() for p in source_files())
+        b"".join(
+            p.relative_to(ROOT).as_posix().encode() + p.read_bytes().replace(b"\r\n", b"\n")
+            for p in source_files()
+        )
     ).hexdigest()
     revision = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True

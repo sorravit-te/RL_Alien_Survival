@@ -2,6 +2,7 @@
 
 import random
 from copy import deepcopy
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -105,6 +106,17 @@ def test_source_identity_covers_nested_packages():
     relative = {p.relative_to(ROOT).as_posix() for p in source_files()}
     assert {"rl/env.py", "rl/bots/evasive.py", "rl/bots/wall_loop.py"} <= relative
     assert {"game/core.py", "ai/navigation.py", "requirements.lock.txt"} <= relative
+
+
+@pytest.mark.parametrize("ending", [b"\n", b"\r\n"])
+def test_a_checkout_that_rewrites_line_endings_keeps_the_source_identity(ending, monkeypatch):
+    original, before = Path.read_bytes, source_state()["source_sha256"]
+
+    def rewritten(path):
+        return original(path).replace(b"\r\n", b"\n").replace(b"\n", ending)
+
+    monkeypatch.setattr(Path, "read_bytes", rewritten)
+    assert source_state()["source_sha256"] == before
 
 
 def test_frozen_config_manifest_and_source_rejected(tmp_path, base_config, monkeypatch):

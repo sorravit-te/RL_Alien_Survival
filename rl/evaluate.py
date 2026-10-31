@@ -12,7 +12,9 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from game.map import DEFAULT_SCENARIO
 from rl.contract import WAIT
+from rl.hunt import SELECTION_SCENARIO_SEED, hunt_test, policy_chooser
 from rl.pipeline import load_checkpoint, make_env, parameter_hash, read_json, read_run, write_json
 from rl.scripted_controllers import HeuristicSelector as HeuristicSelector
 from rl.search_metrics import summarize_search
@@ -164,11 +166,12 @@ def evaluate(
                             obs, action_masks=mask, deterministic=inference != "sampled_masked"
                         )
                         action = int(action)
-                    if not mask[action]:
+                    # The wait baseline is the floor: it stands still even where a policy may not.
+                    if not mask[action] and kind != "wait":
                         raise RuntimeError(f"{kind} selected a masked action {action}")
                     actions.update(bytes([action]))
                     obs, reward, terminated, truncated, info = env.step(action)
-                    if info["invalid_action"]:
+                    if info["invalid_action"] and kind != "wait":
                         raise RuntimeError("Action mask and applied action disagree")
                     total += reward
                     decisions += 1
@@ -271,8 +274,15 @@ def summarize_cases(rows, inference):
     return result
 
 
+def selection_hunt(model, config):
+    """The hunt that helps choose best.zip, on seeds tools.hunt_test never reports."""
+    scenario = config.get("scenario", DEFAULT_SCENARIO)
+    with frozen_evaluation(model):
+        return hunt_test(policy_chooser(model), scenario, first_seed=SELECTION_SCENARIO_SEED)
+
+
 def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
-    from rl.evaluation_protocol import frozen_protocol
+    from rl.evaluation_protocol import HUNT_SELECTION, frozen_protocol
 
     protocol = frozen_protocol(config)
     if stage not in ("baseline", "trained", "final"):
@@ -338,6 +348,8 @@ def evaluate_suite(config, cases, output_dir, *, schedule, models, stage):
             )
         summaries[name]["evaluation_role"] = rows[0]["evaluation_role"]
         all_rows[name] = rows
+    if stage == "trained" and protocol["selection"] == HUNT_SELECTION:
+        summaries["hunt"] = selection_hunt(models["trained"], config)
     write_json(output_dir / "summary.json", summaries)
     write_json(output_dir / "episodes.json", all_rows)
     return summaries, all_rows

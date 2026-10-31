@@ -11,8 +11,9 @@ from rl.bots.hunt_targets import Pacer, StillTarget
 from rl.bots.views import observe_survivor
 from rl.contract import WAIT
 from rl.env import AlienEnv
+from rl.hunt import hunt_test, stations, trial
 from rl.rewards import COVERAGE_REWARD, coverage_reward
-from tools.hunt_test import hunt_test, trial, written_alien_chooser
+from tools.hunt_test import written_alien_chooser
 
 HALL = (
     "##############",
@@ -61,6 +62,21 @@ def test_a_waiting_alien_catches_nobody_silent():
 def test_written_alien_hunts_a_noisy_target():
     result = hunt_test(written_alien_chooser(), SCENE, cases=6, noisy_seconds=30)
     assert result["noisy"]["caught"] > 0
+    assert result["hidden"]["cases"] == len(stations(SCENE))
+
+
+def test_a_hidden_survivor_waits_at_each_station_in_turn():
+    spots = stations(SCENE)[:2]
+    starts = []
+
+    def note_where_it_hides(env, obs, mask):
+        survivor = env.core.snapshot().survivor
+        if env.elapsed_ticks == 0:
+            starts.append((survivor.x, survivor.y))
+        return WAIT
+
+    trial(note_where_it_hides, SCENE, lambda world: StillTarget(), 1, len(spots), spots=spots)
+    assert starts == [tuple(spot) for spot in spots]
 
 
 def test_first_visit_pays():
