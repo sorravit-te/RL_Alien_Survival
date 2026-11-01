@@ -851,6 +851,50 @@ def test_press_release_between_ticks_is_buffered_once_and_repeat_is_ignored():
     assert not inputs.consume(1 / 30).interact
 
 
+def loop_facing_a_card(*others):
+    from game.map import MapObject
+
+    card = MapObject('card', 'keycard', 3.5, 2.5)
+    return FixedStepLoop(GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),), (card, *others))))
+
+
+def tap_e(loop):
+    loop.inputs.key('e', True)
+    loop.inputs.key('e', False)
+    loop.advance(loop.dt)
+
+
+@pytest.mark.parametrize('held', [('w',), ('w', 'shift_left'), ('d',)])
+def test_e_lands_at_a_walk_or_run_and_the_held_keys_carry_on(held):
+    loop = loop_facing_a_card()
+    for key in held:
+        loop.inputs.key(key, True)
+    loop.advance(loop.dt)
+    stride = loop.current.survivor
+    assert stride != SurvivorState(2.5, 2.5)
+    tap_e(loop)
+    assert loop.current.has_keycard and loop.current.survivor == stride
+    loop.advance(loop.dt)
+    assert loop.current.survivor != stride
+
+
+def test_the_exit_opens_on_the_move_too():
+    from game.map import MapObject
+
+    loop = loop_facing_a_card(MapObject('out', 'exit', 3.5, 2.5))
+    loop.inputs.key('w', True)
+    tap_e(loop)
+    tap_e(loop)
+    assert loop.current.outcome == 'escaped'
+
+
+def test_e_with_nothing_to_take_never_breaks_stride():
+    loop = FixedStepLoop(GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),))))
+    loop.inputs.key('w', True)
+    tap_e(loop)
+    assert loop.current.survivor.x > 2.5
+
+
 def test_collected_sprite_disappears_and_rendering_cannot_change_game(display, tmp_path):
     from game.map import MapObject
 

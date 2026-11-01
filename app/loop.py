@@ -20,6 +20,16 @@ START_GRACE_SECONDS = 5.0  # to look around before a searching Alien can have yo
 PLAYER_RADIUS = round(0.2 * 2**26) / 2**26
 
 
+def press_in_stride(command, snapshot):
+    """Core takes E only from a body at rest, and game/ is part of a checkpoint's identity.
+
+    So the player stands for the one tick a press lands, and held keys carry straight on.
+    """
+    if command.interact and snapshot.interaction_target is not None:
+        return replace(command, forward=0.0, strafe=0.0)
+    return command
+
+
 def round_start(snapshot):
     """What a player can tell apart between rounds; the working exit stays private to Core."""
     alien = snapshot.alien
@@ -94,7 +104,7 @@ class FixedStepLoop:
         while self.accumulator + 1e-12 >= self.dt and count < self.max_steps:
             self.previous = self.current
             self.previous_pitch = self.current_pitch
-            self.current = self.core.step(self.inputs.consume(self.dt))
+            self.current = self.core.step(press_in_stride(self.inputs.consume(self.dt), self.current))
             if self.on_tick is not None:
                 self.on_tick(self.current)
             self.current_pitch = self.inputs.pitch
