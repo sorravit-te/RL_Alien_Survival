@@ -4,7 +4,7 @@ Each triangle writes only its id and depth first, so hidden surfaces cost no sha
 never overlap between bands, which keeps the parallel loops free of shared writes.
 
 Every pixel is lit from its own normal, so the relief in a material answers the ship's lights
-and the torch as the player moves. Baked light tells how much arrives and from where.
+as the player moves. Baked light tells how much arrives and from where.
 """
 
 from math import asin, atan2, ceil, floor, pi, sqrt
@@ -17,21 +17,17 @@ FAR = 26.0  # fog has hidden everything long before this
 MIP_ONE = 2.2  # depth where a surface switches to half-size texels, about one per pixel
 MIP_TWO = 5.0  # beyond here relief is too fine to see, so a pixel is lit from its flat face
 RELIEF_RANGE = 1.0  # filtering relief is the dearest step, and only shows this close
-FOG_DENSITY = 0.11
+FOG_DENSITY = 0.15
 FOG_STEPS = 16  # table entries per unit of depth; exp() per pixel is a real cost
 LIGHT_SPAN = 4  # pixels along a row that share one lookup of the baked light
-TORCH_POWER = 1.2
-TORCH_FALLOFF = 0.09
-TORCH_RED, TORCH_GREEN, TORCH_BLUE = 1.0, 0.96, 0.9
+DARK_SPAN = 8  # and where that light is too low to show its own detail
 GLOW = 1.5
-FILL = 0.2  # light that reaches a surface however it faces, from bounces off the walls
-FLOOR_LIGHT = 0.15  # no corridor goes fully black: the player must still see the Alien
+FILL = 0.1  # light that reaches a surface however it faces, from bounces off the walls
+FLOOR_LIGHT = 0.05  # no corridor goes fully black: the player must still see the Alien
+FLOOR_TINT = 1.0, 0.96, 0.9
 BOUNCE = 0.7  # ceilings catch extra fill from the lit deck below them
 LAMP_GAIN = 1.2  # a surface facing the lamp is brighter than the baked average
 SHEEN = 2.4  # how hard metal answers a lamp
-TORCH_FILL = 0.3
-TORCH_SHEEN = 1.8
-FAR_SHINE = 0.4  # the torch still picks out far walls, and the Alien's outline against them
 BAY_LAMP_TOP = 1.6  # hidden light in a wall bay sits at the head of its panel
 BAY_POWER = 3.2
 TONE_STEPS = 1024  # the curve spans twice full white, so highlights roll off, not clip
@@ -43,8 +39,20 @@ GLASS_MIRROR = 0.07  # what it reflects looking straight on; grazing it, nearly 
 GLASS_ROOM = 0.55  # the lit bridge in the pane
 GLASS_DUST = 0.35  # how much the marks on a pane dim the view
 GLASS_MARKS_LIT = 0.6  # how hard those marks catch the room's light
-GLASS_GLARE = 0.3  # the torch thrown back when the pane is faced square on
 GLASS_LAMP = 2.4  # the bridge lamps mirrored in the pane, sliding as the player walks
+AIR_BLOCK = 4  # air is soft: one ray for this many pixels each way is plenty
+AIR_STEPS = 7
+AIR_REACH = 14.0
+AIR_DENSITY = 0.12
+FLOOR_MIST = 2.5  # how much thicker the mist lies at deck level
+FLOOR_MIST_TOP = 0.8
+MIST_TEXELS = 22.0  # of the mist tile, per unit of world
+GLOW_FROM = 0.8  # how bright a pixel must be to spill into the ones around it
+GLOW_AMOUNT = 0.5
+GLOW_DIRT = 2.0  # how much of that spill catches on the dirt on the lens
+FRINGE = 0.0035  # color split at the screen's edges, as a share of its width
+DIM = 0.05  # light so low that a surface's fine relief cannot be seen in it
+SCATTER = ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))  # where rays start
 ATTRIBUTES = 6  # depth, u, v, world x, y, z; each divided by depth
 
 
@@ -297,7 +305,7 @@ def rasterize(tris, count, inverse_depth, ids, bands):
 @njit(parallel=True, nogil=True, cache=True)
 def shade(
     color, inverse_depth, ids, tris, tri_quad, texels, reliefs, starts, size, textures, tints,
-    shifts, shades, frames, light, aim, light_grid, beam, eye, sky, fog_table,
+    shifts, shades, frames, light, aim, light_grid, eye, sky, fog_table, lamps,
 ):  # fmt: skip
     height, width = color.shape[0], color.shape[1]
     eye_x, eye_y, eye_z = eye
@@ -306,7 +314,8 @@ def shade(
         lit_quad, lit_until = -1, 0
         red = green = blue = lamp_x = lamp_y = lamp_z = 0.0
         view_x = view_y = view_z = half_x = half_y = half_z = 0.0
-        fog = gain = torch = bay_height = 0.0
+        fog = gain = bay_height = 0.0
+        dark = False
         across_x = across_y = across_z = up_x = up_y = up_z = out_x = out_y = out_z = 0.0
         tint_red = tint_green = tint_blue = 0.0
         for column in range(width):
@@ -334,7 +343,7 @@ def shade(
                 v = (tris[tri, 12] * sx + tris[tri, 13] * sy + tris[tri, 14]) * depth
                 r, g, b, a = fetch(texels, starts[0], size, textures[quad], u, v, True)
                 marks = a / 255.0
-                # Glass shows by what lands on it: dust, the room, and the player's torch.
+                # Glass shows by what lands on it: dust and the light of the room.
                 out_x, out_y, out_z = frames[quad, 6], frames[quad, 7], frames[quad, 8]
                 square_on = max(-(ray_x * out_x + ray_y * out_y + ray_z * out_z), 0.0)
                 grazing = 1.0 - square_on
@@ -353,30 +362,28 @@ def shade(
                 ) * scale  # fmt: skip
                 lamp_shine = sharpen(max(bounce, 0.0))
                 lamp_shine *= lamp_shine * GLASS_LAMP
-                torch = beam[row, column] * TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth)
-                glare = torch * sharpen(square_on) * GLASS_GLARE
                 seen = (1.0 - mirror) * (1.0 - marks * GLASS_DUST)
                 caught = marks * GLASS_MARKS_LIT
                 color[row, column, 0] = (
                     space_r * seen * GLASS_TINT[0]
                     + room_r * (mirror * GLASS_ROOM + lamp_shine)
-                    + (room_r + torch) * caught * r / 255.0 + glare * TORCH_RED
+                    + room_r * caught * r / 255.0
                 )  # fmt: skip
                 color[row, column, 1] = (
                     space_g * seen * GLASS_TINT[1]
                     + room_g * (mirror * GLASS_ROOM + lamp_shine)
-                    + (room_g + torch) * caught * g / 255.0 + glare * TORCH_GREEN
+                    + room_g * caught * g / 255.0
                 )  # fmt: skip
                 color[row, column, 2] = (
                     space_b * seen * GLASS_TINT[2]
                     + room_b * (mirror * GLASS_ROOM + lamp_shine)
-                    + (room_b + torch) * caught * b / 255.0 + glare * TORCH_BLUE
+                    + room_b * caught * b / 255.0
                 )  # fmt: skip
                 continue
             depth = 1 / inverse_depth[row, column]
             if quad != lit_quad or column >= lit_until:
                 # Light changes slowly across a surface, so a few pixels can share it.
-                lit_quad, lit_until = quad, column + LIGHT_SPAN
+                lit_quad = quad
                 world_x = (tris[tri, 15] * sx + tris[tri, 16] * sy + tris[tri, 17]) * depth
                 world_y = (tris[tri, 18] * sx + tris[tri, 19] * sy + tris[tri, 20]) * depth
                 world_z = (tris[tri, 21] * sx + tris[tri, 22] * sy + tris[tri, 23]) * depth
@@ -406,75 +413,209 @@ def shade(
                 half_z *= scale
                 fog = fog_table[int(depth * FOG_STEPS)]
                 gain = shades[quad] * fog
-                torch = TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth)
+                dark = (red + green + blue) * gain < DIM
+                lit_until = column + (DARK_SPAN if dark else LIGHT_SPAN)
                 bay_height = world_z / BAY_LAMP_TOP
                 bay_height = min(bay_height * bay_height, 1.0) * gain * BAY_POWER
             u = (tris[tri, 9] * sx + tris[tri, 10] * sy + tris[tri, 11]) * depth
             v = (tris[tri, 12] * sx + tris[tri, 13] * sy + tris[tri, 14]) * depth
             texture = textures[quad]
             sheen = 0.0
+            face_x, face_y, face_z = out_x, out_y, out_z
             if depth < MIP_TWO:
-                if depth < MIP_ONE:
-                    r, g, b, a = fetch(texels, starts[0], size, texture, u, v, True)
+                level = 0 if depth < MIP_ONE else 1
+                r, g, b, a = fetch(texels, starts[level], size >> level, texture, u, v, not dark)
+                if not dark:
                     close = depth < RELIEF_RANGE
-                    nx, ny, nz, shine = fetch(reliefs, starts[0], size, texture, u, v, close)
-                else:
-                    r, g, b, a = fetch(texels, starts[1], size // 2, texture, u, v, True)
-                    nx, ny, nz, shine = fetch(reliefs, starts[1], size // 2, texture, u, v, False)
-                nx = nx / 127.5 - 1.0
-                ny = ny / 127.5 - 1.0
-                nz = nz / 127.5 - 1.0
-                shine /= 255.0
-                # The surface's own direction at this pixel, from its relief.
-                face_x = across_x * nx + up_x * ny + out_x * nz
-                face_y = across_y * nx + up_y * ny + out_y * nz
-                face_z = across_z * nx + up_z * ny + out_z * nz
-                mirror = max(face_x * half_x + face_y * half_y + face_z * half_z, 0.0)
-                sheen = sharpen(mirror) * shine * SHEEN * gain
+                    nx, ny, nz, shine = fetch(reliefs, starts[level], size >> level, texture, u, v, close)
+                    nx = nx / 127.5 - 1.0
+                    ny = ny / 127.5 - 1.0
+                    nz = nz / 127.5 - 1.0
+                    shine /= 255.0
+                    # The surface's own direction at this pixel, from its relief.
+                    face_x = across_x * nx + up_x * ny + out_x * nz
+                    face_y = across_y * nx + up_y * ny + out_y * nz
+                    face_z = across_z * nx + up_z * ny + out_z * nz
+                    mirror = max(face_x * half_x + face_y * half_y + face_z * half_z, 0.0)
+                    sheen = sharpen(mirror) * shine * SHEEN * gain
             else:
                 r, g, b, a = fetch(texels, starts[2], size // 4, texture, u, v, False)
-                shine = FAR_SHINE
-                face_x, face_y, face_z = out_x, out_y, out_z
             facing = max(face_x * lamp_x + face_y * lamp_y + face_z * lamp_z, 0.0)
-            toward = max(face_x * view_x + face_y * view_y + face_z * view_z, 0.0)
             fill = FILL * (1.0 + BOUNCE * max(-face_z, 0.0))
             lit = (fill + (1.0 - FILL) * facing * LAMP_GAIN) * gain
-            beamed = torch * beam[row, column]
-            torch_sheen = beamed * sharpen(toward) * shine * TORCH_SHEEN
-            flat_light = FLOOR_LIGHT * gain + beamed * (TORCH_FILL + (1.0 - TORCH_FILL) * toward)
+            flat_light = FLOOR_LIGHT * gain
             bay = bay_height * (0.3 + 1.4 * max(face_z, 0.0))
-            glow = a / 255.0 * (fog * 0.9 + 0.25) * GLOW
+            glow = a / 255.0 * (fog * 0.9 + 0.25) * GLOW * lamps
             color[row, column, 0] = (
-                r / 255.0 * (red * lit + tint_red * bay + flat_light * TORCH_RED + glow)
-                + red * sheen + torch_sheen * TORCH_RED
+                r / 255.0 * (red * lit + tint_red * bay + flat_light * FLOOR_TINT[0] + glow)
+                + red * sheen
             )  # fmt: skip
             color[row, column, 1] = (
-                g / 255.0 * (green * lit + tint_green * bay + flat_light * TORCH_GREEN + glow)
-                + green * sheen + torch_sheen * TORCH_GREEN
+                g / 255.0 * (green * lit + tint_green * bay + flat_light * FLOOR_TINT[1] + glow)
+                + green * sheen
             )  # fmt: skip
             color[row, column, 2] = (
-                b / 255.0 * (blue * lit + tint_blue * bay + flat_light * TORCH_BLUE + glow)
-                + blue * sheen + torch_sheen * TORCH_BLUE
+                b / 255.0 * (blue * lit + tint_blue * bay + flat_light * FLOOR_TINT[2] + glow)
+                + blue * sheen
             )  # fmt: skip
+
+
+@njit(nogil=True, cache=True)
+def stamp_depth(air_depth, picture, box, nearness):
+    """The Alien stands in the air too: mist behind it must not be drawn over it."""
+    left, top, width, height = box
+    picture_height, picture_width = picture.shape[0], picture.shape[1]
+    for row in range(max(top // 2, 0), min((top + height) // 2 + 1, air_depth.shape[0])):
+        y = min(max((row * 2 - top) * picture_height // height, 0), picture_height - 1)
+        for column in range(max(left // 2, 0), min((left + width) // 2 + 1, air_depth.shape[1])):
+            x = min(max((column * 2 - left) * picture_width // width, 0), picture_width - 1)
+            if picture[y, x, 3] > 128 and air_depth[row, column] < nearness:
+                air_depth[row, column] = nearness
 
 
 @njit(parallel=True, nogil=True, cache=True)
-def finish_frame(color, vignette, grain, shift, tone, pixels, shifts):
-    """Vignette, film grain and tone curve, written straight into the surface's own pixels."""
+def shrink_depth(air_depth, inverse_depth):
+    height, width = inverse_depth.shape[0], inverse_depth.shape[1]
+    for row in prange(air_depth.shape[0]):
+        pixel_row = min(row * 2 + 1, height - 1)
+        for column in range(air_depth.shape[1]):
+            air_depth[row, column] = inverse_depth[pixel_row, min(column * 2 + 1, width - 1)]
+
+
+@njit(parallel=True, nogil=True, cache=True)
+def air_light(spill, raw, air_depth, view, eye, light, grid, mist, drift, fog_table):
+    """What the air between the eye and each surface scatters back: mist in every lamp's light."""
+    x, y, fx, fy, _, horizon, focal = view
+    height, width = spill.shape[0], spill.shape[1]
+    frame_width = air_depth.shape[1] * 2
+    grid_height, grid_width = light.shape[0], light.shape[1]
+    top = fog_table.shape[0] - 1
+    tile = mist.shape[0]
+    for row in prange(height):
+        sy = (row + 0.5) * AIR_BLOCK
+        up = (horizon - sy) / focal
+        pixel_row = min(row * AIR_BLOCK // 2 + 1, air_depth.shape[0] - 1)
+        for column in range(width):
+            sx = (column + 0.5) * AIR_BLOCK
+            side = (sx - frame_width * 0.5) / focal
+            nearness = air_depth[pixel_row, min(column * AIR_BLOCK // 2 + 1, air_depth.shape[1] - 1)]
+            reach = AIR_REACH if nearness * AIR_REACH < 1.0 else 1.0 / nearness
+            step = reach / AIR_STEPS
+            along = step * (0.03 + SCATTER[row & 3][column & 3] / 16.0)
+            ray_x, ray_y = fx - fy * side, fy + fx * side
+            stretch = sqrt(1.0 + side * side + up * up)
+            red = green = blue = 0.0
+            for _ in range(AIR_STEPS):
+                at_x, at_y = x + ray_x * along, y + ray_y * along
+                low = max(1.0 - (eye + up * along) / FLOOR_MIST_TOP, 0.0)
+                thick = mist[
+                    int(at_y * MIST_TEXELS + drift) & (tile - 1),
+                    int(at_x * MIST_TEXELS + drift * 0.6) & (tile - 1),
+                ]
+                weight = thick * (1.0 + FLOOR_MIST * low * low) * step * stretch * AIR_DENSITY
+                weight *= fog_table[min(int(along * stretch * FOG_STEPS), top)]
+                cell_y = min(max(int(at_y * grid), 0), grid_height - 1)
+                cell_x = min(max(int(at_x * grid), 0), grid_width - 1)
+                red += light[cell_y, cell_x, 0] * weight
+                green += light[cell_y, cell_x, 1] * weight
+                blue += light[cell_y, cell_x, 2] * weight
+                along += step
+            raw[row, column, 0] = red
+            raw[row, column, 1] = green
+            raw[row, column, 2] = blue
+    for row in prange(height):
+        above, below = max(row - 1, 0), min(row + 1, height - 1)
+        for column in range(width):
+            left, right = max(column - 1, 0), min(column + 1, width - 1)
+            for channel in range(3):
+                spill[row, column, channel] = (
+                    raw[above, left, channel] + raw[above, column, channel] * 2.0
+                    + raw[above, right, channel] + raw[row, left, channel] * 2.0
+                    + raw[row, column, channel] * 4.0 + raw[row, right, channel] * 2.0
+                    + raw[below, left, channel] + raw[below, column, channel] * 2.0
+                    + raw[below, right, channel]
+                ) * 0.0625  # fmt: skip
+
+
+@njit(parallel=True, nogil=True, cache=True)
+def add_glow(spill, color, dirt, shrunk, blurred):
+    """Bright pixels bleed into the ones around them, and catch on the dirt on the lens."""
+    height, width = spill.shape[0], spill.shape[1]
+    frame_height, frame_width = color.shape[0], color.shape[1]
+    for row in prange(height):
+        near = min(row * AIR_BLOCK + 1, frame_height - 1)
+        far = min(row * AIR_BLOCK + 3, frame_height - 1)
+        for column in range(width):
+            left = min(column * AIR_BLOCK + 1, frame_width - 1)
+            right = min(column * AIR_BLOCK + 3, frame_width - 1)
+            red = (color[near, left, 0] + color[far, right, 0]) * 0.5
+            green = (color[near, left, 1] + color[far, right, 1]) * 0.5
+            blue = (color[near, left, 2] + color[far, right, 2]) * 0.5
+            brightest = max(red, green, blue)
+            keep = max(brightest - GLOW_FROM, 0.0) / (brightest + 1e-3)
+            shrunk[row, column, 0] = red * keep
+            shrunk[row, column, 1] = green * keep
+            shrunk[row, column, 2] = blue * keep
+    for row in prange(height):
+        for column in range(width):
+            for channel in range(3):
+                total = shrunk[row, column, channel] * 0.26
+                for offset, weight in ((2, 0.21), (4, 0.11), (7, 0.05)):
+                    total += weight * (
+                        shrunk[row, max(column - offset, 0), channel]
+                        + shrunk[row, min(column + offset, width - 1), channel]
+                    )
+                blurred[row, column, channel] = total
+    for row in prange(height):
+        for column in range(width):
+            for channel in range(3):
+                total = blurred[row, column, channel] * 0.26
+                for offset, weight in ((2, 0.21), (4, 0.11), (7, 0.05)):
+                    total += weight * (
+                        blurred[max(row - offset, 0), column, channel]
+                        + blurred[min(row + offset, height - 1), column, channel]
+                    )
+                spill[row, column, channel] += total * (GLOW_AMOUNT + GLOW_DIRT * dirt[row, column])
+
+
+@njit(parallel=True, nogil=True, cache=True)
+def finish_frame(color, spill, vignette, grain, shift, tone, grade, pixels):
+    """Air and glow, lens fringe, vignette, film grain and color grade, straight into the surface."""
     height, width = color.shape[0], color.shape[1]
-    red_shift, green_shift, blue_shift = shifts
+    spill_height, spill_width = spill.shape[0], spill.shape[1]
     top = TONE_STEPS - 1.0
+    fringe = FRINGE * 2.0
+    step = 1.0 / AIR_BLOCK
     for row in prange(height):
         noise_row = (row + shift) % height
-        for column in range(width):
-            noise = grain[noise_row, column]
-            scale = vignette[row, column] * (TONE_STEPS / 2)
-            red = tone[int(min(max(color[row, column, 0] * scale + noise, 0.0), top))]
-            green = tone[int(min(max(color[row, column, 1] * scale + noise, 0.0), top))]
-            blue = tone[int(min(max(color[row, column, 2] * scale + noise, 0.0), top))]
-            pixels[column, row] = (
-                (red << red_shift) | (green << green_shift) | (blue << blue_shift)
-            )
+        place = (row + 0.5) * step - 0.5
+        y0 = min(max(int(floor(place)), 0), spill_height - 1)
+        y1 = min(y0 + 1, spill_height - 1)
+        down = min(max(place - y0, 0.0), 1.0)
+        for block in range(-1, spill_width):
+            # Between two samples of the spill, which sit in the middle of their blocks.
+            left, right = max(block, 0), min(block + 1, spill_width - 1)
+            first = block * AIR_BLOCK + AIR_BLOCK // 2
+            red_now = spill[y0, left, 0] + (spill[y1, left, 0] - spill[y0, left, 0]) * down
+            green_now = spill[y0, left, 1] + (spill[y1, left, 1] - spill[y0, left, 1]) * down
+            blue_now = spill[y0, left, 2] + (spill[y1, left, 2] - spill[y0, left, 2]) * down
+            red_step = (spill[y0, right, 0] + (spill[y1, right, 0] - spill[y0, right, 0]) * down - red_now) * step
+            green_step = (spill[y0, right, 1] + (spill[y1, right, 1] - spill[y0, right, 1]) * down - green_now) * step
+            blue_step = (spill[y0, right, 2] + (spill[y1, right, 2] - spill[y0, right, 2]) * down - blue_now) * step
+            for column in range(max(first, 0), min(first + AIR_BLOCK, width)):
+                ahead = column - first + 0.5
+                noise = grain[noise_row, (column + shift * 7) % width]
+                scale = vignette[row, column] * (TONE_STEPS / 2)
+                split = int((column - width * 0.5) * fringe)
+                pulled = min(max(column - split, 0), width - 1)
+                pushed = min(max(column + split, 0), width - 1)
+                value = (color[row, pulled, 0] + red_now + red_step * ahead) * scale + noise
+                red = tone[int(min(max(value, 0.0), top))]
+                value = (color[row, column, 1] + green_now + green_step * ahead) * scale + noise
+                green = tone[int(min(max(value, 0.0), top))]
+                value = (color[row, pushed, 2] + blue_now + blue_step * ahead) * scale + noise
+                blue = tone[int(min(max(value, 0.0), top))]
+                pixels[column, row] = grade[((red >> 1) << 14) | ((green >> 1) << 7) | (blue >> 1)]
 
 
 @njit(parallel=True, nogil=True, cache=True)

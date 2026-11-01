@@ -26,6 +26,9 @@ __pycache__/
 # Baked by tools.bake_ship_sky from NASA maps.
 /assets/space/
 
+# Baked by tools.bake_ship_mood; the color grade's license forbids passing its files on.
+/assets/mood/
+
 # Generated experiments and machine-specific reports
 /models/
 /experiments/

@@ -16,41 +16,64 @@ import pygame
 from renderers.alien_sprites import FRAMES as ALIEN_FRAMES
 from renderers.alien_sprites import AlienSprites
 from renderers.ship_kernels import (
+    AIR_BLOCK,
     FAR,
     FOG_DENSITY,
     FOG_STEPS,
     TONE_STEPS,
-    TORCH_BLUE,
-    TORCH_FALLOFF,
-    TORCH_GREEN,
-    TORCH_POWER,
-    TORCH_RED,
     TRI_FIELDS,
+    add_glow,
+    air_light,
     draw_sprite,
     finish_frame,
     project,
     rasterize,
     shade,
+    shrink_depth,
+    stamp_depth,
 )
 from renderers.ship_mesh import build_mesh
 from renderers.ship_theme import FLICKER, LIGHT_GRID, PULSE, STEADY, ShipTheme, stable
 
 TEXTURES = Path(__file__).resolve().parents[1] / "assets/stradex/prepared/ship_textures.npz"
 SKY_VIEW = Path(__file__).resolve().parents[1] / "assets/space/ship_sky.npz"
+MOOD = Path(__file__).resolve().parents[1] / "assets/mood/ship_mood.npz"
 BAKE_HINT = "then run: .venv/Scripts/python.exe -m tools.bake_ship_textures"
 FIELD_OF_VIEW = 100  # degrees across the screen; the player's view, never the Alien's
 EYE_HEIGHT = 1.12
-TORCH_COLOR = np.array([TORCH_RED, TORCH_GREEN, TORCH_BLUE], np.float32)
 TICKS_PER_SECOND = 30
 RASTER_BANDS = 24
 SPARK_TICKS = 12  # a light's chance of shorting out comes up this often
 SPARK_CHANCE = 0.07
 SPARK_PICTURES = 3
 SPARK_CLEAR = 1.0  # up close a falling spark would fill the view and hide the corridor
+MIST_DRIFT = 0.25  # mist tile texels per tick
+POWER_CYCLE, POWER_SAG = 1350, 60  # ticks: about once in 45 seconds the lamps fail for 2
+LAMP_FLOOR = 0.3  # signs and guide lines stay faintly lit through a power sag
 
 
 def packed_levels(levels):
     return np.concatenate([level.reshape(-1, 4).view(np.uint32).ravel() for level in levels])
+
+
+def plain_mood():
+    """Without the bake: a clean lens, even mist and no grade."""
+    levels = (np.arange(128, dtype=np.int32) * 2 + 1).astype(np.uint8)
+    red, green, blue = np.meshgrid(levels, levels, levels, indexing="ij")
+    return {
+        "dirt": np.zeros((4, 4), np.float32),
+        "mist": np.full((4, 4), 0.5, np.float32),
+        "grade": np.stack((red, green, blue), axis=-1),
+    }
+
+
+def power_now(tick):
+    """How much power the ship's lamps have: it sags at set moments and stutters back."""
+    cycle, into = tick // POWER_CYCLE, tick % POWER_CYCLE
+    start = int(stable(cycle, 5, 24) * (POWER_CYCLE - POWER_SAG))
+    if not start <= into < start + POWER_SAG:
+        return 1.0
+    return 0.5 if stable(tick // 3, cycle, 25) < 0.25 else 0.12
 
 
 def make_sprite(draw, size):
@@ -112,7 +135,7 @@ def spark_painter(variant):
 class ShipRenderer:
     def __init__(
         self, world, texture_path=TEXTURES, size=(960, 540), fov=FIELD_OF_VIEW,
-        alien_path=ALIEN_FRAMES, sky_path=SKY_VIEW,
+        alien_path=ALIEN_FRAMES, sky_path=SKY_VIEW, mood_path=MOOD,
     ):  # fmt: skip
         texture_path = Path(texture_path)
         if not texture_path.is_file():
@@ -141,10 +164,10 @@ class ShipRenderer:
             np.load(sky_path)["sky"] if sky_path.is_file() else np.zeros((2, 4), np.uint32)
         )
         self.width, self.height = size
+        self.lit_tick = None
         self.plane_scale = tan(radians(fov) / 2)
         self.focal_length = self.width / (2 * self.plane_scale)
         self.frame = pygame.Surface(size, depth=32)
-        self.pixel_shifts = tuple(np.uint32(shift) for shift in self.frame.get_shifts()[:3])
         self.depth = ()
         self.color = np.zeros((self.height, self.width, 3), np.float32)
         self.inverse_depth = np.zeros((self.height, self.width), np.float64)
@@ -156,19 +179,32 @@ class ShipRenderer:
         across = (2 * (np.arange(self.width, dtype=np.float32) + 0.5) / self.width - 1)[None, :]
         rows = np.arange(self.height, dtype=np.float32) + 0.5
         down = ((rows / self.height) * 2 - 1)[:, None]
-        self.torch_beam = np.exp(-(across**2 + down**2) / 0.5).astype(np.float32)
+        mood_path = Path(mood_path)
+        mood = dict(np.load(mood_path)) if mood_path.is_file() else plain_mood()
+        self.mist = mood["mist"]
+        spill_size = (self.height + AIR_BLOCK - 1) // AIR_BLOCK, (self.width + AIR_BLOCK - 1) // AIR_BLOCK
+        self.spill = np.zeros((*spill_size, 3), np.float32)
+        self.shrunk = np.zeros_like(self.spill)
+        self.blurred = np.zeros_like(self.spill)
+        spots_y = np.arange(spill_size[0]) * mood["dirt"].shape[0] // spill_size[0]
+        spots_x = np.arange(spill_size[1]) * mood["dirt"].shape[1] // spill_size[1]
+        self.dirt = mood["dirt"][np.ix_(spots_y, spots_x)]
+        self.air_depth = np.zeros(((self.height + 1) // 2, (self.width + 1) // 2), np.float32)
         depths = np.arange(int(FAR * FOG_STEPS) + 2, dtype=np.float32) / FOG_STEPS
         self.fog = np.exp(-depths * FOG_DENSITY)
-        self.vignette = (1 - 0.3 * np.clip(across**2 * 0.75 + down**2 * 0.8, 0, 1)).astype(
+        self.vignette = (1 - 0.5 * np.clip(across**2 * 0.75 + down**2 * 0.8, 0, 1)).astype(
             np.float32
         )
-        noise = np.random.default_rng(404).normal(0, 1.4, (self.height, self.width))
+        noise = np.random.default_rng(404).normal(0, 4.0, (self.height, self.width))
         self.grain = noise.astype(np.float32)
         # Shadows stay deep, and light above full white rolls off rather than clipping flat.
         level = np.arange(TONE_STEPS, dtype=np.float32) / (TONE_STEPS / 2)
         shoulder = np.where(level < 0.7, level, 0.7 + 0.3 * (1 - np.exp(-(level - 0.7) / 0.3)))
         curve = shoulder**0.92 * (1.02 - 0.3 * np.clip(1 - level, 0, 1) ** 6)
         self.tone = (np.clip(curve, 0, 1) * 255 + 0.5).astype(np.uint32)
+        graded = mood["grade"].astype(np.uint32).reshape(-1, 3)
+        shifts = self.frame.get_shifts()
+        self.grade = (graded[:, 0] << shifts[0]) | (graded[:, 1] << shifts[1]) | (graded[:, 2] << shifts[2])
         self.sprites = {
             "alien": (make_sprite(draw_alien, (124, 304)), 0.72, 1.85, 0.0),
             "keycard": (make_sprite(draw_keycard, (64, 40)), 0.42, 0.26, 0.95),
@@ -180,19 +216,26 @@ class ShipRenderer:
         }
         self.alien_art = AlienSprites(alien_path)
         spawn = self.theme.world.spawn_points[0]
-        light, *_ = self._draw(*spawn, 0.0, self.height / 2, 0)  # compile first
+        picture = self.sprites["exit"][0][0]
+        light, *_ = self._draw(*spawn, 0.0, self.height / 2, 0, (picture, (0, 0, 1, 1), 1.0))  # compile first
         self._draw_sprite(light, self.height / 2, 1.0, 0.0, "exit", *spawn)
+        self._finish(light, 0)
 
     def _light_now(self, tick):
-        """Blend the light layers; only their strength changes from frame to frame."""
+        """Blend the light layers; only their strength changes, and only from tick to tick."""
+        if tick != self.lit_tick:
+            self.lit_tick, self.lit = tick, self._blend_light(tick)
+        return self.lit
+
+    def _blend_light(self, tick):
         seconds = tick / TICKS_PER_SECOND
         burst = stable(tick // 4, 3, 21)
         flicker = 0.1 if burst < 0.1 else 0.5 if burst < 0.26 else 1.0
         pulse = 0.4 + 0.6 * (0.5 + 0.5 * sin(seconds * 2.2)) ** 2
         layers = self.theme.layers
-        return layers[STEADY] + layers[FLICKER] * flicker + layers[PULSE] * pulse
+        return (layers[STEADY] + layers[FLICKER] * flicker + layers[PULSE] * pulse) * power_now(tick)
 
-    def _draw(self, x, y, yaw, horizon, tick):
+    def _draw(self, x, y, yaw, horizon, tick, figure=None):
         mesh = self.mesh
         fx, fy = cos(yaw), sin(yaw)
         view = (float(x), float(y), fx, fy, self.plane_scale, float(horizon), self.focal_length)
@@ -202,12 +245,16 @@ class ShipRenderer:
         )  # fmt: skip
         rasterize(self.tris, count, self.inverse_depth, self.ids, RASTER_BANDS)
         light = self._light_now(tick)
+        shrink_depth(self.air_depth, self.inverse_depth)
+        if figure is not None:
+            stamp_depth(self.air_depth, *figure)
         shade(
             self.color, self.inverse_depth, self.ids, self.tris, self.tri_quad, self.texels,
             self.reliefs, self.starts, self.texture_size, mesh["textures"], mesh["tints"],
             mesh["shifts"], mesh["shades"], mesh["frames"], light, self.theme.aim, LIGHT_GRID,
-            self.torch_beam, (float(x), float(y), EYE_HEIGHT), self.sky, self.fog,
+            (float(x), float(y), EYE_HEIGHT), self.sky, self.fog, max(power_now(tick), LAMP_FLOOR),
         )  # fmt: skip
+        self.view = view
         return light, fx, fy
 
     def _place_doors(self, openness):
@@ -230,21 +277,36 @@ class ShipRenderer:
         if snapshot.door_open:
             self._place_doors(snapshot.door_open)
         horizon = self.height / 2 + self.focal_length * tan(pitch)
-        light, fx, fy = self._draw(camera.x, camera.y, camera.yaw, horizon, snapshot.tick)
-        middle = self.inverse_depth[self.height // 2]
-        self.depth = tuple((1 / np.maximum(middle, 1e-6)).tolist())
+        fx, fy = cos(camera.yaw), sin(camera.yaw)
         alien = self.alien_art.sprite(snapshot)
         if alien is not None:
             self.sprites["alien"] = alien
-        for sprite in self._visible_sprites(snapshot, fx, fy):
+        sprites = self._visible_sprites(snapshot, fx, fy)
+        standing = next((sprite for sprite in sprites if sprite[2] == "alien"), None)
+        figure = None
+        if standing is not None:
+            depth, across, kind, *_ = standing
+            figure = (self.sprites[kind][0][0], self._box(kind, depth, across, horizon), 1 / depth)
+        light, fx, fy = self._draw(camera.x, camera.y, camera.yaw, horizon, snapshot.tick, figure)
+        middle = self.inverse_depth[self.height // 2]
+        self.depth = tuple((1 / np.maximum(middle, 1e-6)).tolist())
+        for sprite in sprites:
             self._draw_sprite(light, horizon, *sprite)
+        self._finish(light, snapshot.tick)
+        return self.frame
+
+    def _finish(self, light, tick):
+        air_light(
+            self.spill, self.shrunk, self.air_depth, self.view, EYE_HEIGHT, light, LIGHT_GRID,
+            self.mist, tick * MIST_DRIFT, self.fog,
+        )  # fmt: skip
+        add_glow(self.spill, self.color, self.dirt, self.shrunk, self.blurred)
         pixels = pygame.surfarray.pixels2d(self.frame)
         finish_frame(
-            self.color, self.vignette, self.grain, snapshot.tick * 37 % self.height, self.tone,
-            pixels, self.pixel_shifts,
+            self.color, self.spill, self.vignette, self.grain, tick * 37 % self.height, self.tone,
+            self.grade, pixels,
         )  # fmt: skip
         del pixels  # the surface stays locked for as long as this view lives
-        return self.frame
 
     def _visible_sprites(self, snapshot, fx, fy):
         camera = snapshot.survivor
@@ -269,15 +331,18 @@ class ShipRenderer:
                 seen.append((depth, -rx * fy + ry * fx, kind, x, y))
         return sorted(seen, key=lambda item: item[0], reverse=True)
 
-    def _draw_sprite(self, light, horizon, depth, across, kind, x, y):
-        (picture, glow), world_w, world_h, base = self.sprites[kind]
+    def _box(self, kind, depth, across, horizon):
+        _, world_w, world_h, base = self.sprites[kind]
         width = max(1, round(self.focal_length * world_w / depth))
         height = max(1, round(self.focal_length * world_h / depth))
         left = round(self.width / 2 + self.focal_length * across / depth - width / 2)
         top = round(horizon + self.focal_length * (EYE_HEIGHT - base - world_h) / depth)
+        return left, top, width, height
+
+    def _draw_sprite(self, light, horizon, depth, across, kind, x, y):
+        (picture, glow), *_ = self.sprites[kind]
+        left, top, width, height = self._box(kind, depth, across, horizon)
         spot = light[int(y * LIGHT_GRID), int(x * LIGHT_GRID)]
-        fog = exp(-depth * FOG_DENSITY)
-        near = TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth) * 0.6
-        lit = np.asarray(spot * fog + near * TORCH_COLOR, np.float32)
+        lit = np.asarray(spot * exp(-depth * FOG_DENSITY), np.float32)
         box = (left, top, width, height)
         draw_sprite(self.color, self.inverse_depth, picture, glow, box, 1 / depth, lit)

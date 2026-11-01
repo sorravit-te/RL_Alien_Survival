@@ -51,13 +51,7 @@ SIGNS = {
     "medical": "MEDICAL RING",
     "engine": "ENGINE RING",
 }
-STRIPES = {  # guide rail colors: the district language of the whole ship
-    "stripe_spine": (0.3, 0.9, 0.95),
-    "stripe_command": (0.3, 0.5, 1.0),
-    "stripe_crew": (1.0, 0.55, 0.12),
-    "stripe_medical": (0.3, 1.0, 0.45),
-    "stripe_engine": (1.0, 0.14, 0.06),
-}
+GUIDE_LINE = (0.3, 0.5, 1.0)  # one color all over the ship, to follow through the dark
 LIT_COPIES = ("ceiling3_lit", "ceiling4_lit")
 MADE = ("ceiling2_lit", "window_glass", "hazard", "door1_seam")
 WARNINGS = {"quarantine": "QUARANTINE", "seal": "SEAL THIS DECK", "listen": "IT HEARS YOU"}
@@ -66,7 +60,7 @@ FITTINGS = ("pipe", "pipe_hot", "bracket", "cable", "pane_seal")
 
 
 def texture_names():
-    names = [*MATERIALS, *LIT_COPIES, *STRIPES, *MADE, *FITTINGS]
+    names = [*MATERIALS, *LIT_COPIES, "guide_line", *MADE, *FITTINGS]
     names += [f"{name}_blood" for name in BLOODIED]
     names += [f"{name}_clawed" for name in CLAWED]
     names += [f"sign_{key}" for key in SIGNS]
@@ -359,8 +353,7 @@ def bake(directory, seed=20261030):
     no_glow = np.zeros((SIZE, SIZE), np.float32)
     for key, sign in SIGNS.items():
         textures[f"sign_{key}"] = (plate(plain, sign, rng, (222, 204, 158)), no_glow)
-    for name, color in STRIPES.items():
-        textures[name] = stripe_rail(color)
+    textures["guide_line"] = stripe_rail(GUIDE_LINE)
     textures["hazard"] = (hazard_stripes(), no_glow)
     for key, text in WARNINGS.items():
         textures[f"warning_{key}"] = (plate(plain, text, rng, (190, 30, 20)), no_glow)

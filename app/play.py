@@ -20,7 +20,7 @@ from game.state import CoreConfig
 from renderers.raycasting import RaycastingRenderer
 from renderers.ship_renderer import FIELD_OF_VIEW, ShipRenderer
 
-WINDOW = (1200, 675)
+WINDOW = (1067, 600)  # mist and grain hide the softness; a chase needs the frame rate
 SHIP_FRAME = WINDOW  # drawn pixel for pixel; only the graphics card stretches it to the screen
 MIN_FOV, MAX_FOV = 60, 120  # wider stretches walls at the screen's edges past looking right
 MENU_VEIL = 165  # opacity of 255; a paused frame stays visible behind the text, at about a third

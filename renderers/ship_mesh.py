@@ -369,12 +369,12 @@ class Wall:
             )  # fmt: skip
 
     def floor_line(self):
-        """A painted line beside the wall: its color tells which part of the ship this is."""
-        if self.zone.stripe:
+        """A lit line beside the wall, the same blue everywhere, to follow in the dark."""
+        if self.zone.guide_line:
             near, far = -LINE_OFFSET, -LINE_OFFSET - LINE_WIDTH
             self.mesh.quad(
                 self.at(0, near, 0.012), self.at(self.length, near, 0.012),
-                self.at(self.length, far, 0.012), self.at(0, far, 0.012), self.zone.stripe,
+                self.at(self.length, far, 0.012), self.at(0, far, 0.012), "guide_line",
                 (0, 0, 1), repeat=(self.length, 1.0), reach=0.0,
             )  # fmt: skip
 

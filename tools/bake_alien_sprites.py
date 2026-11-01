@@ -29,7 +29,7 @@ ARCHIVES = ("Poses.zip", "Colors.zip")
 SOURCE = ROOT / "assets" / "alien" / "source"
 RENDERS = ROOT / "assets" / "alien" / "frames"
 KEEP = (".fbx", ".png", ".txt")
-# The ship's torch adds to whatever is drawn, so a plainly lit render washes out up close.
+# Dark skin reads as a figure against the ship's lit walls and mist.
 SKIN_GAIN, SKIN_GAMMA = 0.42, 1.6
 
 

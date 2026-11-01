@@ -12,12 +12,13 @@ from game.ship_deck import EXITS
 from renderers.ship_zones import ZONE_ROWS
 
 LIGHT_GRID = 4  # light samples per world unit
-LIGHT_RADIUS = 10.0
+LIGHT_RADIUS = 7.5  # lamps make pools with dark between them, not an even wash
 RAY_SAMPLES = 40
 LAMP_LOW, LAMP_HIGH = 1.92, 2.3  # lamp height under a plain ceiling and a raised one
 EXIT_LAMP = 1.7
-TONE_KEPT = 0.3  # how much of a zone's hue its lamps keep; metal should still read as metal
-AMBIENT = 3.0  # a dead stretch of corridor stays readable, and the Alien stands out against it
+TONE_KEPT = 0.75  # how much of a zone's hue its lamps keep
+AMBIENT = 1.1  # a dead stretch of corridor is dark, but not black
+DARKER = 0.22  # share of every zone's lamps that have failed, on top of its own
 STEADY, FLICKER, PULSE = 0, 1, 2
 LIGHT_LAYERS = 3
 
@@ -40,7 +41,7 @@ class Zone:
     power: float = 1.0
     blood: float = 0.0  # share of panels and floors with blood or claw marks
     bay_glow: tuple[float, float, float] = (0.0, 0.0, 0.0)  # hidden light inside recesses
-    stripe: str = ""  # lit guide rail along a corridor; its color names the district
+    guide_line: bool = False  # a lit line along the corridor floor
 
 
 CORRIDORS = "SOWEGAD"  # zones that follow the corridor layout of side strips and a middle
@@ -48,7 +49,7 @@ SPINE = Zone(
     ("wall10", "wall10", "wall12", "wall10"), "walltrim2", "ceiling_trim2", "floor_trim1",
     "walltrim3", ("floortrim4", "floor3"), ("ceiling4", "ceiling2"), "ceiling2_lit",
     (0.55, 0.86, 0.92), (0.022, 0.034, 0.042), 5, 0.3, FLICKER, 0.8, 0.1, (0.06, 0.28, 0.33),
-    "stripe_spine",
+    True,
 )  # fmt: skip
 ZONES = {
     "S": SPINE,
@@ -57,22 +58,22 @@ ZONES = {
     "O": Zone(
         ("wall2", "wall7", "wall11"), "columna1", "ceiling_trim1", "floor_trim1", "walltrim6",
         ("floor1", "floor4"), ("ceiling6", "ceiling2"), "ceiling7", (0.5, 0.68, 1.0),
-        (0.016, 0.026, 0.06), 5, 0.2, STEADY, 1.1, 0.0, (0.02, 0.07, 0.22), "stripe_command",
+        (0.016, 0.026, 0.06), 5, 0.2, STEADY, 1.1, 0.0, (0.02, 0.07, 0.22), True,
     ),
     "W": Zone(
         ("wall1", "wall7", "wall1"), "walltrim1", "ceiling_trim2", "floor_trim2", "walltrim4",
         ("floor5", "floor5"), ("ceiling2", "ceiling6"), "ceiling7", (1.0, 0.66, 0.32),
-        (0.042, 0.026, 0.014), 5, 0.4, FLICKER, 0.9, 0.18, (0.2, 0.09, 0.02), "stripe_crew",
+        (0.042, 0.026, 0.014), 5, 0.4, FLICKER, 0.9, 0.18, (0.2, 0.09, 0.02), True,
     ),
     "E": Zone(
         ("wall5", "wall7", "wall5"), "trim2", "ceiling_trim5", "floor_trim2", "walltrim3",
         ("floor4", "floor1"), ("ceiling6", "ceiling2"), "ceiling2_lit", (0.78, 1.0, 0.86),
-        (0.028, 0.044, 0.034), 5, 0.3, STEADY, 1.05, 0.08, (0.05, 0.16, 0.08), "stripe_medical",
+        (0.028, 0.044, 0.034), 5, 0.3, STEADY, 1.05, 0.08, (0.05, 0.16, 0.08), True,
     ),
     "G": Zone(
         ("rack1", "wall12", "wall2"), "columna2", "walltrim5", "floor_trim3", "walltrim5",
         ("floor3", "floor2"), ("ceiling3", "ceiling4"), "ceiling3_lit", (1.0, 0.3, 0.12),
-        (0.05, 0.016, 0.01), 5, 0.3, PULSE, 1.3, 0.1, (0.22, 0.05, 0.01), "stripe_engine",
+        (0.05, 0.016, 0.01), 5, 0.3, PULSE, 1.3, 0.1, (0.22, 0.05, 0.01), True,
     ),
     "Z": Zone(
         ("wall12", "wall10"), "columna1", "ceiling_trim2", "floor_trim1", "walltrim6",
@@ -262,7 +263,7 @@ class ShipTheme:
             ):
                 continue
             taken.append((x, y, zone.spacing))
-            dead = stable(x, y, 11) < zone.dead_share
+            dead = stable(x, y, 11) < zone.dead_share + DARKER
             self.light_cells[(x, y)] = not dead
             if not dead:
                 layer = self._layer_for(zone, x, y)

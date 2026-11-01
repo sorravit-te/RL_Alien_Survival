@@ -173,7 +173,7 @@ def test_glass_shows_even_with_nothing_but_dark_behind_it(textures, tmp_path, sn
     assert dark.sky.shape == (2, 4) and not dark.sky.any()
     camera = replace(snapshot, survivor=SurvivorState(19.5, 3.2, -pi / 2))
     _, colors = window_pixels(dark, dark.render(camera))
-    assert colors.mean() > 2  # room light, marks and the torch all land on the pane
+    assert colors.mean() > 2  # room light and marks both land on the pane
 
 
 def test_a_window_is_sealed_around_its_glass(mesh):
@@ -357,10 +357,37 @@ def test_lamp_direction_leads_back_to_the_lamp(theme):
     assert across < 0 and LAMP_LOW <= lamp <= LAMP_HIGH
 
 
-def test_lamps_keep_a_hint_of_their_zone_and_leave_metal_grey():
+def test_every_corridor_line_is_the_same_blue_guide_line(mesh):
+    lines = mesh["textures"] == texture_names().index("guide_line")
+    assert lines.sum() > 40
+    assert not [name for name in texture_names() if name.startswith("stripe")]
+
+
+def test_the_game_runs_without_the_mood_bake(textures, tmp_path, snapshot):
+    plain = ShipRenderer(WORLD, textures, size=(81, 47), mood_path=tmp_path / "none.npz")
+    frame = plain.render(replace(snapshot, survivor=SurvivorState(19.5, 8.0, -pi / 2)))
+    assert pygame.surfarray.array3d(frame).mean() > 0
+
+
+@pytest.mark.parametrize("size", [(81, 47), (83, 50), (161, 91)])
+def test_sizes_that_do_not_divide_into_the_air_blocks_still_draw(textures, snapshot, size):
+    seen = ShipRenderer(WORLD, textures, size=size)
+    close = AlienState(19.5, 7.0, pi / 2)
+    camera = replace(snapshot, survivor=SurvivorState(19.5, 8.0, -pi / 2), alien=close)
+    assert seen.render(camera).get_size() == size
+
+
+def test_the_same_snapshot_draws_the_same_frame(renderer, snapshot):
+    camera = replace(snapshot, survivor=SurvivorState(19.5, 8.0, -pi / 2), tick=77)
+    first = pygame.surfarray.array3d(renderer.render(camera)).copy()
+    renderer.render(replace(camera, tick=500))
+    assert (pygame.surfarray.array3d(renderer.render(camera)) == first).all()
+
+
+def test_lamps_keep_their_zones_color_so_each_district_has_its_own_light():
     red = ZONES["G"].color
     kept = muted(red)
-    assert max(kept) - min(kept) < (max(red) - min(red)) / 2
+    assert (max(red) - min(red)) / 2 < max(kept) - min(kept) < max(red) - min(red)
     assert kept.index(max(kept)) == red.index(max(red))
 
 
