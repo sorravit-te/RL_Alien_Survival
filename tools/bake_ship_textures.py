@@ -59,10 +59,10 @@ STRIPES = {  # guide rail colors: the district language of the whole ship
     "stripe_engine": (1.0, 0.14, 0.06),
 }
 LIT_COPIES = ("ceiling3_lit", "ceiling4_lit")
-MADE = ("ceiling2_lit", "viewport", "hazard", "door1_seam")
+MADE = ("ceiling2_lit", "window_glass", "hazard", "door1_seam")
 WARNINGS = {"quarantine": "QUARANTINE", "seal": "SEAL THIS DECK", "listen": "IT HEARS YOU"}
 SEAM_HALF = 5  # texels either side of a door's middle
-FITTINGS = ("pipe", "pipe_hot", "bracket", "cable")
+FITTINGS = ("pipe", "pipe_hot", "bracket", "cable", "pane_seal")
 
 
 def texture_names():
@@ -243,17 +243,27 @@ def blood(rgb, rng, *, drips):
     return rgb * (1 - alpha[..., None] * 0.94) + dried * alpha[..., None] * 0.94
 
 
-def starfield(rng):
-    """Sparse stars over a faint gradient; open space should feel empty, not painted."""
-    fade = np.linspace(0.0, 1.0, SIZE, dtype=np.float32)[None, :, None]
-    sky = fade * np.array([0.006, 0.012, 0.03], np.float32) * np.ones((SIZE, SIZE, 3), np.float32)
-    for _ in range(260):
-        x, y = rng.integers(0, SIZE - 2, 2)
-        size = 2 if rng.random() < 0.15 else 1
-        sky[y : y + size, x : x + size] = float(rng.uniform(0.25, 1.0)) * np.array(
-            [0.9, 0.95, 1.0], np.float32
-        )
-    return sky
+def glass_marks(rng):
+    """Dust, scratches, corner grime and two soft streaks: what shows a pane is really there."""
+    dust = np.clip(smooth_noise(rng, 12) - 0.5, 0, 1) * 0.16
+    grit = (rng.random((SIZE, SIZE), dtype=np.float32) > 0.9985) * 0.35
+    lines = Image.new("L", (SIZE, SIZE), 0)
+    draw = ImageDraw.Draw(lines)
+    for _ in range(14):
+        x, y = rng.integers(0, SIZE, 2)
+        turn, length = float(rng.normal(0.5, 0.5)), float(rng.uniform(20, 90))
+        end = (x + np.cos(turn) * length, y + np.sin(turn) * length)
+        draw.line((int(x), int(y), *end), fill=int(rng.integers(30, 80)), width=1)
+    scratches = np.asarray(lines.filter(ImageFilter.GaussianBlur(0.6)), np.float32) / 255
+    places = np.arange(SIZE, dtype=np.float32) / SIZE
+    from_edge = np.minimum(places, 1 - places)
+    edge = np.minimum(from_edge[None, :], from_edge[:, None])
+    grime = np.clip(1 - edge / 0.07, 0, 1) ** 2 * (0.25 + 0.35 * smooth_noise(rng, 30))
+    slant = places[None, :] + places[:, None] * 0.6
+    streaks = 0.2 * np.exp(-(((slant - 0.62) / 0.09) ** 2))
+    streaks += 0.15 * np.exp(-(((slant - 0.86) / 0.03) ** 2))
+    marks = np.clip(dust + grit + scratches + grime + streaks, 0, 1)
+    return np.ones((SIZE, SIZE, 3), np.float32) * np.array((0.72, 0.76, 0.8), np.float32), marks
 
 
 def lit_panel(rgb):
@@ -313,7 +323,9 @@ def add_fittings(textures, reliefs, rng):
     textures["pipe_hot"] = (pipe_metal((0.5, 0.33, 0.24), rng), no_glow)
     textures["bracket"] = (plain_metal(0.1, rng), no_glow)
     textures["cable"] = (plain_metal(0.05, rng), no_glow)
-    for name, shine in (("pipe", 0.55), ("pipe_hot", 0.5), ("bracket", 0.3), ("cable", 0.2)):
+    textures["pane_seal"] = (plain_metal(0.035, rng), no_glow)
+    shines = {"pipe": 0.55, "pipe_hot": 0.5, "bracket": 0.3, "cable": 0.2, "pane_seal": 0.1}
+    for name, shine in shines.items():
         reliefs[name] = flat_relief()
         reliefs[name][..., 3] = shine
 
@@ -334,7 +346,7 @@ def bake(directory, seed=20261030):
         textures[name] = textures[base]
         reliefs[name] = reliefs[base]
         textures[base] = (textures[base][0] * 0.6, np.zeros((SIZE, SIZE), np.float32))
-    textures["viewport"] = (starfield(rng), np.ones((SIZE, SIZE), np.float32))
+    textures["window_glass"] = glass_marks(rng)
     for name in BLOODIED:
         rgb, glow = textures[name]
         textures[f"{name}_blood"] = (blood(rgb, rng, drips=name.startswith("wall")), glow)

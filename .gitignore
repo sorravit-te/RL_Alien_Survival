@@ -23,6 +23,9 @@ __pycache__/
 # Baked by tools.bake_alien_sprites from a free model.
 /assets/alien/
 
+# Baked by tools.bake_ship_sky from NASA maps.
+/assets/space/
+
 # Generated experiments and machine-specific reports
 /models/
 /experiments/

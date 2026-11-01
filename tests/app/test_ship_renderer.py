@@ -123,11 +123,67 @@ def test_door_leaves_carry_their_seam_in_the_texture(mesh):
 
 
 def test_windows_show_space_from_behind_closed_reveals(mesh):
-    sky = texture_names().index("viewport")
+    sky = texture_names().index("window_glass")
     panes = mesh["textures"] == sky
     assert panes.sum() >= 4 and (mesh["shades"][panes] == SKY).all()
     frame = (mesh["textures"] == texture_names().index("walltrim3")) & (mesh["shades"] < 0.75)
     assert frame.sum() >= panes.sum() * 4
+
+
+def sky_file(tmp_path, west, east):
+    sky = np.full((256, 512), west, np.uint32)
+    sky[:, 256:] = east
+    path = tmp_path / "sky.npz"
+    np.savez(path, sky=sky)
+    return path
+
+
+def window_pixels(renderer, frame):
+    """Screen columns and colors of what shows through the glass, in the last render."""
+    quads = renderer.tri_quad[np.maximum(renderer.ids, 0)]
+    glass = (renderer.ids >= 0) & (renderer.mesh["shades"][quads] == SKY)
+    rows, columns = np.nonzero(glass)
+    return columns, pygame.surfarray.array3d(frame).swapaxes(0, 1)[rows, columns].astype(np.int32)
+
+
+def test_space_keeps_east_on_the_right_through_the_windows(textures, tmp_path, snapshot):
+    red, blue = 0x0000FF, 0xFF0000
+    wide = (320, 180)
+    seen = ShipRenderer(WORLD, textures, size=wide, sky_path=sky_file(tmp_path, red, blue))
+    camera = replace(snapshot, survivor=SurvivorState(19.5, 4.5, -pi / 2))
+    columns, colors = window_pixels(seen, seen.render(camera))
+    left, right = colors[columns < 150], colors[columns > 170]
+    assert left[:, 0].mean() > left[:, 2].mean() and right[:, 2].mean() > right[:, 0].mean()
+
+
+@pytest.mark.parametrize(("x", "y"), [(19.1, 3.0), (20.9, 3.0), (19.1, 14.0)])
+def test_space_ignores_where_the_player_stands(textures, tmp_path, snapshot, x, y):
+    """Like a real window: anything that scaled with distance would read as a picture on the wall."""
+    red, blue = 0x0000FF, 0xFF0000
+    wide = (320, 180)
+    seen = ShipRenderer(WORLD, textures, size=wide, sky_path=sky_file(tmp_path, red, blue))
+    camera = replace(snapshot, survivor=SurvivorState(x, y, -pi / 2))
+    columns, colors = window_pixels(seen, seen.render(camera))
+    left, right = colors[columns < 158], colors[columns > 162]
+    assert left[:, 0].mean() > left[:, 2].mean() * 2 and right[:, 2].mean() > right[:, 0].mean() * 2
+
+
+def test_glass_shows_even_with_nothing_but_dark_behind_it(textures, tmp_path, snapshot):
+    dark = ShipRenderer(WORLD, textures, size=(320, 180), sky_path=tmp_path / "none.npz")
+    assert dark.sky.shape == (2, 4) and not dark.sky.any()
+    camera = replace(snapshot, survivor=SurvivorState(19.5, 3.2, -pi / 2))
+    _, colors = window_pixels(dark, dark.render(camera))
+    assert colors.mean() > 2  # room light, marks and the torch all land on the pane
+
+
+def test_a_window_is_sealed_around_its_glass(mesh):
+    panes = mesh["vertices"][mesh["textures"] == texture_names().index("window_glass")]
+    seals = mesh["vertices"][mesh["textures"] == texture_names().index("pane_seal")]
+    for pane in panes:
+        low, high = pane.min(axis=0), pane.max(axis=0)
+        around = (seals.min(axis=1) >= low - 0.05).all(axis=1)
+        around &= (seals.max(axis=1) <= high + 0.05).all(axis=1)
+        assert around.sum() == 4
 
 
 @pytest.mark.parametrize(

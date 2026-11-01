@@ -5,7 +5,7 @@ motion in the picture comes from snapshot.tick, so a frame replays exactly. Pitc
 simulated: it slides the horizon and never changes what the Core senses.
 """
 
-from math import cos, exp, hypot, pi, radians, sin, tan
+from math import cos, exp, hypot, radians, sin, tan
 from os import cpu_count
 from pathlib import Path
 
@@ -36,13 +36,13 @@ from renderers.ship_mesh import build_mesh
 from renderers.ship_theme import FLICKER, LIGHT_GRID, PULSE, STEADY, ShipTheme, stable
 
 TEXTURES = Path(__file__).resolve().parents[1] / "assets/stradex/prepared/ship_textures.npz"
+SKY_VIEW = Path(__file__).resolve().parents[1] / "assets/space/ship_sky.npz"
 BAKE_HINT = "then run: .venv/Scripts/python.exe -m tools.bake_ship_textures"
 FIELD_OF_VIEW = 100  # degrees across the screen; the player's view, never the Alien's
 EYE_HEIGHT = 1.12
 TORCH_COLOR = np.array([TORCH_RED, TORCH_GREEN, TORCH_BLUE], np.float32)
 TICKS_PER_SECOND = 30
 RASTER_BANDS = 24
-SKY_TURNS = 4  # star texture repeats around one full turn of the camera
 SPARK_TICKS = 12  # a light's chance of shorting out comes up this often
 SPARK_CHANCE = 0.07
 SPARK_PICTURES = 3
@@ -112,7 +112,7 @@ def spark_painter(variant):
 class ShipRenderer:
     def __init__(
         self, world, texture_path=TEXTURES, size=(960, 540), fov=FIELD_OF_VIEW,
-        alien_path=ALIEN_FRAMES,
+        alien_path=ALIEN_FRAMES, sky_path=SKY_VIEW,
     ):  # fmt: skip
         texture_path = Path(texture_path)
         if not texture_path.is_file():
@@ -135,6 +135,11 @@ class ShipRenderer:
         sizes = [level.reshape(-1, 4).shape[0] for level in levels]
         self.starts = np.array((0, sizes[0], sizes[0] + sizes[1]), np.int64)
         self.door_rest = self.mesh["vertices"][self.mesh["door_quads"]].copy()
+        # Without the baked sky the windows simply look out on the dark.
+        sky_path = Path(sky_path)
+        self.sky = (
+            np.load(sky_path)["sky"] if sky_path.is_file() else np.zeros((2, 4), np.uint32)
+        )
         self.width, self.height = size
         self.plane_scale = tan(radians(fov) / 2)
         self.focal_length = self.width / (2 * self.plane_scale)
@@ -201,8 +206,7 @@ class ShipRenderer:
             self.color, self.inverse_depth, self.ids, self.tris, self.tri_quad, self.texels,
             self.reliefs, self.starts, self.texture_size, mesh["textures"], mesh["tints"],
             mesh["shifts"], mesh["shades"], mesh["frames"], light, self.theme.aim, LIGHT_GRID,
-            self.torch_beam, (float(x), float(y), EYE_HEIGHT), yaw / (2 * pi) * SKY_TURNS,
-            float(horizon), self.fog,
+            self.torch_beam, (float(x), float(y), EYE_HEIGHT), self.sky, self.fog,
         )  # fmt: skip
         return light, fx, fy
 

@@ -7,7 +7,7 @@ Every pixel is lit from its own normal, so the relief in a material answers the 
 and the torch as the player moves. Baked light tells how much arrives and from where.
 """
 
-from math import ceil, floor, sqrt
+from math import asin, atan2, ceil, floor, pi, sqrt
 
 import numpy as np
 from numba import njit, prange
@@ -37,8 +37,14 @@ BAY_POWER = 3.2
 TONE_STEPS = 1024  # the curve spans twice full white, so highlights roll off, not clip
 TRI_FIELDS = 24
 FRAME_FIELDS = 9  # across, up and out of a surface, in world space
-SKY = 0.0  # a surface with this shade shows space, as far away as the stars are
-SKY_SCALE = 0.8  # share of the star texture seen across the screen
+SKY = 0.0  # a surface with this shade is window glass with open space behind it
+GLASS_TINT = 0.93, 0.97, 1.0  # thick glass takes a little red out of what passes
+GLASS_MIRROR = 0.07  # what it reflects looking straight on; grazing it, nearly all
+GLASS_ROOM = 0.55  # the lit bridge in the pane
+GLASS_DUST = 0.35  # how much the marks on a pane dim the view
+GLASS_MARKS_LIT = 0.6  # how hard those marks catch the room's light
+GLASS_GLARE = 0.3  # the torch thrown back when the pane is faced square on
+GLASS_LAMP = 2.4  # the bridge lamps mirrored in the pane, sliding as the player walks
 ATTRIBUTES = 6  # depth, u, v, world x, y, z; each divided by depth
 
 
@@ -73,6 +79,27 @@ def light_at(light, aim, grid, x, y):
         blend(aim, 0, y0, x0, y1, x1, near, right, below, far),
         blend(aim, 1, y0, x0, y1, x1, near, right, below, far),
         blend(aim, 2, y0, x0, y1, x1, near, right, below, far),
+    )
+
+
+@njit(inline="always")
+def sky_at(sky, x, y, z):
+    """Bilinear look along a unit ray: x right of the bow, y ahead of it, z up."""
+    height, width = sky.shape[0], sky.shape[1]
+    fx = (atan2(x, y) / (2 * pi) + 0.5) * width - 0.5
+    fy = (0.5 - asin(min(max(z, -1.0), 1.0)) / pi) * height - 0.5
+    left, top = floor(fx), floor(fy)
+    tx, ty = fx - left, fy - top
+    x0, x1 = int(left) % width, (int(left) + 1) % width
+    y0, y1 = max(int(top), 0), min(int(top) + 1, height - 1)
+    ar, ag, ab, _ = unpack(sky[y0, x0])
+    br, bg, bb, _ = unpack(sky[y0, x1])
+    cr, cg, cb, _ = unpack(sky[y1, x0])
+    dr, dg, db, _ = unpack(sky[y1, x1])
+    return (
+        mix(ar, br, cr, dr, tx, ty) / 255.0,
+        mix(ag, bg, cg, dg, tx, ty) / 255.0,
+        mix(ab, bb, cb, db, tx, ty) / 255.0,
     )
 
 
@@ -270,7 +297,7 @@ def rasterize(tris, count, inverse_depth, ids, bands):
 @njit(parallel=True, nogil=True, cache=True)
 def shade(
     color, inverse_depth, ids, tris, tri_quad, texels, reliefs, starts, size, textures, tints,
-    shifts, shades, frames, light, aim, light_grid, beam, eye, sky_turn, horizon, fog_table,
+    shifts, shades, frames, light, aim, light_grid, beam, eye, sky, fog_table,
 ):  # fmt: skip
     height, width = color.shape[0], color.shape[1]
     eye_x, eye_y, eye_z = eye
@@ -292,13 +319,59 @@ def shade(
             sx = column + 0.5
             quad = tri_quad[tri]
             if shades[quad] == SKY:
-                # Stars depend only on where the camera points, so they never come closer.
-                u = sky_turn + sx / width * SKY_SCALE
-                v = (sy - horizon) / width * SKY_SCALE
-                r, g, b, a = fetch(texels, starts[0], size, textures[quad], u, v, False)
-                color[row, column, 0] = r / 255.0
-                color[row, column, 1] = g / 255.0
-                color[row, column, 2] = b / 255.0
+                # Space sits at infinity: only the way the player looks moves it.
+                depth = 1 / inverse_depth[row, column]
+                world_x = (tris[tri, 15] * sx + tris[tri, 16] * sy + tris[tri, 17]) * depth
+                world_y = (tris[tri, 18] * sx + tris[tri, 19] * sy + tris[tri, 20]) * depth
+                world_z = (tris[tri, 21] * sx + tris[tri, 22] * sy + tris[tri, 23]) * depth
+                ray_x, ray_y, ray_z = world_x - eye_x, world_y - eye_y, world_z - eye_z
+                scale = 1.0 / sqrt(ray_x * ray_x + ray_y * ray_y + ray_z * ray_z + 1e-6)
+                ray_x *= scale
+                ray_y *= scale
+                ray_z *= scale
+                space_r, space_g, space_b = sky_at(sky, ray_x, -ray_y, ray_z)
+                u = (tris[tri, 9] * sx + tris[tri, 10] * sy + tris[tri, 11]) * depth
+                v = (tris[tri, 12] * sx + tris[tri, 13] * sy + tris[tri, 14]) * depth
+                r, g, b, a = fetch(texels, starts[0], size, textures[quad], u, v, True)
+                marks = a / 255.0
+                # Glass shows by what lands on it: dust, the room, and the player's torch.
+                out_x, out_y, out_z = frames[quad, 6], frames[quad, 7], frames[quad, 8]
+                square_on = max(-(ray_x * out_x + ray_y * out_y + ray_z * out_z), 0.0)
+                grazing = 1.0 - square_on
+                mirror = grazing * grazing
+                mirror = GLASS_MIRROR + (1.0 - GLASS_MIRROR) * mirror * mirror * grazing
+                shift_x, shift_y = shifts[quad, 0], shifts[quad, 1]
+                room_r, room_g, room_b, aim_x, aim_y, lamp_top = light_at(
+                    light, aim, light_grid, world_x + shift_x, world_y + shift_y
+                )
+                lamp_x, lamp_y, lamp_z = aim_x + shift_x, aim_y + shift_y, lamp_top - world_z
+                scale = 1.0 / sqrt(lamp_x * lamp_x + lamp_y * lamp_y + lamp_z * lamp_z + 1e-4)
+                turn = 2.0 * square_on
+                bounce = (
+                    (ray_x + turn * out_x) * lamp_x + (ray_y + turn * out_y) * lamp_y
+                    + (ray_z + turn * out_z) * lamp_z
+                ) * scale  # fmt: skip
+                lamp_shine = sharpen(max(bounce, 0.0))
+                lamp_shine *= lamp_shine * GLASS_LAMP
+                torch = beam[row, column] * TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth)
+                glare = torch * sharpen(square_on) * GLASS_GLARE
+                seen = (1.0 - mirror) * (1.0 - marks * GLASS_DUST)
+                caught = marks * GLASS_MARKS_LIT
+                color[row, column, 0] = (
+                    space_r * seen * GLASS_TINT[0]
+                    + room_r * (mirror * GLASS_ROOM + lamp_shine)
+                    + (room_r + torch) * caught * r / 255.0 + glare * TORCH_RED
+                )  # fmt: skip
+                color[row, column, 1] = (
+                    space_g * seen * GLASS_TINT[1]
+                    + room_g * (mirror * GLASS_ROOM + lamp_shine)
+                    + (room_g + torch) * caught * g / 255.0 + glare * TORCH_GREEN
+                )  # fmt: skip
+                color[row, column, 2] = (
+                    space_b * seen * GLASS_TINT[2]
+                    + room_b * (mirror * GLASS_ROOM + lamp_shine)
+                    + (room_b + torch) * caught * b / 255.0 + glare * TORCH_BLUE
+                )  # fmt: skip
                 continue
             depth = 1 / inverse_depth[row, column]
             if quad != lit_quad or column >= lit_until:

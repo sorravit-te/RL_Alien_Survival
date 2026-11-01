@@ -40,6 +40,7 @@ LINTEL_FOOT = 1.7
 PANEL_LOW = 0.16  # recess depth at the foot of a bay panel
 PANEL_HIGH = 0.42  # recess depth at its head
 WINDOW_LOW, WINDOW_HIGH, WINDOW_DEPTH = 0.42, 1.65, 0.3
+WINDOW_SEAL = 0.035  # the dark gasket a pane sits in
 DOOR_TRIM, DOOR_COLUMN = 0.26, 0.5  # frame widths beside a doorway
 DOOR_FRAME_PROUD, DOOR_COLUMN_PROUD, DOOR_HEADER_PROUD = 0.1, 0.18, 0.14  # past PILLAR_PROUD
 FRAME_INSET, FRAME_BACK = 0.01, 0.05  # the frame's inner face must not share a pillar's plane
@@ -345,7 +346,13 @@ class Wall:
         low, high, deep = WINDOW_LOW, WINDOW_HIGH, WINDOW_DEPTH
         self.flat(s0, s1, 0, low, "wall9", shade=0.8)
         self.flat(s0, s1, high, self.top, "walltrim6", shade=0.8)
-        self.flat(s0, s1, low, high, "viewport", depth=deep, shade=SKY)
+        self.flat(s0, s1, low, high, "window_glass", depth=deep, shade=SKY)
+        seal, front = WINDOW_SEAL, deep - 0.012
+        for left, right, foot, head in (
+            (s0, s1, low, low + seal), (s0, s1, high - seal, high),
+            (s0, s0 + seal, low, high), (s1 - seal, s1, low, high),
+        ):  # fmt: skip
+            self.flat(left, right, foot, head, "pane_seal", depth=front, reach=0.3)
         frame = "walltrim3"
         self.mesh.quad(
             self.at(s0, 0, low), self.at(s1, 0, low), self.at(s1, deep, low),

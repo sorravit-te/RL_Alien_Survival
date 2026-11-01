@@ -8,3 +8,5 @@ A small test scene is playable against a trained Alien. The full map and hiding 
 ## Assets
 
 [Stradex - Sci-Fi Tech Hall Texture Pack](https://stradex.itch.io/scifi-tech-hall-texture-pack)
+
+Earth and Moon imagery: NASA Earth Observatory and NASA's Scientific Visualization Studio. This project is not endorsed by NASA.
