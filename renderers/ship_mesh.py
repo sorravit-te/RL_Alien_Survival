@@ -15,7 +15,6 @@ from renderers.ship_kernels import SKY
 from renderers.ship_theme import (
     CABLED,
     CORRIDORS,
-    CROSSES,
     FACES,
     FURNITURE,
     HOT_PIPES,
@@ -60,6 +59,8 @@ LEAF_PROFILE = (  # height, distance out from the door's middle plane
     (1.54, LEAF_RAISED),
     (DOOR_TOP, LEAF_RAISED),
 )
+SIGN_LEFT, SIGN_RIGHT, SIGN_LOW, SIGN_HIGH = -0.25, 1.25, 1.74, 2.0
+SIGN_PROUD = 0.19  # clear of the door frames beside it, inside the player's collision radius
 LINE_OFFSET = 0.3  # painted floor line, measured out from the wall
 LINE_WIDTH = 0.045
 SIDEWAYS = ("columna1", "columna2")  # these images lie down, so a pillar stands them up
@@ -390,6 +391,21 @@ class Wall:
         self.flat(0, self.length, 0.26, self.top - 0.3, texture, repeat=(self.length / 1.6, 1.0))
         self.flat(0, self.length, self.top - 0.3, self.top, self.zone.cornice, shade=0.85)
 
+    def sign_edges(self):
+        """The underside and ends of a sign box, so it reads as fixed to the wall."""
+        low, high, proud = SIGN_LOW, SIGN_HIGH, -SIGN_PROUD
+        self.mesh.quad(
+            self.at(SIGN_LEFT, proud, low), self.at(SIGN_RIGHT, proud, low),
+            self.at(SIGN_RIGHT, 0, low), self.at(SIGN_LEFT, 0, low), "walltrim5", (0, 0, -1),
+            span=(0, 0.5), shade=0.35, reach=0.3,
+        )  # fmt: skip
+        for s, sign in ((SIGN_LEFT, -1), (SIGN_RIGHT, 1)):
+            self.mesh.quad(
+                self.at(s, 0, low), self.at(s, proud, low), self.at(s, proud, high),
+                self.at(s, 0, high), "walltrim5", self.side(sign), span=(0, 0.2), shade=0.45,
+                reach=0.3,
+            )  # fmt: skip
+
     def pipe(self, s0, s1, out, z, radius, texture):
         """A run along the wall, faceted around the sides seen from below."""
         points = [(radians(a), cos(radians(a)), sin(radians(a))) for a in PIPE_ANGLES]
@@ -563,7 +579,8 @@ def add_signs(mesh, theme):
         along = y if dx else x
         # The wall's outward normal is (dx, dy), so it is built from the open cell's side.
         wall = Wall(mesh, -dx, -dy, line, along, along + 1, WALL_TOP, ZONES["S"], 0)
-        wall.flat(-0.25, 1.25, 1.74, 2.0, name, depth=-0.1, shade=1.0, reach=0.3)
+        wall.flat(SIGN_LEFT, SIGN_RIGHT, SIGN_LOW, SIGN_HIGH, name, depth=-SIGN_PROUD, reach=0.3)
+        wall.sign_edges()
 
 
 def add_doors(mesh, theme):
@@ -699,11 +716,6 @@ class DoorSide:
         )  # fmt: skip
 
 
-def add_crosses(mesh, theme):
-    for x, y, face in CROSSES:
-        wall_at(mesh, x, y, face).flat(0.15, 0.85, 1.15, 1.85, "cross", depth=-0.1, reach=0.3)
-
-
 def add_hazard_lines(mesh, theme):
     """Striped thresholds warn that the ship's dangerous end starts here."""
     for y in range(theme.height):
@@ -722,22 +734,16 @@ def add_hazard_lines(mesh, theme):
 
 
 def add_wreck(mesh):
-    """One ceiling panel has torn loose in the crew ring: a sight nobody forgets passing."""
+    """One ceiling panel has dropped on its hinge in the crew ring, above the Alien's head."""
+    hole = WALL_TOP - 0.01
     mesh.quad(
-        (7.1, 16.2, 1.25), (8.9, 16.5, 1.55), (8.9, 17.3, WALL_TOP), (7.1, 17.0, WALL_TOP),
-        "ceiling2", (0.1, -0.6, 0.8), shade=0.75, reach=0.0,
+        (7.1, 17.3, hole), (8.9, 17.3, hole), (8.9, 16.1, hole), (7.1, 16.1, hole), "cable",
+        (0, 0, -1), reach=0.0, shade=0.5,
     )  # fmt: skip
-    mesh.quad(
-        (7.1, 16.2, 1.25), (8.9, 16.5, 1.55), (8.9, 17.3, WALL_TOP), (7.1, 17.0, WALL_TOP),
-        "walltrim5", (-0.1, 0.6, -0.8), shade=0.6, reach=0.0,
-    )  # fmt: skip
-
-
-def wall_at(mesh, x, y, face):
-    dx, dy = FACES[face]
-    line = (x + (dx > 0)) if dx else (y + (dy > 0))
-    along = y if dx else x
-    return Wall(mesh, -dx, -dy, line, along, along + 1, WALL_TOP, ZONES["S"], 0)
+    low, high = OVERHEAD_FLOOR + 0.02, OVERHEAD_FLOOR + 0.08
+    corners = (7.1, 16.2, low), (8.9, 16.4, high), (8.9, 17.3, WALL_TOP), (7.1, 17.2, WALL_TOP)
+    mesh.quad(*corners, "ceiling2", (0.1, -0.2, 0.97), shade=0.75, reach=0.0)
+    mesh.quad(*corners, "ceiling4", (-0.1, 0.2, -0.97), shade=0.9, reach=0.0)
 
 
 def build_mesh(theme, names):
@@ -747,7 +753,6 @@ def build_mesh(theme, names):
     add_hull_doors(mesh, theme)
     add_signs(mesh, theme)
     add_doors(mesh, theme)
-    add_crosses(mesh, theme)
     add_hazard_lines(mesh, theme)
     add_wreck(mesh)
     add_cables(mesh, theme)

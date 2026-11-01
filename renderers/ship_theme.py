@@ -61,7 +61,7 @@ ZONES = {
     ),
     "W": Zone(
         ("wall1", "wall7", "wall1"), "walltrim1", "ceiling_trim2", "floor_trim2", "walltrim4",
-        ("floor5", "floor2"), ("ceiling2", "ceiling6"), "ceiling7", (1.0, 0.66, 0.32),
+        ("floor5", "floor5"), ("ceiling2", "ceiling6"), "ceiling7", (1.0, 0.66, 0.32),
         (0.042, 0.026, 0.014), 5, 0.4, FLICKER, 0.9, 0.18, (0.2, 0.09, 0.02), "stripe_crew",
     ),
     "E": Zone(
@@ -167,8 +167,7 @@ WARNINGS = {
     (29, 22, 1): "warning_seal",
     (17, 23, 1): "warning_listen",
 }
-CROSSES = ((29, 23, 1), (33, 20, 0))  # green crosses mark the medical side
-FACES = ((-1, 0), (1, 0), (0, -1), (0, 1))  # west, east, north, south face of a solid cell
+FACES =((-1, 0), (1, 0), (0, -1), (0, 1))  # west, east, north, south face of a solid cell
 PIPED ={"S": 0.7, "O": 0.6, "W": 0.7, "E": 0.6, "G": 1.0, "C": 0.5, "R": 1.0}  # share of walls
 HOT_PIPES = "GR"
 CABLED = "SOEGZ"

@@ -59,7 +59,7 @@ STRIPES = {  # guide rail colors: the district language of the whole ship
     "stripe_engine": (1.0, 0.14, 0.06),
 }
 LIT_COPIES = ("ceiling3_lit", "ceiling4_lit")
-MADE = ("ceiling2_lit", "viewport", "hazard", "cross", "door1_seam")
+MADE = ("ceiling2_lit", "viewport", "hazard", "door1_seam")
 WARNINGS = {"quarantine": "QUARANTINE", "seal": "SEAL THIS DECK", "listen": "IT HEARS YOU"}
 SEAM_HALF = 5  # texels either side of a door's middle
 FITTINGS = ("pipe", "pipe_hot", "bracket", "cable")
@@ -292,15 +292,6 @@ def stripe_rail(color):
     return rgb, glow
 
 
-def medical_cross():
-    rgb = np.full((SIZE, SIZE, 3), 0.03, np.float32)
-    glow = np.zeros((SIZE, SIZE), np.float32)
-    low, high = SIZE // 3, 2 * SIZE // 3
-    rgb[low:high, 40:-40] = rgb[40:-40, low:high] = (0.25, 1.0, 0.45)
-    glow[low:high, 40:-40] = glow[40:-40, low:high] = 0.45
-    return rgb, glow
-
-
 def pipe_metal(color, rng):
     """Rounded across its width, with a joint once per cell along its length."""
     across = np.sin(np.linspace(0.25, 2.9, SIZE, dtype=np.float32))[:, None] ** 2
@@ -359,7 +350,6 @@ def bake(directory, seed=20261030):
     for name, color in STRIPES.items():
         textures[name] = stripe_rail(color)
     textures["hazard"] = (hazard_stripes(), no_glow)
-    textures["cross"] = medical_cross()
     for key, text in WARNINGS.items():
         textures[f"warning_{key}"] = (plate(plain, text, rng, (190, 30, 20)), no_glow)
     add_fittings(textures, reliefs, rng)

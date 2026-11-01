@@ -18,11 +18,14 @@ from renderers.raycasting import cast_ray
 from renderers.ship_kernels import SKY
 from renderers.ship_mesh import (
     COLLAR_SCALE,
+    DOOR_COLUMN_PROUD,
+    DOOR_HEADER_PROUD,
     DOOR_TOP,
     OVERHEAD_FLOOR,
     PILLAR_PROUD,
     PIPE_OUT,
     PIPE_RADIUS,
+    SIGN_PROUD,
     WALL_TOP,
     Mesh,
     Wall,
@@ -314,6 +317,39 @@ def test_fittings_hang_above_the_alien_so_they_never_hide_it(mesh):
     assert fittings(mesh).sum() > 300
     assert mesh["vertices"][fittings(mesh)][:, :, 2].min() >= OVERHEAD_FLOOR
     assert OVERHEAD_FLOOR > 1.85  # the top of the Alien sprite
+
+
+def hanging_in_open_floor(mesh, theme):
+    """Door headers and the low crawlway ceiling belong where they are; nothing else may hang."""
+    corners = mesh["vertices"]
+    centres = corners.mean(axis=1)
+    doorways = np.array(WORLD.doors, np.float32) + 0.5
+
+    def open_floor(x, y):
+        beside_door = (np.abs(doorways - (x, y)) <= 0.7).all(axis=1).any()
+        if beside_door or WORLD.overlaps(float(x), float(y), 0.3):
+            return False
+        around = ((0.1, 0), (-0.1, 0), (0, 0.1), (0, -0.1))
+        return all(theme.zone_at(int(x + dx), int(y + dy)) != "N" for dx, dy in around)
+
+    clear = np.array([open_floor(x, y) for x, y, _ in centres])
+    lowest, highest = corners[:, :, 2].min(axis=1), corners[:, :, 2].max(axis=1)
+    return centres[clear & (highest > 0.05) & (lowest < OVERHEAD_FLOOR)]
+
+
+def test_nothing_hangs_where_it_could_hide_the_alien_in_open_floor(mesh, theme):
+    assert len(hanging_in_open_floor(mesh, theme)) == 0
+
+
+def test_a_panel_hanging_low_in_a_corridor_would_be_noticed(mesh, theme):
+    low = mesh["vertices"].copy()
+    panel = (7.1, 16.2, 1.25), (8.9, 16.5, 1.55), (8.9, 17.3, WALL_TOP), (7.1, 17.0, WALL_TOP)
+    low[0] = panel
+    assert len(hanging_in_open_floor({**mesh, "vertices": low}, theme)) == 1
+
+
+def test_signs_stand_clear_of_door_frames_and_inside_collision():
+    assert max(DOOR_COLUMN_PROUD, DOOR_HEADER_PROUD) < SIGN_PROUD < CoreConfig().radius
 
 
 def test_fittings_stay_inside_where_collision_stops_the_player():
