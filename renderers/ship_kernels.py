@@ -309,6 +309,7 @@ def shade(
 ):  # fmt: skip
     height, width = color.shape[0], color.shape[1]
     eye_x, eye_y, eye_z = eye
+    last_fog = fog_table.shape[0] - 1
     for row in prange(height):
         sy = row + 0.5
         lit_quad, lit_until = -1, 0
@@ -411,7 +412,8 @@ def shade(
                 half_x *= scale
                 half_y *= scale
                 half_z *= scale
-                fog = fog_table[int(depth * FOG_STEPS)]
+                # A surface that starts inside FAR can run on well past it.
+                fog = fog_table[min(int(depth * FOG_STEPS), last_fog)]
                 gain = shades[quad] * fog
                 dark = (red + green + blue) * gain < DIM
                 lit_until = column + (DARK_SPAN if dark else LIGHT_SPAN)

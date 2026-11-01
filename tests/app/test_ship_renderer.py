@@ -15,7 +15,7 @@ from game.map import scenario_map
 from game.ship_deck import SHIP_SCENARIO
 from game.state import AlienState, CoreConfig, SurvivorState
 from renderers.raycasting import cast_ray
-from renderers.ship_kernels import SKY
+from renderers.ship_kernels import FOG_STEPS, SKY
 from renderers.ship_mesh import (
     COLLAR_SCALE,
     DOOR_COLUMN_PROUD,
@@ -361,6 +361,18 @@ def test_every_corridor_line_is_the_same_blue_guide_line(mesh):
     lines = mesh["textures"] == texture_names().index("guide_line")
     assert lines.sum() > 40
     assert not [name for name in texture_names() if name.startswith("stripe")]
+
+
+def test_a_long_wall_never_reads_past_the_fog_table(textures, snapshot):
+    camera = replace(snapshot, survivor=SurvivorState(20.5, 37.5, -pi / 2 + 0.04))
+    seen = ShipRenderer(WORLD, textures, size=(1067, 600))
+    calm = pygame.surfarray.array3d(seen.render(camera))
+    entries = len(seen.fog)
+    # Numba checks no bounds: whatever follows the table in memory lands on the screen.
+    seen.fog = np.concatenate((seen.fog, np.full(entries, np.nan, np.float32)))[:entries]
+    frame = pygame.surfarray.array3d(seen.render(camera))
+    assert (seen.inverse_depth[seen.ids >= 0] * entries / FOG_STEPS < 1).any()
+    assert (frame == calm).all()
 
 
 def test_the_game_runs_without_the_mood_bake(textures, tmp_path, snapshot):
