@@ -88,11 +88,15 @@ class HumanRLController:
             raise ValueError("RL play requires an active external-control Alien")
         self.core, self.model = core, model
         self.config = core.config
-        self.controller_label = label
+        self.label = label
         self.sampler = EpisodeSampler(model)
         self.sampling_seed = sampling_seed
         self.recorder = None
         self.reset(core.snapshot().seed)
+
+    @property
+    def controller_label(self):
+        return f"{self.label} | seed {self.sampling_seed}"
 
     def reset(self, seed):
         if self.recorder is not None:
@@ -172,7 +176,7 @@ def load_human_rl(run_dir, checkpoint, sampling_seed, scenario_seed=0):
         scenario_map(config.get("scenario", DEFAULT_SCENARIO)), alien_control="external"
     )
     core.reset(scenario_seed)
-    label = f"RL sampled | {run_dir.name}/{checkpoint.name} | {metadata['actual_steps']} steps | seed {sampling_seed}"
+    label = f"RL sampled | {run_dir.name}/{checkpoint.name} | {metadata['actual_steps']} steps"
     driver = HumanRLController(core, model, sampling_seed, label=label)
     # Copy provenance returned by the strict loader, without a second policy load/draw.
     driver.checkpoint_identity = {

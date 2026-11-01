@@ -32,6 +32,10 @@ KEYS = {
 }
 
 
+def window_title(core):
+    return "Alien Survival - " + getattr(core, "controller_label", "Heuristic Test")
+
+
 class PlaySession:
     """Window events are isolated here so focus/pause/reset can be regression-tested."""
 
@@ -88,10 +92,14 @@ class PlaySession:
                     self.set_paused(not self.loop.paused, "escape")
                     self.sync_mouse()
                     transitioned = True
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+            elif event.type == pygame.KEYDOWN and event.key in (pygame.K_r, pygame.K_n):
                 if self.focused and not transitioned and not getattr(event, "repeat", False):
                     was_terminal = self.loop.current.outcome is not None
-                    self.loop.reset()
+                    if event.key == pygame.K_r:
+                        self.loop.reset()
+                    else:
+                        self.loop.new_round()
+                        pygame.display.set_caption(window_title(self.loop.core))
                     if was_terminal:
                         self.set_paused(False, "terminal_reset")
                     self.sync_mouse()
@@ -142,11 +150,11 @@ def hud_labels(loop, *, debug_alien=False):
     debug = alien_debug_labels(snapshot) if debug_alien else []
     if snapshot.outcome:
         result = "YOU ESCAPED" if snapshot.outcome == "escaped" else "YOU WERE CAUGHT"
-        return [f"{result} - R to restart", "Mouse released", controller] + debug
+        return [f"{result} - N new round | R same round", "Mouse released", controller] + debug
     status = "PAUSED - Esc to play" if loop.paused else "WASD move | Shift run | Press E interact"
     labels = [
         status,
-        "Mouse look | Arrows turn | Esc pause | R reset",
+        "Mouse look | Arrows turn | Esc pause | N new round | R same round",
         "Keycard: acquired" if snapshot.has_keycard else "Keycard: not acquired",
         controller if snapshot.alien is not None else "Alien disabled (isolated fixture)",
     ]
@@ -253,9 +261,7 @@ def main(argv=None):
         pygame.display.init()
         pygame.font.init()
         screen = pygame.display.set_mode((960, 540))
-        pygame.display.set_caption(
-            "Alien Survival - " + getattr(core, "controller_label", "Heuristic Test")
-        )
+        pygame.display.set_caption(window_title(core))
         renderer = make_renderer(core.snapshot().world_map)
         smooth = isinstance(renderer, ShipRenderer)
         fit = pygame.transform.smoothscale if smooth else pygame.transform.scale

@@ -1,11 +1,36 @@
 """Bounded fixed-step scheduling and collision-safe display interpolation."""
 
 from dataclasses import replace
-from math import floor, pi
+from math import floor, hypot, pi
+from random import Random
 
+from ai.navigation import find_path
 from app.input import InputState
+from game.core import GameCore
 from game.interaction import angle_difference
 from game.motion import segment_has_clearance
+
+NEW_ROUND_TRIES = 64  # a map with a single start stops looking for a different one
+SEED_LIMIT = 2**32  # the range EpisodeSampler accepts
+START_GRACE_SECONDS = 5.0  # to look around before a searching Alien can have you in sight range
+
+
+def round_start(snapshot):
+    """What a player can tell apart between rounds; the working exit stays private to Core."""
+    alien = snapshot.alien
+    cards = tuple(obj.object_id for obj in snapshot.world_map.objects if obj.kind == "keycard")
+    return (snapshot.survivor.x, snapshot.survivor.y), alien and (alien.x, alien.y), cards
+
+
+def alien_starts_far(snapshot):
+    """Measured by walking, since a wall can part two close starts; human rounds only."""
+    alien, survivor, config = snapshot.alien, snapshot.survivor, snapshot.config
+    if alien is None:
+        return True
+    start = (alien.x, alien.y)
+    route = find_path(snapshot.world_map, start, (survivor.x, survivor.y), config.alien_radius)
+    walk = sum(hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip((start, *route), route))
+    return walk >= config.alien_sight_range + START_GRACE_SECONDS * config.alien_search_speed
 
 
 class FixedStepLoop:
@@ -18,6 +43,7 @@ class FixedStepLoop:
         self.paused = False
         self.dropped_seconds = 0.0
         self.on_tick = None
+        self.rounds = Random()  # new rounds differ per session; a recording keeps each seed
         self.synchronize()
 
     def synchronize(self):
@@ -30,10 +56,27 @@ class FixedStepLoop:
         self.paused = paused
         self.synchronize()
 
-    def reset(self):
-        self.core.reset(self.current.seed)
+    def reset(self, seed=None):
+        self.core.reset(self.current.seed if seed is None else seed)
         self.inputs.pitch = 0.0
         self.synchronize()
+
+    def new_round(self):
+        """Leave the played start, card and Alien spawn; a new sampling seed varies its choices."""
+        core = getattr(self.core, "core", self.core)
+        preview = GameCore(core.world_map, core.config, alien_control=core.alien_control)
+        played = round_start(preview.reset(self.current.seed))
+        seed = self.rounds.randrange(SEED_LIMIT)
+        for _ in range(NEW_ROUND_TRIES):
+            candidate = self.rounds.randrange(SEED_LIMIT)
+            start = preview.reset(candidate)
+            if round_start(start) != played:
+                seed = candidate
+                if alien_starts_far(start):
+                    break
+        if hasattr(self.core, "sampling_seed"):
+            self.core.sampling_seed = self.rounds.randrange(SEED_LIMIT)
+        self.reset(seed)
 
     def advance(self, elapsed):
         if self.paused:

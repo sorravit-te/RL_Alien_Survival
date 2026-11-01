@@ -3,6 +3,7 @@
 import os
 from dataclasses import replace
 from math import pi, tan
+from random import Random
 
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
 
@@ -10,10 +11,11 @@ import pygame
 import pytest
 
 from app.input import InputState
-from app.loop import FixedStepLoop
+from app.loop import FixedStepLoop, alien_starts_far, round_start
 from app.play import PlaySession
 from game.core import GameCore
-from game.map import WorldMap
+from game.map import WorldMap, scenario_map
+from game.ship_deck import SHIP_SCENARIO
 from game.state import CoreConfig, SurvivorCommand, SurvivorState
 from renderers.raycasting import RaycastingRenderer, cast_ray
 
@@ -493,6 +495,135 @@ def test_e_input_and_terminal_mouse_release_restart(display, monkeypatch):
     assert loop.current.outcome is None and not loop.current.has_keycard
     assert loop.display_pitch() == 0
     assert loop.inputs.consume(loop.dt) == SurvivorCommand()
+
+
+class Draws:
+    """Hand new_round the seeds a test needs, in order."""
+
+    def __init__(self, *seeds):
+        self.seeds = list(seeds)
+
+    def randrange(self, limit):
+        return self.seeds.pop(0)
+
+
+def test_every_new_round_leaves_the_start_just_played():
+    loop = FixedStepLoop(GameCore(scenario_map(SHIP_SCENARIO)))
+    loop.rounds = Random(7)
+    starts = [round_start(loop.current)]
+    for _ in range(40):
+        loop.new_round()
+        starts.append(round_start(loop.current))
+        assert starts[-1] != starts[-2] and loop.current.tick == 0
+    assert len(set(starts)) >= 30
+    assert len({start[2] for start in starts}) == 6  # every keycard room comes up
+
+
+def test_new_round_compares_the_start_not_where_the_round_got_to():
+    core = GameCore(scenario_map(SHIP_SCENARIO))
+    played = round_start(core.reset(1))
+    twin = next(s for s in range(2, 9999) if round_start(core.reset(s)) == played)
+    other = next(
+        s
+        for s in range(2, 9999)
+        if round_start(snapshot := core.reset(s)) != played and alien_starts_far(snapshot)
+    )
+    core.reset(1)
+    loop = FixedStepLoop(core)
+    start = loop.current.survivor
+    loop.inputs.key("w", True)
+    for _ in range(30):
+        loop.advance(loop.dt)
+    assert loop.current.survivor != start
+    loop.rounds = Draws(twin, twin, other)
+    loop.new_round()
+    assert loop.current.seed == other
+
+
+@pytest.mark.parametrize(
+    "seed, far",
+    [
+        (4253250415, False),  # 9.5 cells apart, 10.2 to walk: caught in 6 seconds
+        (752671448, False),  # 13.6 apart, 17.2 to walk: caught in 6 seconds
+        (1303755778, True),  # 14.9 apart, 19.2 to walk
+        (3566102720, True),  # 13.0 apart in a line, but a wall makes it 23.8 to walk
+    ],
+)
+def test_the_alien_start_is_judged_by_walking(seed, far):
+    assert alien_starts_far(GameCore(scenario_map(SHIP_SCENARIO)).reset(seed)) is far
+
+
+def test_new_rounds_leave_out_the_closest_ship_starts():
+    loop = FixedStepLoop(GameCore(scenario_map(SHIP_SCENARIO)))
+    loop.rounds = Random(5)
+    pairs = set()
+    for _ in range(150):
+        loop.new_round()
+        assert alien_starts_far(loop.current)
+        pairs.add(round_start(loop.current)[:2])
+    assert len(pairs) == 12
+
+
+def test_a_map_of_close_starts_still_leaves_the_start_just_played():
+    world = WorldMap(("." * 12,) * 8, ((1.5, 1.5), (1.5, 6.5)), alien_spawn=(10.5, 3.5, pi),
+                     patrol_waypoints=((10.5, 3.5),))
+    loop = FixedStepLoop(GameCore(world))
+    loop.rounds = Random(3)
+    for _ in range(20):
+        before = round_start(loop.current)
+        assert not alien_starts_far(loop.current)
+        loop.new_round()
+        assert round_start(loop.current) != before
+
+
+def test_new_round_on_a_map_with_one_start_still_takes_a_new_seed():
+    world = WorldMap(("....",) * 4, ((1.5, 1.5),))
+    loop = FixedStepLoop(GameCore(world, CoreConfig(alien_enabled=False)))
+    before = loop.current.seed
+    loop.new_round()
+    assert loop.current.seed != before and loop.current.tick == 0
+
+
+def test_same_round_replays_the_round_new_round_chose():
+    loop = FixedStepLoop(GameCore(scenario_map(SHIP_SCENARIO)))
+    loop.rounds = Random(11)
+    loop.new_round()
+    start = loop.current
+    loop.inputs.key("w", True)
+    for _ in range(30):
+        loop.advance(loop.dt)
+    assert loop.current.survivor != start.survivor
+    loop.reset()
+    assert loop.current == start
+
+
+def test_new_round_key_waits_for_focus_and_ignores_key_repeat(display):
+    loop = FixedStepLoop(GameCore(scenario_map(SHIP_SCENARIO)))
+    session = PlaySession(loop)
+    seed = loop.current.seed
+    session.focused = False
+    session.events([event(pygame.KEYDOWN, key=pygame.K_n)])
+    assert loop.current.seed == seed
+    session.focused = True
+    session.events([event(pygame.KEYDOWN, key=pygame.K_n, repeat=True)])
+    assert loop.current.seed == seed
+
+
+def test_new_round_key_keeps_a_pause_and_resumes_after_a_finished_round(display):
+    from app.play import hud_labels, window_title
+
+    world = WorldMap(("......",) * 6, ((2.5, 2.5), (3.5, 3.5)))
+    loop = FixedStepLoop(GameCore(world))
+    session = PlaySession(loop)
+    session.focused = True
+    session.events([event(pygame.KEYDOWN, key=pygame.K_n)])
+    assert loop.paused  # the first round can be swapped before it starts
+    assert any("N new round" in text and "R same round" in text for text in hud_labels(loop))
+    assert pygame.display.get_caption()[0] == window_title(loop.core)
+    loop.current = replace(loop.current, outcome="captured")
+    assert "N new round" in hud_labels(loop)[0] and "R same round" in hud_labels(loop)[0]
+    session.events([event(pygame.KEYDOWN, key=pygame.K_n)])
+    assert not loop.paused and loop.current.outcome is None
 
 
 def test_locked_exit_hint_and_occluded_object_no_hint(display):

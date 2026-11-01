@@ -37,7 +37,8 @@ def test_real_recording_reports_waiting_survivor_and_kept_route(root, capsys):
     rec.close(completed=True, reason="synthetic_end")
     main([str(rec.directory)])
     report = capsys.readouterr().out
-    assert "episode 0: None (partial) 3.3s" in report
+    assert "episode 0: None (partial) 3.3s, scenario seed 7799101" in report
+    assert "rounds 1, different scenario seeds 1" in report
     assert "Survivor waited unseen 3.3s at (2.5, 2.5)" in report
     reviews = review_records(recording.read_records(rec.directory))
     assert len(reviews) == 1

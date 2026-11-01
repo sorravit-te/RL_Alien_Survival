@@ -28,6 +28,7 @@ def distance(a, b):
 @dataclass
 class EpisodeReview:
     episode: int
+    scenario_seed: int | None = None
     outcome: str | None = None
     status: str = "incomplete"
     ticks: int = 0
@@ -114,10 +115,12 @@ def review_records(records):
     episodes = {}
     for record in records:
         kind = record["type"]
-        if kind not in ("decision", "tick", "episode_end"):
+        if kind not in ("episode_start", "decision", "tick", "episode_end"):
             continue
         review = episodes.setdefault(record["episode"], EpisodeReview(record["episode"]))
-        if kind == "decision":
+        if kind == "episode_start":
+            review.scenario_seed = record["scenario_seed"]
+        elif kind == "decision":
             review.decision(record)
         elif kind == "tick":
             review.tick(record)
@@ -134,7 +137,10 @@ def seconds(ticks):
 
 def print_report(reviews):
     for r in reviews:
-        print(f"episode {r.episode}: {r.outcome} ({r.status}) {seconds(r.ticks):.1f}s")
+        print(
+            f"episode {r.episode}: {r.outcome} ({r.status}) {seconds(r.ticks):.1f}s, "
+            f"scenario seed {r.scenario_seed}"
+        )
         print(
             f"  sight: visible {r.visible_ticks} ticks, "
             f"stood still while visible {r.stationary_while_visible}"
@@ -159,6 +165,8 @@ def print_report(reviews):
                 f"from tick {wait['start_tick']}: Alien moved {wait['alien_moved']:.1f} units, "
                 f"still {wait['alien_still_ticks']}/{wait['ticks']} ticks"
             )
+    seeds = {r.scenario_seed for r in reviews}
+    print(f"rounds {len(reviews)}, different scenario seeds {len(seeds)}")
     route = sum((r.route for r in reviews), Counter())
     decisions = route["kept"] + route["switched"] + route["other"]
     if decisions:

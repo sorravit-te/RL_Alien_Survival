@@ -174,6 +174,42 @@ def test_focus_pause_resume_reset_records_boundaries_without_advancing_or_sampli
     assert ends[0]["reason"] == "reset" and ends[0]["status"] == "partial"
 
 
+def test_new_round_records_both_seeds_and_same_round_replays_them(root, window):
+    app = driver()
+    rec = attach(root / "rounds", app)
+    loop = FixedStepLoop(app)
+    session = PlaySession(loop)
+    session.focused = True
+    key = {name: pygame.event.Event(pygame.KEYDOWN, key=name) for name in (pygame.K_n, pygame.K_r)}
+
+    def play():
+        actions = []
+        for _ in range(46):
+            app.step(SurvivorCommand())
+            actions.append(app.last_action)
+        return actions
+
+    play()
+    session.events([key[pygame.K_n]])
+    seeds = app.snapshot().seed, app.sampling_seed
+    assert seeds[0] != 7799101 and seeds[1] != 991
+    assert app.controller_label.endswith(f"seed {app.sampling_seed}")
+    assert app.controller_label in pygame.display.get_caption()[0]
+    first = play()
+    session.events([key[pygame.K_r]])
+    assert (app.snapshot().seed, app.sampling_seed) == seeds and play() == first
+    rec.close(completed=True, reason="synthetic_end")
+    records = list(read_records(rec.directory))
+    starts = [r for r in records if r["type"] == "episode_start"]
+    assert [(r["scenario_seed"], r["sampling_seed"]) for r in starts] == [
+        (7799101, 991),
+        seeds,
+        seeds,
+    ]
+    boundaries = [r for r in records if r["type"] == "reset_boundary"]
+    assert [(r["requested_scenario_seed"], r["sampling_seed"]) for r in boundaries] == [seeds] * 2
+
+
 def test_early_capture_full_episode_no_extra_terminal_draw_and_reset(root):
     world = replace(arena(), alien_spawn=(6.5, 2.5, 0), patrol_waypoints=((2.5, 2.5),))
     app = driver(
