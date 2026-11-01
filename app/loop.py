@@ -13,6 +13,11 @@ from game.motion import segment_has_clearance
 NEW_ROUND_TRIES = 64  # a map with a single start stops looking for a different one
 SEED_LIMIT = 2**32  # the range EpisodeSampler accepts
 START_GRACE_SECONDS = 5.0  # to look around before a searching Alien can have you in sight range
+# 0.2 has no exact binary form. Against walls to the south and east it rounds to just inside the
+# wall, so the seams between wall cells stop the player dead. This is 0.2 to eight places and
+# exact. It lives here because game/ is part of a checkpoint's identity, and the Alien needs no
+# such fix: its routes never press it against a wall.
+PLAYER_RADIUS = round(0.2 * 2**26) / 2**26
 
 
 def round_start(snapshot):

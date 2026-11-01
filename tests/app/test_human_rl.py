@@ -3,12 +3,13 @@
 import random
 from dataclasses import replace
 from math import pi
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 
-from app.loop import FixedStepLoop
+from app.loop import PLAYER_RADIUS, FixedStepLoop
 from app.rl_controller import HumanRLController, load_human_rl, rng_state
 from game.core import GameCore
 from game.map import MapObject, WorldMap
@@ -403,3 +404,26 @@ def test_selected_best_binding_failure_prevents_core_creation(monkeypatch, tmp_p
     monkeypatch.setattr("app.rl_controller.GameCore", no_core)
     with pytest.raises(ValueError, match="selected, replay-verified"):
         load_human_rl(tmp_path, path, 123)
+
+
+def test_a_loaded_checkpoint_plays_with_the_players_exact_radius(monkeypatch, tmp_path):
+    import rl.pipeline as pipeline
+
+    class Loaded(Policy):
+        policy = SimpleNamespace(set_training_mode=lambda mode: None)
+
+    path = tmp_path / "model.zip"
+    path.write_bytes(b"synthetic checkpoint fixture")
+    pipeline.write_json(
+        tmp_path / "selection.json",
+        {
+            "best_checkpoint_sha256": pipeline.file_hash(path),
+            "best_steps": 20224,
+            "best_optimizer_update_epochs": 790,
+            "fresh_load_reproduced_actions_and_episodes": True,
+        },
+    )
+    metadata = {"role": "best_validation", "actual_steps": 20224, "optimizer_update_epochs": 790}
+    monkeypatch.setattr(pipeline, "read_run", lambda p: ({"torch_threads": 1}, {}, {}))
+    monkeypatch.setattr(pipeline, "load_checkpoint", lambda *a: (Loaded(), metadata))
+    assert load_human_rl(tmp_path, path, 123).config.radius == PLAYER_RADIUS

@@ -11,7 +11,7 @@ import pygame
 import pytest
 
 from app.input import InputState
-from app.loop import FixedStepLoop, alien_starts_far, round_start
+from app.loop import PLAYER_RADIUS, FixedStepLoop, alien_starts_far, round_start
 from app.play import PlaySession
 from game.core import GameCore
 from game.map import WorldMap, scenario_map
@@ -542,6 +542,21 @@ def test_no_alien_walks_the_map_alone_and_keeps_new_rounds(monkeypatch):
     seed = loop.current.seed
     loop.new_round()
     assert loop.current.alien is None and loop.current.seed != seed
+
+
+@pytest.mark.parametrize("extra", [[], ["--no-alien"]])
+def test_a_played_round_uses_the_players_exact_radius(monkeypatch, extra):
+    from app import play
+
+    def stop_at_the_core(world, config):
+        made.append(config)
+        raise SystemExit
+
+    made = []
+    monkeypatch.setattr(play, "GameCore", stop_at_the_core)
+    with pytest.raises(SystemExit):
+        play.main(["--scenario", "ship_deck_v1", *extra])
+    assert made[0].radius == PLAYER_RADIUS and made[0].alien_enabled is not bool(extra)
 
 
 def test_no_alien_refuses_an_rl_controller(capsys):
