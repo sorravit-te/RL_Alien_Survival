@@ -16,10 +16,29 @@ from game.ship_deck import SHIP_SCENARIO
 from game.state import AlienState, CoreConfig, SurvivorState
 from renderers.raycasting import cast_ray
 from renderers.ship_kernels import SKY
-from renderers.ship_mesh import DOOR_TOP, PILLAR_PROUD, WALL_TOP, build_mesh
-from renderers.ship_renderer import ShipRenderer
-from renderers.ship_theme import FACES, ZONES, ShipTheme
-from tools.bake_ship_textures import MATERIALS, texture_names
+from renderers.ship_mesh import (
+    COLLAR_SCALE,
+    DOOR_TOP,
+    OVERHEAD_FLOOR,
+    PILLAR_PROUD,
+    PIPE_OUT,
+    PIPE_RADIUS,
+    WALL_TOP,
+    Mesh,
+    Wall,
+    build_mesh,
+)
+from renderers.ship_renderer import FIELD_OF_VIEW, ShipRenderer
+from renderers.ship_theme import (
+    FACES,
+    LAMP_HIGH,
+    LAMP_LOW,
+    LIGHT_GRID,
+    ZONES,
+    ShipTheme,
+    muted,
+)
+from tools.bake_ship_textures import MATERIALS, facing_axes, texture_names
 
 WORLD = scenario_map(SHIP_SCENARIO)
 SIZE = (80, 45)
@@ -32,9 +51,10 @@ def textures(tmp_path_factory):
     rng = np.random.default_rng(1)
     path = tmp_path_factory.mktemp("ship") / "fake.npz"
     levels = {
-        f"level{i}": rng.integers(
+        f"{kind}{i}": rng.integers(
             40, 220, (len(names), FAKE_TEXELS >> i, FAKE_TEXELS >> i, 4), dtype=np.uint8
         )
+        for kind in ("level", "relief")
         for i in range(3)
     }
     np.savez(path, names=np.array(names), **levels)
@@ -183,3 +203,148 @@ def test_collected_keycard_disappears(renderer, snapshot):
 def test_missing_textures_explain_the_fix(tmp_path):
     with pytest.raises(FileNotFoundError, match="tools.bake_ship_textures"):
         ShipRenderer(WORLD, tmp_path / "missing.npz")
+
+
+def test_a_bake_from_before_a_new_texture_explains_the_fix(tmp_path):
+    names = [name for name in texture_names() if name != "pipe"]
+    levels = {
+        f"{kind}{i}": np.zeros((len(names), 16 >> i, 16 >> i, 4), np.uint8)
+        for kind in ("level", "relief")
+        for i in range(3)
+    }
+    path = tmp_path / "old.npz"
+    np.savez(path, names=np.array(names), **levels)
+    with pytest.raises(FileNotFoundError, match="tools.bake_ship_textures"):
+        ShipRenderer(WORLD, path)
+
+
+def test_a_bake_from_before_relief_explains_the_fix(tmp_path):
+    names = texture_names()
+    levels = {f"level{i}": np.zeros((len(names), 16 >> i, 16 >> i, 4), np.uint8) for i in range(3)}
+    path = tmp_path / "older.npz"
+    np.savez(path, names=np.array(names), **levels)
+    with pytest.raises(FileNotFoundError, match="tools.bake_ship_textures"):
+        ShipRenderer(WORLD, path)
+
+
+def test_a_wider_view_shows_more_and_changes_no_surface(textures):
+    wide = ShipRenderer(WORLD, textures, size=SIZE, fov=FIELD_OF_VIEW)
+    narrow = ShipRenderer(WORLD, textures, size=SIZE, fov=75)
+    assert wide.focal_length < narrow.focal_length
+    assert (wide.mesh["vertices"] == narrow.mesh["vertices"]).all()
+
+
+def test_a_texture_on_a_wall_reads_along_and_up_the_wall():
+    mesh = Mesh({"plate": 0})
+    Wall(mesh, 1, 0, 5, 0, 2, WALL_TOP, ZONES["S"], 0).flat(0, 2, 0, 2, "plate")
+    right, up, out = np.reshape(mesh.frames[0], (3, 3))
+    assert right == pytest.approx((0, 1, 0)) and up == pytest.approx((0, 0, 1))
+    assert out == pytest.approx((-1, 0, 0))
+
+
+def test_a_turned_texture_turns_its_relief_with_it():
+    mesh = Mesh({"plate": 0})
+    Wall(mesh, 1, 0, 5, 0, 2, WALL_TOP, ZONES["S"], 0).flat(0, 2, 0, 2, "plate", turned=True)
+    right, up, _ = np.reshape(mesh.frames[0], (3, 3))
+    assert abs(right[2]) == pytest.approx(1) and abs(up[1]) == pytest.approx(1)
+
+
+def test_every_surface_has_an_upright_frame(mesh):
+    right, up, out = np.split(mesh["frames"], 3, axis=1)
+    assert np.isclose(np.linalg.norm(out, axis=1), 1, atol=1e-3).all()
+    assert np.isclose(np.linalg.norm(right, axis=1), 1, atol=1e-3).all()
+    assert np.abs((right * out).sum(axis=1)).max() < 1e-3
+    assert np.abs((up * out).sum(axis=1)).max() < 1e-3
+
+
+def ridge(width=64):
+    """A raised bar across a flat plate, and the normal a height map implies for it."""
+    rows = np.arange(width, dtype=np.float32)
+    height = 200.0 * np.exp(-(((rows - width / 2) / 5) ** 2))
+    height = height[:, None] * height[None, :] / 200.0
+    slope_y, slope_x = np.gradient(height)
+    normal = np.dstack((-slope_x / 40, slope_y / 40, np.ones_like(height)))
+    return height, normal
+
+
+@pytest.mark.parametrize("across, up", [(1.0, 1.0), (-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0)])
+def test_a_normal_map_is_read_the_way_its_height_map_runs(across, up):
+    height, normal = ridge()
+    flipped = normal * np.array((across, up, 1.0), np.float32)
+    assert facing_axes(flipped, height) == (across, up)
+
+
+def test_a_normal_map_with_nothing_to_check_keeps_the_packs_usual_axes():
+    assert facing_axes(ridge()[1], None) == (-1.0, -1.0)
+    assert facing_axes(ridge()[1], np.zeros((64, 64), np.float32)) == (-1.0, -1.0)
+
+
+def test_relief_changes_how_a_surface_is_lit(renderer, snapshot):
+    lit = picture(renderer, snapshot)
+    relief = renderer.reliefs.copy()
+    renderer.reliefs[:] = 0xFF00FFFF  # every normal leaning one way
+    try:
+        assert picture(renderer, snapshot) != lit
+    finally:
+        renderer.reliefs[:] = relief
+
+
+def test_lamp_direction_leads_back_to_the_lamp(theme):
+    x, y, *_ = next(
+        light for light in theme.lights if theme.is_open(int(light[0]) + 2, int(light[1]))
+    )
+    grid = int((x + 1.5) * LIGHT_GRID), int(y * LIGHT_GRID)
+    across, _, lamp = theme.aim[grid[1], grid[0]]
+    assert across < 0 and LAMP_LOW <= lamp <= LAMP_HIGH
+
+
+def test_lamps_keep_a_hint_of_their_zone_and_leave_metal_grey():
+    red = ZONES["G"].color
+    kept = muted(red)
+    assert max(kept) - min(kept) < (max(red) - min(red)) / 2
+    assert kept.index(max(kept)) == red.index(max(red))
+
+
+def fittings(mesh):
+    made = [texture_names().index(name) for name in ("pipe", "pipe_hot", "bracket", "cable")]
+    return np.isin(mesh["textures"], made)
+
+
+def test_fittings_hang_above_the_alien_so_they_never_hide_it(mesh):
+    assert fittings(mesh).sum() > 300
+    assert mesh["vertices"][fittings(mesh)][:, :, 2].min() >= OVERHEAD_FLOOR
+    assert OVERHEAD_FLOOR > 1.85  # the top of the Alien sprite
+
+
+def test_fittings_stay_inside_where_collision_stops_the_player():
+    reach = PIPE_OUT + PIPE_RADIUS * COLLAR_SCALE
+    assert reach < CoreConfig().radius
+
+
+def test_room_detail_never_depends_on_the_round(theme):
+    core = GameCore(WORLD)
+    first = core.reset(1).world_map
+    other = next(
+        map_ for map_ in (core.reset(seed).world_map for seed in range(2, 99)) if map_ != first
+    )
+    built = [build_mesh(ShipTheme(world), texture_names()) for world in (first, other)]
+    assert (built[0]["vertices"] == built[1]["vertices"]).all()
+    assert (built[0]["textures"] == built[1]["textures"]).all()
+
+
+def test_sparks_come_from_dead_lights_only_and_replay(renderer, theme):
+    assert theme.sparks
+    assert all(not theme.light_cells[(int(x), int(y))] for x, y in theme.sparks)
+    bursts = [renderer._sparks(tick) for tick in range(0, 3000, 12)]
+    assert any(bursts) and not all(bursts)
+    assert renderer._sparks(600) == renderer._sparks(600)
+
+
+def test_a_spark_right_in_front_of_the_player_is_not_drawn(renderer, snapshot):
+    tick = next(t for t in range(1, 5000) if renderer._sparks(t))
+    x, y = renderer._sparks(tick)[0]
+    close = replace(snapshot, survivor=SurvivorState(x, y - 0.5, pi / 2), tick=tick)
+    far = replace(snapshot, survivor=SurvivorState(x, y - 4.0, pi / 2), tick=tick)
+    spark = f"spark{tick // 2 % 3}"
+    assert all(item[2] != spark for item in renderer._visible_sprites(close, 0.0, 1.0))
+    assert any(item[2] == spark for item in renderer._visible_sprites(far, 0.0, 1.0))

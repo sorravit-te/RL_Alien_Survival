@@ -333,6 +333,8 @@ def test_pygame_focus_pause_preserves_partial_decision_clock_and_retry(monkeypat
         session.events([pygame.event.Event(pygame.KEYDOWN, key=pygame.K_r)])
         assert app.snapshot().tick == app.phase == app.decisions == 0
         assert loop.display_pitch() == 0 and loop.inputs.pending_interactions == 0
+        assert not any("RL sampled" in label for label in hud_labels(loop))
+        session.events([pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
         assert any("RL sampled" in label for label in hud_labels(loop))
     finally:
         pygame.quit()
@@ -362,6 +364,7 @@ def test_rl_window_close_releases_pygame_with_placeholder_texture(monkeypatch, t
             "fixture.zip",
             "--sampling-seed",
             "123",
+            "--windowed",
         ]
     )
     assert not pygame.display.get_init() and not pygame.font.get_init()

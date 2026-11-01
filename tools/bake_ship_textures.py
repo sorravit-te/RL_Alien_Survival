@@ -2,9 +2,10 @@
 
 Usage: python -m tools.bake_ship_textures
 
-Normal, height, specular and emissive maps are baked into the pixels, so the renderer
-only samples colors. Blood, claw marks, signs and the starfield are made here and painted
-over copies. Output stays in the ignored assets/stradex/prepared/ folder.
+Each texture becomes a color layer with its glow, and a relief layer with its normal and
+shine, because the renderer lights every pixel itself. Blood, claw marks, signs and the
+starfield are made here and painted over copies. Output stays in the ignored
+assets/stradex/prepared/ folder.
 """
 
 import argparse
@@ -19,7 +20,8 @@ from tools.prepare_assets import ROOT, resolve_source_root
 
 SIZE = 512
 OUTPUT = ROOT / "assets" / "stradex" / "prepared" / "ship_textures.npz"
-LIGHT = np.array([0.0, 0.5, 0.86])  # tangent-space key light, above and in front
+EDGE = 4.0  # height change per texel that counts as a real edge when reading a normal map
+TRUSTED = 0.1  # weaker agreement than this leaves a map to the pack's usual axes
 MATERIALS = (
     *(f"wall{i}" for i in range(1, 13)),
     *(f"walltrim{i}" for i in range(1, 7)),
@@ -60,10 +62,11 @@ LIT_COPIES = ("ceiling3_lit", "ceiling4_lit")
 MADE = ("ceiling2_lit", "viewport", "hazard", "cross", "door1_seam")
 WARNINGS = {"quarantine": "QUARANTINE", "seal": "SEAL THIS DECK", "listen": "IT HEARS YOU"}
 SEAM_HALF = 5  # texels either side of a door's middle
+FITTINGS = ("pipe", "pipe_hot", "bracket", "cable")
 
 
 def texture_names():
-    names = [*MATERIALS, *LIT_COPIES, *STRIPES, *MADE]
+    names = [*MATERIALS, *LIT_COPIES, *STRIPES, *MADE, *FITTINGS]
     names += [f"{name}_blood" for name in BLOODIED]
     names += [f"{name}_clawed" for name in CLAWED]
     names += [f"sign_{key}" for key in SIGNS]
@@ -79,31 +82,61 @@ def load(directory, name, suffix, mode):
         return image.convert(mode).resize((SIZE, SIZE), Image.Resampling.LANCZOS)
 
 
+def flat_relief():
+    relief = np.zeros((SIZE, SIZE, 4), np.float32)
+    relief[..., 2] = 1.0
+    return relief
+
+
+def facing_axes(normal, height):
+    """Which way a map's axes run, measured from its height map.
+
+    Most of the pack points its axes left and down, a few differ, and read the wrong way a
+    groove lights like a ridge. Height falling to the right tilts a surface right.
+    """
+    if height is None:
+        return -1.0, -1.0
+    slope_y, slope_x = np.gradient(np.asarray(height, np.float32))
+    edges = (np.abs(slope_x) + np.abs(slope_y)) > EDGE
+    axes = [-1.0, -1.0]
+    if edges.sum() > 200:
+        for axis, (values, slope, sign) in enumerate(
+            ((normal[..., 0], slope_x, -1.0), (normal[..., 1], slope_y, 1.0))
+        ):
+            if values[edges].std() > 1e-3 and slope[edges].std() > 1e-3:
+                agreement = float(np.corrcoef(values[edges], slope[edges])[0, 1]) * sign
+                if abs(agreement) > TRUSTED:
+                    axes[axis] = 1.0 if agreement > 0 else -1.0
+    return axes[0], axes[1]
+
+
+def relief_of(directory, name, height):
+    """A unit normal running right, up and out of the texture, and how hard it shines."""
+    relief = flat_relief()
+    normal = load(directory, name, "n", "RGB") or load(directory, name, "local", "RGB")
+    if normal is not None:
+        n = np.asarray(normal, np.float32) / 127.5 - 1
+        across, up = facing_axes(n, height)
+        n = n * np.array((across, up, 1.0), np.float32)
+        relief[..., :3] = n / np.maximum(np.linalg.norm(n, axis=2, keepdims=True), 1e-5)
+    specular = load(directory, name, "s", "L")
+    if specular is not None:
+        relief[..., 3] = np.asarray(specular, np.float32) / 255
+    return relief
+
+
 def material(directory, name):
-    """Return float RGB in 0..1 and a glow mask, with the pack's relief maps baked in."""
+    """Return float RGB in 0..1, a glow mask and the relief the renderer lights."""
     color = load(directory, name, "d", "RGB")
     if color is None:
         raise FileNotFoundError(f"Missing material: {name}_d.png")
     rgb = np.asarray(color, np.float32) / 255
-    normal = load(directory, name, "n", "RGB")
-    if normal is None:
-        normal = load(directory, name, "local", "RGB")
-    if normal is not None:
-        n = np.asarray(normal, np.float32) / 127.5 - 1
-        n /= np.maximum(np.linalg.norm(n, axis=2, keepdims=True), 1e-5)
-        ndotl = np.clip(n @ LIGHT.astype(np.float32), 0, 1)
-        rgb = rgb * (0.32 + 0.8 * ndotl[..., None])
-        specular = load(directory, name, "s", "L")
-        if specular is not None:
-            half = LIGHT + np.array([0, 0, 1.0])
-            half /= np.linalg.norm(half)
-            shine = np.clip(n @ half.astype(np.float32), 0, 1) ** 28
-            rgb = rgb + (np.asarray(specular, np.float32) / 255 * shine * 0.55)[..., None]
     height = load(directory, name, "h", "L")
+    relief = relief_of(directory, name, height)
     if height is not None:
         soft = height.filter(ImageFilter.GaussianBlur(4))
         crevice = np.asarray(soft, np.float32) - np.asarray(height, np.float32)
-        rgb = rgb * (1 - np.clip(crevice / 255 * 2.6, 0, 0.7))[..., None]
+        rgb = rgb * (1 - np.clip(crevice / 255 * 1.6, 0, 0.35))[..., None]
     glow = np.zeros(rgb.shape[:2], np.float32)
     add = load(directory, name, "add", "RGB")
     if add is not None:
@@ -112,7 +145,7 @@ def material(directory, name):
         glow = np.clip(strength * 4, 0, 1)
         peak = np.maximum(strength, 1e-3)[..., None]
         rgb = np.where(strength[..., None] > 0.02, np.clip(emit / peak, 0, 1), rgb)
-    return rgb, glow
+    return rgb, glow, relief
 
 
 def smooth_noise(rng, cells):
@@ -122,15 +155,14 @@ def smooth_noise(rng, cells):
 
 
 def weather(rgb, rng):
-    """Soft grime and thin rust runs, so no surface looks freshly printed."""
-    grime = 0.86 + 0.2 * smooth_noise(rng, 14)
+    """Faint grime and thin rust runs, so no surface looks freshly printed."""
+    grime = 0.94 + 0.1 * smooth_noise(rng, 14)
     runs = np.zeros(SIZE, np.float32)
     for x in rng.integers(0, SIZE, 30):
         runs[x : x + int(rng.integers(1, 4))] = float(rng.uniform(0.25, 0.8))
     reach = 1 - np.arange(SIZE, dtype=np.float32)[:, None] / (SIZE * rng.uniform(0.5, 1.2))
     streak = runs[None, :] * np.clip(reach, 0, 1)
-    shade = (grime * (1 - streak * 0.45))[..., None]
-    return rgb * shade * np.array([1.0, 0.97, 0.93], np.float32)
+    return rgb * (grime * (1 - streak * 0.18))[..., None]
 
 
 def font(size):
@@ -229,8 +261,8 @@ def lit_panel(rgb):
     mask = np.zeros((SIZE, SIZE), np.float32)
     inset = SIZE // 9
     mask[inset:-inset, inset:-inset] = 1
-    lamp = np.array([0.9, 0.97, 1.0], np.float32)
-    return rgb * (1 - mask[..., None]) + lamp * mask[..., None], mask
+    lamp = np.array([0.78, 0.84, 0.88], np.float32)
+    return rgb * (1 - mask[..., None]) + lamp * mask[..., None], mask * 0.42
 
 
 def leaf_seam(rgb):
@@ -253,7 +285,7 @@ def hazard_stripes():
 def stripe_rail(color):
     """A lit strip with dark edges; the renderer shows it thin along a wall."""
     rgb = np.ones((SIZE, SIZE, 3), np.float32) * np.array(color, np.float32)
-    glow = np.ones((SIZE, SIZE), np.float32) * 0.5
+    glow = np.ones((SIZE, SIZE), np.float32) * 0.2
     edge = SIZE // 8
     rgb[:edge] = rgb[-edge:] = 0.05
     glow[:edge] = glow[-edge:] = 0.0
@@ -269,26 +301,57 @@ def medical_cross():
     return rgb, glow
 
 
+def pipe_metal(color, rng):
+    """Rounded across its width, with a joint once per cell along its length."""
+    across = np.sin(np.linspace(0.25, 2.9, SIZE, dtype=np.float32))[:, None] ** 2
+    rgb = np.ones((SIZE, SIZE, 3), np.float32) * np.array(color, np.float32)
+    rgb = rgb * (0.3 + 0.9 * across)[..., None]
+    rgb[:, :18] *= 0.35
+    rgb[:, 18:30] *= 1.25
+    return weather(rgb, rng)
+
+
+def plain_metal(level, rng):
+    return weather(np.full((SIZE, SIZE, 3), level, np.float32), rng)
+
+
+def add_fittings(textures, reliefs, rng):
+    """Self-made, drawn last so the rest of the bake keeps its random stream."""
+    no_glow = np.zeros((SIZE, SIZE), np.float32)
+    textures["pipe"] = (pipe_metal((0.42, 0.45, 0.47), rng), no_glow)
+    textures["pipe_hot"] = (pipe_metal((0.5, 0.33, 0.24), rng), no_glow)
+    textures["bracket"] = (plain_metal(0.1, rng), no_glow)
+    textures["cable"] = (plain_metal(0.05, rng), no_glow)
+    for name, shine in (("pipe", 0.55), ("pipe_hot", 0.5), ("bracket", 0.3), ("cable", 0.2)):
+        reliefs[name] = flat_relief()
+        reliefs[name][..., 3] = shine
+
+
 def bake(directory, seed=20261030):
     rng = np.random.default_rng(seed)
-    textures = {}
+    textures, reliefs = {}, {}
     for name in MATERIALS:
-        rgb, glow = material(directory, name)
+        rgb, glow, reliefs[name] = material(directory, name)
         textures[name] = (weather(rgb, rng), glow)
     textures["ceiling2_lit"] = lit_panel(textures["ceiling2"][0])
+    reliefs["ceiling2_lit"] = reliefs["ceiling2"]
     textures["door1_seam"] = (leaf_seam(textures["door1"][0]), textures["door1"][1])
+    reliefs["door1_seam"] = reliefs["door1"]
     for name in LIT_COPIES:
         # Most vents are dead: the plain name loses its glow, the lit copy keeps it.
         base = name.removesuffix("_lit")
         textures[name] = textures[base]
+        reliefs[name] = reliefs[base]
         textures[base] = (textures[base][0] * 0.6, np.zeros((SIZE, SIZE), np.float32))
     textures["viewport"] = (starfield(rng), np.ones((SIZE, SIZE), np.float32))
     for name in BLOODIED:
         rgb, glow = textures[name]
         textures[f"{name}_blood"] = (blood(rgb, rng, drips=name.startswith("wall")), glow)
+        reliefs[f"{name}_blood"] = reliefs[name]
     for name in CLAWED:
         rgb, glow = textures[name]
         textures[f"{name}_clawed"] = (scratches(rgb, rng), glow)
+        reliefs[f"{name}_clawed"] = reliefs[name]
     plain = textures["walltrim4"][0]
     no_glow = np.zeros((SIZE, SIZE), np.float32)
     for key, sign in SIGNS.items():
@@ -299,11 +362,19 @@ def bake(directory, seed=20261030):
     textures["cross"] = medical_cross()
     for key, text in WARNINGS.items():
         textures[f"warning_{key}"] = (plate(plain, text, rng, (190, 30, 20)), no_glow)
-    return textures
+    add_fittings(textures, reliefs, rng)
+    return textures, reliefs
 
 
 def pack(rgb, glow):
     return (np.dstack((np.clip(rgb, 0, 1), np.clip(glow, 0, 1))) * 255 + 0.5).astype(np.uint8)
+
+
+def pack_relief(relief):
+    """Axes run -1..1 and shine 0..1; the shader reads them back from the same four bytes."""
+    stored = relief.copy()
+    stored[..., :3] = stored[..., :3] * 0.5 + 0.5
+    return (np.clip(stored, 0, 1) * 255 + 0.5).astype(np.uint8)
 
 
 def half(pixels):
@@ -324,13 +395,17 @@ def main():
     directory = source_root / "Materials"
     if not directory.is_dir():
         raise FileNotFoundError(f"Required Stradex folder is missing: {directory}")
-    textures = bake(directory)
+    textures, reliefs = bake(directory)
     names = texture_names()
-    level0 = np.stack([pack(*textures[name]) for name in names])
-    level1 = half(level0).astype(np.uint8)
-    level2 = half(level1).astype(np.uint8)
+    levels = {"level0": np.stack([pack(*textures[name]) for name in names])}
+    levels["relief0"] = np.stack(
+        [pack_relief(reliefs[name] if name in reliefs else flat_relief()) for name in names]
+    )
+    for kind in ("level", "relief"):
+        levels[f"{kind}1"] = half(levels[f"{kind}0"]).astype(np.uint8)
+        levels[f"{kind}2"] = half(levels[f"{kind}1"]).astype(np.uint8)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(OUTPUT, level0=level0, level1=level1, level2=level2, names=np.array(names))
+    np.savez(OUTPUT, names=np.array(names), **levels)
     manifest = {
         "creator": "Stradex / Maximiliano Ruben Viamonte",
         "source_url": "https://stradex.itch.io/scifi-tech-hall-texture-pack",

@@ -2,32 +2,57 @@
 
 Each triangle writes only its id and depth first, so hidden surfaces cost no shading. Rows
 never overlap between bands, which keeps the parallel loops free of shared writes.
+
+Every pixel is lit from its own normal, so the relief in a material answers the ship's lights
+and the torch as the player moves. Baked light tells how much arrives and from where.
 """
 
-from math import ceil, exp, floor
+from math import ceil, floor, sqrt
 
 import numpy as np
 from numba import njit, prange
 
 NEAR = 0.04
 FAR = 26.0  # fog has hidden everything long before this
-SMOOTH_RANGE = 7.0  # nearer than this, texels are filtered
-MIP_ONE = 5.0  # depth where a surface switches to half-size texels
-MIP_TWO = 11.0
+MIP_ONE = 2.2  # depth where a surface switches to half-size texels, about one per pixel
+MIP_TWO = 5.0  # beyond here relief is too fine to see, so a pixel is lit from its flat face
+RELIEF_RANGE = 1.0  # filtering relief is the dearest step, and only shows this close
 FOG_DENSITY = 0.11
-TORCH_POWER = 1.7
-TORCH_FALLOFF = 0.2
-TORCH_RED, TORCH_GREEN, TORCH_BLUE = 1.0, 0.94, 0.82
+FOG_STEPS = 16  # table entries per unit of depth; exp() per pixel is a real cost
+LIGHT_SPAN = 4  # pixels along a row that share one lookup of the baked light
+TORCH_POWER = 1.2
+TORCH_FALLOFF = 0.09
+TORCH_RED, TORCH_GREEN, TORCH_BLUE = 1.0, 0.96, 0.9
 GLOW = 1.5
+FILL = 0.2  # light that reaches a surface however it faces, from bounces off the walls
+FLOOR_LIGHT = 0.15  # no corridor goes fully black: the player must still see the Alien
+BOUNCE = 0.7  # ceilings catch extra fill from the lit deck below them
+LAMP_GAIN = 1.2  # a surface facing the lamp is brighter than the baked average
+SHEEN = 2.4  # how hard metal answers a lamp
+TORCH_FILL = 0.3
+TORCH_SHEEN = 1.8
+FAR_SHINE = 0.4  # the torch still picks out far walls, and the Alien's outline against them
+BAY_LAMP_TOP = 1.6  # hidden light in a wall bay sits at the head of its panel
+BAY_POWER = 3.2
+TONE_STEPS = 1024  # the curve spans twice full white, so highlights roll off, not clip
 TRI_FIELDS = 24
+FRAME_FIELDS = 9  # across, up and out of a surface, in world space
 SKY = 0.0  # a surface with this shade shows space, as far away as the stars are
 SKY_SCALE = 0.8  # share of the star texture seen across the screen
 ATTRIBUTES = 6  # depth, u, v, world x, y, z; each divided by depth
 
 
 @njit(inline="always")
-def light_at(light, grid, x, y):
-    """Bilinear RGB lookup; a clamped edge keeps points behind the hull valid."""
+def blend(grid_values, channel, y0, x0, y1, x1, near, right, below, far):
+    return (
+        grid_values[y0, x0, channel] * near + grid_values[y0, x1, channel] * right
+        + grid_values[y1, x0, channel] * below + grid_values[y1, x1, channel] * far
+    )  # fmt: skip
+
+
+@njit(inline="always")
+def light_at(light, aim, grid, x, y):
+    """Bilinear light and its direction; a clamped edge keeps points behind the hull valid."""
     fx = x * grid - 0.5
     fy = y * grid - 0.5
     left = int(floor(fx))
@@ -42,13 +67,22 @@ def light_at(light, grid, x, y):
     below = (1 - tx) * ty
     far = tx * ty
     return (
-        light[y0, x0, 0] * near + light[y0, x1, 0] * right + light[y1, x0, 0] * below
-        + light[y1, x1, 0] * far,
-        light[y0, x0, 1] * near + light[y0, x1, 1] * right + light[y1, x0, 1] * below
-        + light[y1, x1, 1] * far,
-        light[y0, x0, 2] * near + light[y0, x1, 2] * right + light[y1, x0, 2] * below
-        + light[y1, x1, 2] * far,
-    )  # fmt: skip
+        blend(light, 0, y0, x0, y1, x1, near, right, below, far),
+        blend(light, 1, y0, x0, y1, x1, near, right, below, far),
+        blend(light, 2, y0, x0, y1, x1, near, right, below, far),
+        blend(aim, 0, y0, x0, y1, x1, near, right, below, far),
+        blend(aim, 1, y0, x0, y1, x1, near, right, below, far),
+        blend(aim, 2, y0, x0, y1, x1, near, right, below, far),
+    )
+
+
+@njit(inline="always")
+def sharpen(amount):
+    """amount to the 16th: the tight highlight of worn metal, at the cost of four multiplies."""
+    amount *= amount
+    amount *= amount
+    amount *= amount
+    return amount * amount
 
 
 @njit(inline="always")
@@ -235,12 +269,19 @@ def rasterize(tris, count, inverse_depth, ids, bands):
 
 @njit(parallel=True, nogil=True, cache=True)
 def shade(
-    color, inverse_depth, ids, tris, tri_quad, texels, starts, size, textures, tints, shifts,
-    shades, light, light_grid, beam, top, sky_turn, horizon,
+    color, inverse_depth, ids, tris, tri_quad, texels, reliefs, starts, size, textures, tints,
+    shifts, shades, frames, light, aim, light_grid, beam, eye, sky_turn, horizon, fog_table,
 ):  # fmt: skip
     height, width = color.shape[0], color.shape[1]
+    eye_x, eye_y, eye_z = eye
     for row in prange(height):
         sy = row + 0.5
+        lit_quad, lit_until = -1, 0
+        red = green = blue = lamp_x = lamp_y = lamp_z = 0.0
+        view_x = view_y = view_z = half_x = half_y = half_z = 0.0
+        fog = gain = torch = bay_height = 0.0
+        across_x = across_y = across_z = up_x = up_y = up_z = out_x = out_y = out_z = 0.0
+        tint_red = tint_green = tint_blue = 0.0
         for column in range(width):
             tri = ids[row, column]
             if tri < 0:
@@ -260,51 +301,107 @@ def shade(
                 color[row, column, 2] = b / 255.0
                 continue
             depth = 1 / inverse_depth[row, column]
+            if quad != lit_quad or column >= lit_until:
+                # Light changes slowly across a surface, so a few pixels can share it.
+                lit_quad, lit_until = quad, column + LIGHT_SPAN
+                world_x = (tris[tri, 15] * sx + tris[tri, 16] * sy + tris[tri, 17]) * depth
+                world_y = (tris[tri, 18] * sx + tris[tri, 19] * sy + tris[tri, 20]) * depth
+                world_z = (tris[tri, 21] * sx + tris[tri, 22] * sy + tris[tri, 23]) * depth
+                shift_x, shift_y = shifts[quad, 0], shifts[quad, 1]
+                across_x, across_y, across_z = frames[quad, 0], frames[quad, 1], frames[quad, 2]
+                up_x, up_y, up_z = frames[quad, 3], frames[quad, 4], frames[quad, 5]
+                out_x, out_y, out_z = frames[quad, 6], frames[quad, 7], frames[quad, 8]
+                tint_red, tint_green, tint_blue = tints[quad, 0], tints[quad, 1], tints[quad, 2]
+                red, green, blue, aim_x, aim_y, lamp_top = light_at(
+                    light, aim, light_grid, world_x + shift_x, world_y + shift_y
+                )
+                # Lamp direction: the baked way across the deck, and the height of the lamps.
+                lamp_x, lamp_y, lamp_z = aim_x + shift_x, aim_y + shift_y, lamp_top - world_z
+                scale = 1.0 / sqrt(lamp_x * lamp_x + lamp_y * lamp_y + lamp_z * lamp_z + 1e-4)
+                lamp_x *= scale
+                lamp_y *= scale
+                lamp_z *= scale
+                view_x, view_y, view_z = eye_x - world_x, eye_y - world_y, eye_z - world_z
+                scale = 1.0 / sqrt(view_x * view_x + view_y * view_y + view_z * view_z + 1e-4)
+                view_x *= scale
+                view_y *= scale
+                view_z *= scale
+                half_x, half_y, half_z = lamp_x + view_x, lamp_y + view_y, lamp_z + view_z
+                scale = 1.0 / sqrt(half_x * half_x + half_y * half_y + half_z * half_z + 1e-4)
+                half_x *= scale
+                half_y *= scale
+                half_z *= scale
+                fog = fog_table[int(depth * FOG_STEPS)]
+                gain = shades[quad] * fog
+                torch = TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth)
+                bay_height = world_z / BAY_LAMP_TOP
+                bay_height = min(bay_height * bay_height, 1.0) * gain * BAY_POWER
             u = (tris[tri, 9] * sx + tris[tri, 10] * sy + tris[tri, 11]) * depth
             v = (tris[tri, 12] * sx + tris[tri, 13] * sy + tris[tri, 14]) * depth
-            world_x = (tris[tri, 15] * sx + tris[tri, 16] * sy + tris[tri, 17]) * depth
-            world_y = (tris[tri, 18] * sx + tris[tri, 19] * sy + tris[tri, 20]) * depth
-            world_z = (tris[tri, 21] * sx + tris[tri, 22] * sy + tris[tri, 23]) * depth
-            if depth < MIP_ONE:
-                r, g, b, a = fetch(
-                    texels, starts[0], size, textures[quad], u, v, depth < SMOOTH_RANGE
-                )
-            elif depth < MIP_TWO:
-                r, g, b, a = fetch(
-                    texels, starts[1], size // 2, textures[quad], u, v, depth < SMOOTH_RANGE
-                )
+            texture = textures[quad]
+            sheen = 0.0
+            if depth < MIP_TWO:
+                if depth < MIP_ONE:
+                    r, g, b, a = fetch(texels, starts[0], size, texture, u, v, True)
+                    close = depth < RELIEF_RANGE
+                    nx, ny, nz, shine = fetch(reliefs, starts[0], size, texture, u, v, close)
+                else:
+                    r, g, b, a = fetch(texels, starts[1], size // 2, texture, u, v, True)
+                    nx, ny, nz, shine = fetch(reliefs, starts[1], size // 2, texture, u, v, False)
+                nx = nx / 127.5 - 1.0
+                ny = ny / 127.5 - 1.0
+                nz = nz / 127.5 - 1.0
+                shine /= 255.0
+                # The surface's own direction at this pixel, from its relief.
+                face_x = across_x * nx + up_x * ny + out_x * nz
+                face_y = across_y * nx + up_y * ny + out_y * nz
+                face_z = across_z * nx + up_z * ny + out_z * nz
+                mirror = max(face_x * half_x + face_y * half_y + face_z * half_z, 0.0)
+                sheen = sharpen(mirror) * shine * SHEEN * gain
             else:
-                r, g, b, a = fetch(texels, starts[2], size // 4, textures[quad], u, v, False)
-            red, green, blue = light_at(
-                light, light_grid, world_x + shifts[quad, 0], world_y + shifts[quad, 1]
-            )
-            fog = exp(-depth * FOG_DENSITY)
-            gain = shades[quad] * (0.72 + 0.36 * world_z / top)
-            torch = beam[row, column] * TORCH_POWER / (1 + TORCH_FALLOFF * depth * depth)
+                r, g, b, a = fetch(texels, starts[2], size // 4, texture, u, v, False)
+                shine = FAR_SHINE
+                face_x, face_y, face_z = out_x, out_y, out_z
+            facing = max(face_x * lamp_x + face_y * lamp_y + face_z * lamp_z, 0.0)
+            toward = max(face_x * view_x + face_y * view_y + face_z * view_z, 0.0)
+            fill = FILL * (1.0 + BOUNCE * max(-face_z, 0.0))
+            lit = (fill + (1.0 - FILL) * facing * LAMP_GAIN) * gain
+            beamed = torch * beam[row, column]
+            torch_sheen = beamed * sharpen(toward) * shine * TORCH_SHEEN
+            flat_light = FLOOR_LIGHT * gain + beamed * (TORCH_FILL + (1.0 - TORCH_FILL) * toward)
+            bay = bay_height * (0.3 + 1.4 * max(face_z, 0.0))
             glow = a / 255.0 * (fog * 0.9 + 0.25) * GLOW
             color[row, column, 0] = (
-                r / 255.0 * ((red + tints[quad, 0]) * fog * gain + torch * TORCH_RED + glow)
-            )
+                r / 255.0 * (red * lit + tint_red * bay + flat_light * TORCH_RED + glow)
+                + red * sheen + torch_sheen * TORCH_RED
+            )  # fmt: skip
             color[row, column, 1] = (
-                g / 255.0 * ((green + tints[quad, 1]) * fog * gain + torch * TORCH_GREEN + glow)
-            )
+                g / 255.0 * (green * lit + tint_green * bay + flat_light * TORCH_GREEN + glow)
+                + green * sheen + torch_sheen * TORCH_GREEN
+            )  # fmt: skip
             color[row, column, 2] = (
-                b / 255.0 * ((blue + tints[quad, 2]) * fog * gain + torch * TORCH_BLUE + glow)
-            )
+                b / 255.0 * (blue * lit + tint_blue * bay + flat_light * TORCH_BLUE + glow)
+                + blue * sheen + torch_sheen * TORCH_BLUE
+            )  # fmt: skip
 
 
 @njit(parallel=True, nogil=True, cache=True)
-def finish_frame(color, vignette, grain, shift, tone, pixels):
-    """Vignette, film grain and tone curve; pixels is indexed (column, row, channel)."""
+def finish_frame(color, vignette, grain, shift, tone, pixels, shifts):
+    """Vignette, film grain and tone curve, written straight into the surface's own pixels."""
     height, width = color.shape[0], color.shape[1]
+    red_shift, green_shift, blue_shift = shifts
+    top = TONE_STEPS - 1.0
     for row in prange(height):
         noise_row = (row + shift) % height
         for column in range(width):
             noise = grain[noise_row, column]
-            scale = vignette[row, column] * 255
-            for channel in range(3):
-                level = color[row, column, channel] * scale + noise
-                pixels[column, row, channel] = tone[int(min(max(level, 0.0), 255.0))]
+            scale = vignette[row, column] * (TONE_STEPS / 2)
+            red = tone[int(min(max(color[row, column, 0] * scale + noise, 0.0), top))]
+            green = tone[int(min(max(color[row, column, 1] * scale + noise, 0.0), top))]
+            blue = tone[int(min(max(color[row, column, 2] * scale + noise, 0.0), top))]
+            pixels[column, row] = (
+                (red << red_shift) | (green << green_shift) | (blue << blue_shift)
+            )
 
 
 @njit(parallel=True, nogil=True, cache=True)

@@ -164,6 +164,6 @@ def test_cli_debug_flag_is_off_by_default_and_pygame_closes(monkeypatch, enabled
         return original(loop, debug_alien=debug_alien)
 
     monkeypatch.setattr(play, "hud_labels", labels)
-    play.main(["--debug-alien"] if enabled else [])
+    play.main(["--windowed", "--debug-alien"] if enabled else ["--windowed"])
     assert seen == [enabled]
     assert not pygame.display.get_init() and not pygame.font.get_init()

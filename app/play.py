@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 from math import degrees
 from pathlib import Path
 from statistics import mean
@@ -15,10 +16,18 @@ from app.recorder import GameplayRecorder, validate_record_directory
 from game.core import GameCore
 from game.map import DEFAULT_SCENARIO, SCENARIOS, scenario_map
 from game.ship_deck import ROWS as SHIP_ROWS
+from game.state import CoreConfig
 from renderers.raycasting import RaycastingRenderer
-from renderers.ship_renderer import ShipRenderer
+from renderers.ship_renderer import FIELD_OF_VIEW, ShipRenderer
 
-SHIP_FRAME = (960, 540)
+WINDOW = (1200, 675)
+SHIP_FRAME = WINDOW  # drawn pixel for pixel; only the graphics card stretches it to the screen
+MIN_FOV, MAX_FOV = 60, 120  # wider stretches walls at the screen's edges past looking right
+MENU_VEIL = 165  # opacity of 255; a paused frame stays visible behind the text, at about a third
+TEXT_COLOR, TEXT_BACKING = (240, 240, 240), (15, 18, 23)
+TEXT_SIZE, TITLE_SIZE = 24, 46
+LINE_HEIGHT = 30
+PROMPT_FROM_BOTTOM = 96  # low on the floor, where it hides nothing the player is watching
 KEYS = {
     pygame.K_w: "w",
     pygame.K_s: "s",
@@ -34,6 +43,21 @@ KEYS = {
 
 def window_title(core):
     return "Alien Survival - " + getattr(core, "controller_label", "Heuristic Test")
+
+
+def keep_window_sharp():
+    """Windows otherwise blurs the game by stretching it to the desktop's text size."""
+    os.environ.setdefault("SDL_WINDOWS_DPI_AWARENESS", "permonitorv2")
+
+
+def open_screen(windowed):
+    """Fill the desktop by letting the graphics card stretch the frame, which costs almost
+    nothing; drawing every desktop pixel in the shader would cost two and a half times more."""
+    if windowed:
+        return pygame.display.set_mode(WINDOW)
+    os.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "linear")  # smooth, not blocky
+    os.environ.setdefault("SDL_MOUSE_RELATIVE_SCALING", "0")  # the stretch must not slow the mouse
+    return pygame.display.set_mode(WINDOW, pygame.SCALED | pygame.FULLSCREEN)
 
 
 class PlaySession:
@@ -92,6 +116,11 @@ class PlaySession:
                     self.set_paused(not self.loop.paused, "escape")
                     self.sync_mouse()
                     transitioned = True
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_q:
+                # Full screen has no close button; a running round ignores a stray press.
+                if self.focused and self.loop.paused and not getattr(event, "repeat", False):
+                    self.running = False
+                    self.notify("window_close")
             elif event.type == pygame.KEYDOWN and event.key in (pygame.K_r, pygame.K_n):
                 if self.focused and not transitioned and not getattr(event, "repeat", False):
                     was_terminal = self.loop.current.outcome is not None
@@ -144,40 +173,66 @@ def alien_debug_labels(snapshot):
     ]
 
 
+def interaction_prompt(snapshot):
+    target = snapshot.interaction_target
+    if target is None:
+        return []
+    if target.object_id in snapshot.ruled_out_exits:
+        return ["Exit - Offline"]
+    if target.kind == "exit" and not snapshot.has_keycard:
+        return ["Exit - Keycard required"]
+    return [f"Press E - {'Keycard' if target.kind == 'keycard' else 'Exit'}"]
+
+
+def showing_menu(loop):
+    return loop.paused or loop.current.outcome is not None
+
+
 def hud_labels(loop, *, debug_alien=False):
+    """The screen stays clear in play: only what can be done right now, or the pause menu."""
     snapshot = loop.current
     controller = getattr(loop.core, "controller_label", "Heuristic test controller - NOT RL")
     debug = alien_debug_labels(snapshot) if debug_alien else []
     if snapshot.outcome:
         result = "YOU ESCAPED" if snapshot.outcome == "escaped" else "YOU WERE CAUGHT"
-        return [f"{result} - N new round | R same round", "Mouse released", controller] + debug
-    status = "PAUSED - Esc to play" if loop.paused else "WASD move | Shift run | Press E interact"
-    labels = [
-        status,
-        "Mouse look | Arrows turn | Esc pause | N new round | R same round",
+        return [result, "N new round | R same round | Q quit", controller] + debug
+    if not loop.paused:
+        return interaction_prompt(snapshot) + debug
+    return [
+        "PAUSED",
+        "Esc play | N new round | R same round | Q quit",
+        "WASD move | Shift run | E interact | Mouse look | Arrows turn",
         "Keycard: acquired" if snapshot.has_keycard else "Keycard: not acquired",
         controller if snapshot.alien is not None else "Alien disabled (isolated fixture)",
+        *interaction_prompt(snapshot),
+        *debug,
     ]
-    target = snapshot.interaction_target
-    if target is not None:
-        if target.object_id in snapshot.ruled_out_exits:
-            labels.append("Exit - Offline")
-        elif target.kind == "exit" and not snapshot.has_keycard:
-            labels.append("Exit - Keycard required")
-        else:
-            name = "Keycard" if target.kind == "keycard" else "Exit"
-            labels.append(f"Press E - {name}")
-    return labels + debug
+
+
+def show_labels(screen, fonts, labels, menu):
+    """A menu sits in the middle over a dimmed frame; a prompt sits low and in the way of nothing."""
+    width, height = screen.get_size()
+    if menu:
+        veil = pygame.Surface((width, height))
+        veil.set_alpha(MENU_VEIL)
+        screen.blit(veil, (0, 0))
+    top = (height - len(labels) * LINE_HEIGHT) // 2 if menu else height - PROMPT_FROM_BOTTOM
+    for line, label in enumerate(labels):
+        title = menu and line == 0
+        font = fonts[1] if title else fonts[0]
+        text = font.render(label, True, TEXT_COLOR, None if menu else TEXT_BACKING)
+        y = top + line * LINE_HEIGHT + (TITLE_SIZE // 2 if menu and line else 0)
+        screen.blit(text, ((width - text.get_width()) // 2, y))
 
 
 def frame_size(world):
     return SHIP_FRAME if world.rows == SHIP_ROWS else (320, 180)
 
 
-def make_renderer(world):
+def make_renderer(world, fov=FIELD_OF_VIEW):
     """The ship deck has its own textures and light; test scenes keep the plain renderer."""
     if world.rows == SHIP_ROWS:
-        return ShipRenderer(world, size=SHIP_FRAME)
+        return ShipRenderer(world, size=SHIP_FRAME, fov=fov)
     return RaycastingRenderer()
 
 
@@ -194,6 +249,11 @@ def main(argv=None):
     parser.add_argument("--sampling-seed", type=int)
     parser.add_argument("--scenario-seed", type=int, default=0)
     parser.add_argument("--scenario", choices=SCENARIOS, help="Heuristic only; RL uses its run")
+    parser.add_argument("--no-alien", action="store_true", help="Walk the map alone; heuristic only")
+    parser.add_argument("--windowed", action="store_true", help="Stay in a window, not full screen")
+    parser.add_argument(
+        "--fov", type=int, default=FIELD_OF_VIEW, help="Degrees across the screen, on the ship"
+    )
     parser.add_argument(
         "--debug-alien", action="store_true", help="Privileged yaw/sensor HUD; off by default"
     )
@@ -207,6 +267,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.fps_limit < 0 or args.benchmark_seconds < 0:
         parser.error("Limits must be nonnegative")
+    if not MIN_FOV <= args.fov <= MAX_FOV:
+        parser.error(f"--fov must be between {MIN_FOV} and {MAX_FOV}")
     if args.record_dir is not None:
         if args.controller != "rl":
             parser.error("--record-dir requires --controller rl")
@@ -215,6 +277,8 @@ def main(argv=None):
         except RuntimeError as exc:
             parser.error(str(exc))
     if args.controller == "rl":
+        if args.no_alien:
+            parser.error("--no-alien has no RL Alien to run")
         if args.scenario is not None:
             parser.error("--scenario is fixed by the RL run")
         if args.run_dir is None or args.checkpoint is None or args.sampling_seed is None:
@@ -230,7 +294,8 @@ def main(argv=None):
     else:
         if any(value is not None for value in (args.run_dir, args.checkpoint, args.sampling_seed)):
             parser.error("RL checkpoint options require --controller rl")
-        core = GameCore(scenario_map(args.scenario or DEFAULT_SCENARIO))
+        config = CoreConfig(alien_enabled=False) if args.no_alien else None
+        core = GameCore(scenario_map(args.scenario or DEFAULT_SCENARIO), config)
         core.reset(args.scenario_seed)
     recorder = None
     completed, end_reason = False, "exception"
@@ -247,8 +312,9 @@ def main(argv=None):
                     "max_frame_seconds": loop.max_frame_time,
                     "fps_limit": args.fps_limit,
                     "framebuffer": list(frame_size(core.snapshot().world_map)),
-                    "window": [960, 540],
-                    "fov_degrees": 75,
+                    "window": list(WINDOW),
+                    "fullscreen": not args.windowed,
+                    "fov_degrees": args.fov,
                     "mouse_sensitivity": loop.inputs.mouse_sensitivity,
                     "vertical_sensitivity": loop.inputs.vertical_sensitivity,
                     "turn_speed": loop.inputs.turn_speed,
@@ -258,14 +324,15 @@ def main(argv=None):
             )
             core.recorder = recorder
             print(f"Recording game to {recorder.directory}")
+        keep_window_sharp()
         pygame.display.init()
         pygame.font.init()
-        screen = pygame.display.set_mode((960, 540))
+        screen = open_screen(args.windowed)
         pygame.display.set_caption(window_title(core))
-        renderer = make_renderer(core.snapshot().world_map)
+        renderer = make_renderer(core.snapshot().world_map, args.fov)
         smooth = isinstance(renderer, ShipRenderer)
         fit = pygame.transform.smoothscale if smooth else pygame.transform.scale
-        font = pygame.font.Font(None, 22)
+        fonts = pygame.font.Font(None, TEXT_SIZE), pygame.font.Font(None, TITLE_SIZE)
         session = PlaySession(loop)
         audio = ShipAudio(Speaker())
         loop.on_tick = audio.hear
@@ -287,13 +354,15 @@ def main(argv=None):
             session.after_step()
             audio.follow(loop.paused, loop.current)
             frame = renderer.render(loop.display_snapshot(), pitch=loop.display_pitch())
-            fit(frame, screen.get_size(), screen)
+            if frame.get_size() == WINDOW:
+                screen.blit(frame, (0, 0))
+            else:
+                fit(frame, WINDOW, screen)
             labels = hud_labels(loop, debug_alien=args.debug_alien)
-            if recorder is not None:
+            menu = showing_menu(loop)
+            if recorder is not None and menu:
                 labels.append(f"Recording: {recorder.directory.name}")
-            for line, label in enumerate(labels):
-                text = font.render(label, True, (240, 240, 240), (15, 18, 23))
-                screen.blit(text, (12, 12 + line * 24))
+            show_labels(screen, fonts, labels, menu)
             pygame.display.flip()
             work_end = perf_counter()
             if args.benchmark_seconds and now - start >= 1:
@@ -311,8 +380,10 @@ def main(argv=None):
                 json.dumps(
                     {
                         "framebuffer": list(frame_size(core.snapshot().world_map)),
-                        "window": [960, 540],
-                        "fov_degrees": 75,
+                        "window": list(WINDOW),
+                        "fullscreen": not args.windowed,
+                        "screen": list(pygame.display.get_window_size()),
+                        "fov_degrees": args.fov,
                         "display_driver": pygame.display.get_driver(),
                         "fps_limit": args.fps_limit,
                         "warmup_seconds": 1,

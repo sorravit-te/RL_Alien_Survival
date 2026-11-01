@@ -161,7 +161,8 @@ def fake_textures(tmp_path_factory):
     rng = np.random.default_rng(1)
     path = tmp_path_factory.mktemp("ship") / "fake.npz"
     levels = {
-        f"level{i}": rng.integers(40, 220, (len(names), 16 >> i, 16 >> i, 4), dtype=np.uint8)
+        f"{kind}{i}": rng.integers(40, 220, (len(names), 16 >> i, 16 >> i, 4), dtype=np.uint8)
+        for kind in ("level", "relief")
         for i in range(3)
     }
     np.savez(path, names=np.array(names), **levels)

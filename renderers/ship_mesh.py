@@ -6,15 +6,20 @@ middle of a room, floor grates sink, and doorways drop a header. Surfaces may si
 wall line but never reach past where collision stops the player, so Core stays the truth.
 """
 
+from math import cos, radians, sin
+
 import numpy as np
 
 from game.ship_deck import EXITS
 from renderers.ship_kernels import SKY
 from renderers.ship_theme import (
+    CABLED,
     CORRIDORS,
     CROSSES,
     FACES,
     FURNITURE,
+    HOT_PIPES,
+    PIPED,
     SIGNS,
     WARNINGS,
     ZONES,
@@ -56,16 +61,44 @@ LEAF_PROFILE = (  # height, distance out from the door's middle plane
     (DOOR_TOP, LEAF_RAISED),
 )
 LINE_OFFSET = 0.3  # painted floor line, measured out from the wall
-LINE_WIDTH = 0.09
-BAND_LOW, BAND_HIGH = 1.08, 1.13  # district color around each pillar
+LINE_WIDTH = 0.045
 SIDEWAYS = ("columna1", "columna2")  # these images lie down, so a pillar stands them up
+# Overhead fittings hang above the Alien's head and inside the player's collision radius,
+# so they can never hide it or look like something to walk around.
+OVERHEAD_FLOOR = 1.87
+PIPE_OUT, PIPE_HEIGHT, PIPE_RADIUS = 0.08, 1.96, 0.06
+LINE_OUT, LINE_HEIGHT, LINE_RADIUS = 0.05, 1.895, 0.024
+COLLAR_SCALE, COLLAR_WIDTH, COLLAR_SPAN = 1.3, 0.08, 2  # width in units, one every SPAN cells
+PIPE_ANGLES = (45, -5, -55, -110)  # the sides a standing player can see from below
+PIPE_SHADES = (0.95, 0.8, 0.6)
+CABLE_THICKNESS = 0.03
+CABLE_SHARE = 0.2
+
+
+def surface_frame(points, corners, normal):
+    """World directions of a texture's right, up and out, so its relief can be read in place."""
+    a, b, _, d = points
+    edge_u, edge_v = b - a, d - a
+    (u0, v0), (u1, v1), _, (u3, v3) = corners
+    du1, dv1, du2, dv2 = u1 - u0, v1 - v0, u3 - u0, v3 - v0
+    area = du1 * dv2 - du2 * dv1
+    if abs(area) < 1e-7:
+        right, down = edge_u, edge_v
+    else:
+        right = (dv2 * edge_u - dv1 * edge_v) / area
+        down = (du1 * edge_v - du2 * edge_u) / area
+    right = right - normal * np.dot(right, normal)
+    down = down - normal * np.dot(down, normal)
+    right = right / max(np.linalg.norm(right), 1e-7)
+    down = down / max(np.linalg.norm(down), 1e-7)
+    return (*right, *-down, *normal)
 
 
 class Mesh:
     def __init__(self, index):
         self.index = index
         self.vertices, self.uvs, self.normals, self.textures = [], [], [], []
-        self.tints, self.shifts, self.shades = [], [], []
+        self.tints, self.shifts, self.shades, self.frames = [], [], [], []
         self.door_parts = []  # (quad, door index, sliding direction) of every door leaf
 
     def quad(
@@ -90,6 +123,7 @@ class Mesh:
         self.vertices.append(points)
         self.uvs.append(corners)
         self.normals.append(normal)
+        self.frames.append(surface_frame(points, corners, normal))
         self.textures.append(self.index[texture])
         self.tints.append(tint)
         self.shifts.append((facing[0] * reach, facing[1] * reach))
@@ -271,8 +305,6 @@ class Wall:
         self.flat(
             s0, s1, 0, self.top, self.zone.pillar, depth=proud, shade=0.9, reach=0.2, turned=turned,
         )  # fmt: skip
-        if self.zone.stripe:
-            self.flat(s0, s1, BAND_LOW, BAND_HIGH, self.zone.stripe, depth=proud - 0.01, reach=0.2)
         for s, sign in ((s0, -1), (s1, 1)):
             self.mesh.quad(
                 self.at(s, 0, 0), self.at(s, proud, 0), self.at(s, proud, self.top),
@@ -358,6 +390,22 @@ class Wall:
         self.flat(0, self.length, 0.26, self.top - 0.3, texture, repeat=(self.length / 1.6, 1.0))
         self.flat(0, self.length, self.top - 0.3, self.top, self.zone.cornice, shade=0.85)
 
+    def pipe(self, s0, s1, out, z, radius, texture):
+        """A run along the wall, faceted around the sides seen from below."""
+        points = [(radians(a), cos(radians(a)), sin(radians(a))) for a in PIPE_ANGLES]
+        facets = len(points) - 1
+        for index, (near, far) in enumerate(zip(points, points[1:])):
+            high_out, high_z = out + radius * near[1], z + radius * near[2]
+            low_out, low_z = out + radius * far[1], z + radius * far[2]
+            middle = (near[0] + far[0]) / 2
+            nx, ny, _ = self.facing
+            self.mesh.quad(
+                self.at(s0, -low_out, low_z), self.at(s1, -low_out, low_z),
+                self.at(s1, -high_out, high_z), self.at(s0, -high_out, high_z), texture,
+                (nx * cos(middle), ny * cos(middle), sin(middle)), repeat=(s1 - s0, 1.0),
+                rows=(index / facets, (index + 1) / facets), shade=PIPE_SHADES[index], reach=0.3,
+            )  # fmt: skip
+
 
 def worn(zone, name, x, y):
     """Blood and claw marks stay rare, and only appear on panels that have such a copy."""
@@ -401,6 +449,65 @@ def add_walls(mesh, theme):
                 lambda i, x=x, y=y, z=zone: worn(z, pick(z.bays, x + i, y + i, 5), x + i, y + i)
             )
             wall.floor_line()
+            add_pipes(wall, key, x, y)
+
+
+def add_pipes(wall, key, x, y):
+    if wall.length < 3 or stable(x, y, 14) >= PIPED.get(key, 0.0):
+        return
+    texture = "pipe_hot" if key in HOT_PIPES else "pipe"
+    wall.pipe(0, wall.length, PIPE_OUT, PIPE_HEIGHT, PIPE_RADIUS, texture)
+    wall.pipe(0, wall.length, LINE_OUT, LINE_HEIGHT, LINE_RADIUS, "cable")
+    for s in np.arange(1.0, wall.length - 0.5, COLLAR_SPAN):
+        wall.pipe(
+            float(s), float(s) + COLLAR_WIDTH, PIPE_OUT, PIPE_HEIGHT, PIPE_RADIUS * COLLAR_SCALE,
+            "bracket",
+        )  # fmt: skip
+
+
+def raised_axis(theme, x, y):
+    """The way a raised ceiling runs through a cell, or None where it does not run on."""
+    def raised(cx, cy):
+        return theme.is_open(cx, cy) and theme.edge_count(cx, cy) == 0
+    if raised(x, y - 1) and raised(x, y + 1):
+        return (0.0, 1.0)
+    if raised(x - 1, y) and raised(x + 1, y):
+        return (1.0, 0.0)
+    return None
+
+
+def add_cables(mesh, theme):
+    """Slack cables strung under the raised ceiling, all well above anyone's head."""
+    for y in range(theme.height):
+        for x in range(theme.width):
+            if (
+                not theme.is_open(x, y)
+                or theme.zone_at(x, y) not in CABLED
+                or theme.edge_count(x, y) != 0
+                or stable(x, y, 17) >= CABLE_SHARE
+            ):
+                continue
+            axis = raised_axis(theme, x, y)
+            if axis is not None:
+                add_cable(mesh, x, y, axis, cell_ceiling(theme, x, y))
+
+
+def add_cable(mesh, x, y, axis, ceiling):
+    side = (axis[1], axis[0])
+    offset = (stable(x, y, 18) - 0.5) * 0.6
+    middle = np.array((x + 0.5 + side[0] * offset, y + 0.5 + side[1] * offset))
+    sag = 2.02 + stable(x, y, 19) * 0.16
+    heights = (ceiling, sag + 0.1, sag, ceiling)
+    spots = (-1.4, -0.45, 0.4, 1.4)
+    for (s0, z0), (s1, z1) in zip(zip(spots, heights), zip(spots[1:], heights[1:])):
+        a, b = middle + np.array(axis) * s0, middle + np.array(axis) * s1
+        low = (float(a[0]), float(a[1]), z0), (float(b[0]), float(b[1]), z1)
+        high = (*low[0][:2], z0 + CABLE_THICKNESS), (*low[1][:2], z1 + CABLE_THICKNESS)
+        for sign in (-1.0, 1.0):
+            mesh.quad(
+                low[0], low[1], high[1], high[0], "cable", (side[0] * sign, side[1] * sign, 0.0),
+                repeat=(s1 - s0, 1.0), reach=0.0,
+            )  # fmt: skip
 
 
 def add_block(wall, kind):
@@ -643,10 +750,12 @@ def build_mesh(theme, names):
     add_crosses(mesh, theme)
     add_hazard_lines(mesh, theme)
     add_wreck(mesh)
+    add_cables(mesh, theme)
     return {
         "vertices": np.array(mesh.vertices, np.float32),
         "uvs": np.array(mesh.uvs, np.float32),
         "normals": np.array(mesh.normals, np.float32),
+        "frames": np.array(mesh.frames, np.float32),
         "textures": np.array(mesh.textures, np.int64),
         "tints": np.array(mesh.tints, np.float32),
         "shifts": np.array(mesh.shifts, np.float32),

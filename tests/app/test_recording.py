@@ -360,6 +360,7 @@ def cli(path=None):
         "991",
         "--scenario-seed",
         "7799101",
+        "--windowed",
     ]
     return args if path is None else args + ["--record-dir", str(path)]
 

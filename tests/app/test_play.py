@@ -243,7 +243,7 @@ def test_normal_window_close_releases_pygame(monkeypatch, tmp_path):
     pygame.image.save(pygame.Surface((16, 16)), texture_path)
     monkeypatch.setattr(play, 'RaycastingRenderer', lambda: RaycastingRenderer(texture_path))
     monkeypatch.setattr(pygame.event, 'get', lambda: [event(pygame.QUIT)])
-    play.main([])
+    play.main(["--windowed"])
     assert not pygame.display.get_init()
     assert not pygame.font.get_init()
 
@@ -497,6 +497,61 @@ def test_e_input_and_terminal_mouse_release_restart(display, monkeypatch):
     assert loop.inputs.consume(loop.dt) == SurvivorCommand()
 
 
+def test_the_ship_view_follows_the_fov_option(monkeypatch):
+    from app import play
+
+    seen = []
+    monkeypatch.setattr(
+        play, "ShipRenderer", lambda world, size, fov: seen.append((size, fov)) or "ship"
+    )
+    assert play.make_renderer(scenario_map(SHIP_SCENARIO), 90) == "ship"
+    assert seen == [(play.SHIP_FRAME, 90)]
+
+
+@pytest.mark.parametrize("fov", ["59", "121"])
+def test_a_field_of_view_that_would_look_wrong_is_refused(fov, capsys):
+    from app import play
+
+    with pytest.raises(SystemExit) as error:
+        play.main(["--scenario", "ship_deck_v1", "--fov", fov])
+    assert error.value.code == 2 and "--fov" in capsys.readouterr().err
+
+
+def test_the_ship_is_drawn_pixel_for_pixel_and_never_stretched_by_windows(monkeypatch):
+    from app import play
+
+    assert play.frame_size(scenario_map(SHIP_SCENARIO)) == play.WINDOW
+    monkeypatch.delenv("SDL_WINDOWS_DPI_AWARENESS", raising=False)
+    play.keep_window_sharp()
+    assert os.environ["SDL_WINDOWS_DPI_AWARENESS"] == "permonitorv2"
+
+
+def test_no_alien_walks_the_map_alone_and_keeps_new_rounds(monkeypatch):
+    from app import play
+
+    def stop_at_the_core(world, config):
+        made.append(GameCore(world, config))
+        raise SystemExit
+
+    made = []
+    monkeypatch.setattr(play, "GameCore", stop_at_the_core)
+    with pytest.raises(SystemExit):
+        play.main(["--scenario", "ship_deck_v1", "--no-alien"])
+    loop = FixedStepLoop(made[0])
+    assert loop.current.alien is None
+    seed = loop.current.seed
+    loop.new_round()
+    assert loop.current.alien is None and loop.current.seed != seed
+
+
+def test_no_alien_refuses_an_rl_controller(capsys):
+    from app import play
+
+    with pytest.raises(SystemExit) as error:
+        play.main(["--controller", "rl", "--no-alien"])
+    assert error.value.code == 2 and "--no-alien" in capsys.readouterr().err
+
+
 class Draws:
     """Hand new_round the seeds a test needs, in order."""
 
@@ -621,9 +676,89 @@ def test_new_round_key_keeps_a_pause_and_resumes_after_a_finished_round(display)
     assert any("N new round" in text and "R same round" in text for text in hud_labels(loop))
     assert pygame.display.get_caption()[0] == window_title(loop.core)
     loop.current = replace(loop.current, outcome="captured")
-    assert "N new round" in hud_labels(loop)[0] and "R same round" in hud_labels(loop)[0]
+    assert any("N new round" in text and "R same round" in text for text in hud_labels(loop))
     session.events([event(pygame.KEYDOWN, key=pygame.K_n)])
     assert not loop.paused and loop.current.outcome is None
+
+
+def test_a_running_round_keeps_the_screen_clear():
+    from app.play import hud_labels, showing_menu
+
+    world = WorldMap(("......",) * 6, ((2.5, 2.5),))
+    loop = FixedStepLoop(GameCore(world))
+    assert hud_labels(loop) == [] and not showing_menu(loop)
+
+
+def test_the_pause_menu_holds_what_the_screen_no_longer_shows(display):
+    from app.play import hud_labels, showing_menu
+
+    world = WorldMap(("......",) * 6, ((2.5, 2.5),))
+    loop = FixedStepLoop(GameCore(world))
+    session = PlaySession(loop)
+    assert showing_menu(loop)
+    text = " ".join(hud_labels(loop))
+    for wanted in ("Esc", "WASD", "Q quit", "Keycard: not acquired", "Alien disabled"):
+        assert wanted in text
+    session.focused = True
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    assert not showing_menu(loop)
+
+
+def test_a_finished_round_shows_the_menu_before_the_session_pauses_it():
+    from app.play import showing_menu
+
+    loop = FixedStepLoop(GameCore(WorldMap(("......",) * 6, ((2.5, 2.5),))))
+    loop.current = replace(loop.current, outcome="escaped")
+    assert not loop.paused and showing_menu(loop)
+
+
+def test_q_quits_only_from_the_menu(display):
+    loop = FixedStepLoop(GameCore(config=CoreConfig(alien_enabled=False)))
+    session = PlaySession(loop)
+    session.focused = True
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    session.events([event(pygame.KEYDOWN, key=pygame.K_q)])
+    assert session.running  # a round in play ignores a stray press
+    session.events([event(pygame.KEYDOWN, key=pygame.K_ESCAPE)])
+    session.events([event(pygame.KEYDOWN, key=pygame.K_q, repeat=True)])
+    assert session.running
+    session.events([event(pygame.KEYDOWN, key=pygame.K_q)])
+    assert not session.running
+
+
+def test_labels_draw_in_the_middle_only_for_a_menu(display):
+    from app.play import LINE_HEIGHT, WINDOW, show_labels
+
+    pygame.font.init()
+    fonts = pygame.font.Font(None, 24), pygame.font.Font(None, 46)
+
+    def drawn(menu):
+        screen = pygame.Surface(WINDOW)
+        screen.fill((200, 200, 200))
+        show_labels(screen, fonts, ["one line"], menu)
+        return screen
+
+    prompt, menu = drawn(False), drawn(True)
+    assert prompt.get_at((5, 5))[:3] == (200, 200, 200)  # play is not dimmed
+    assert menu.get_at((5, 5))[0] < 100
+    middle = WINDOW[1] // 2
+    row = pygame.surfarray.array3d(menu)[:, middle - LINE_HEIGHT // 2 : middle + LINE_HEIGHT]
+    assert row.max() > 200  # the title sits at the centre of the screen
+
+
+@pytest.mark.parametrize("windowed", [True, False])
+def test_the_game_fills_the_screen_unless_told_to_stay_in_a_window(monkeypatch, windowed):
+    from app import play
+
+    seen = []
+    monkeypatch.setattr(pygame.display, "set_mode", lambda *args: seen.append(args))
+    monkeypatch.delenv("SDL_MOUSE_RELATIVE_SCALING", raising=False)
+    play.open_screen(windowed)
+    if windowed:
+        assert seen == [(play.WINDOW,)]
+    else:
+        assert seen == [(play.WINDOW, pygame.SCALED | pygame.FULLSCREEN)]
+        assert os.environ["SDL_MOUSE_RELATIVE_SCALING"] == "0"
 
 
 def test_locked_exit_hint_and_occluded_object_no_hint(display):
