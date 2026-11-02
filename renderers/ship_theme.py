@@ -19,6 +19,12 @@ EXIT_LAMP = 1.7
 TONE_KEPT = 0.75  # how much of a zone's hue its lamps keep
 AMBIENT = 1.1  # a dead stretch of corridor is dark, but not black
 DARKER = 0.22  # share of every zone's lamps that have failed, on top of its own
+LIT_ROOM = 8  # a room this many cells or more never goes black; smaller ones may
+DARK_ROOM = 0.1  # light in a room's middle cells below which the screen shows black there
+LAST_LAMP = 0.6  # the lamp that comes back on is a weak one, so the room stays dim
+# Set by eye in play, over whatever the rules above decide.
+LAMPS_ON = ((11, 16), (11, 23))  # two crew cabins, as bright as the two lit ones beside them
+LAMPS_OFF = ((8, 13),)  # the command ring's corner, where it turns into the crew ring
 STEADY, FLICKER, PULSE = 0, 1, 2
 LIGHT_LAYERS = 3
 
@@ -162,12 +168,6 @@ SIGNS = {  # (cell x, y, face): a stencil beside the doorway it names
     (12, 11, 3): "sign_lab",
     (27, 11, 3): "sign_lab",
 }
-WARNINGS = {
-    (29, 18, 0): "warning_quarantine",
-    (9, 24, 0): "warning_listen",
-    (29, 22, 1): "warning_seal",
-    (17, 23, 1): "warning_listen",
-}
 FACES =((-1, 0), (1, 0), (0, -1), (0, 1))  # west, east, north, south face of a solid cell
 PIPED ={"S": 0.7, "O": 0.6, "W": 0.7, "E": 0.6, "G": 1.0, "C": 0.5, "R": 1.0}  # share of walls
 HOT_PIPES = "GR"
@@ -196,6 +196,8 @@ class ShipTheme:
         self.light_cells = {}
         self._place_lights()
         self.layers = self._bake_light()
+        if self._light_dark_rooms():
+            self.layers = self._bake_light()
         self.sparks = tuple(
             (x + 0.5, y + 0.5)
             for (x, y), lit in sorted(self.light_cells.items())
@@ -263,16 +265,60 @@ class ShipTheme:
             ):
                 continue
             taken.append((x, y, zone.spacing))
-            dead = stable(x, y, 11) < zone.dead_share + DARKER
-            self.light_cells[(x, y)] = not dead
-            if not dead:
-                layer = self._layer_for(zone, x, y)
-                lamp = LAMP_HIGH if self.edge_count(x, y) == 0 else LAMP_LOW
-                color = muted(zone.color)
-                self.lights.append((x + 0.5, y + 0.5, color, zone.power, layer, lamp))
+            self.light_cells[(x, y)] = False
+            if stable(x, y, 11) >= zone.dead_share + DARKER and (x, y) not in LAMPS_OFF:
+                self._add_lamp(x, y, zone.power)
+        for x, y in LAMPS_ON:
+            self._add_lamp(x, y, ZONES[self.zone_at(x, y)].power)
         for _, ex, ey in EXITS:
             # Every exit carries the same lamp, so light never tells which one works.
             self.lights.append((ex, ey, (0.3, 1.0, 0.55), 0.7, STEADY, EXIT_LAMP))
+
+    def _light_dark_rooms(self):
+        """No room goes pitch black: the dead lamp nearest its middle comes back, weakly."""
+        seen = self.layers.sum(axis=0).mean(axis=-1)
+        cell_light = seen.reshape(self.height, LIGHT_GRID, self.width, LIGHT_GRID).mean(axis=(1, 3))
+        added = False
+        for cells in self._rooms():
+            if len(cells) < LIT_ROOM or np.median([cell_light[y, x] for x, y in cells]) >= DARK_ROOM:
+                continue
+            middle_x = sum(x for x, _ in cells) / len(cells)
+            middle_y = sum(y for _, y in cells) / len(cells)
+            dead = [cell for cell in cells if self.light_cells.get(cell) is False]
+            slots = [cell for cell in dead if cell not in LAMPS_OFF]
+            slots = slots or [cell for cell in cells if cell not in self.light_cells]
+            x, y = min(slots, key=lambda cell: ((cell[0] - middle_x) ** 2 + (cell[1] - middle_y) ** 2, cell))
+            self._add_lamp(x, y, ZONES[self.zone_at(x, y)].power * LAST_LAMP)
+            added = True
+        return added
+
+    def _add_lamp(self, x, y, power):
+        zone = ZONES[self.zone_at(x, y)]
+        lamp = LAMP_HIGH if self.edge_count(x, y) == 0 else LAMP_LOW
+        self.light_cells[(x, y)] = True
+        self.lights.append(
+            (x + 0.5, y + 0.5, muted(zone.color), power, self._layer_for(zone, x, y), lamp)
+        )
+
+    def _rooms(self):
+        """Open cells of one zone joined side by side; doorways and alcoves belong to none."""
+        rooms, seen = [], set()
+        for start in ((x, y) for y in range(self.height) for x in range(self.width)):
+            if start in seen or not self.is_open(*start) or self.zone_at(*start) in "DA":
+                continue
+            letter = self.zone_at(*start)
+            cells, stack = [], [start]
+            seen.add(start)
+            while stack:
+                x, y = stack.pop()
+                cells.append((x, y))
+                for dx, dy in FACES:
+                    near = x + dx, y + dy
+                    if near not in seen and self.is_open(*near) and self.zone_at(*near) == letter:
+                        seen.add(near)
+                        stack.append(near)
+            rooms.append(cells)
+        return rooms
 
     @staticmethod
     def _layer_for(zone, x, y):

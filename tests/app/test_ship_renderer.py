@@ -33,10 +33,15 @@ from renderers.ship_mesh import (
 )
 from renderers.ship_renderer import FIELD_OF_VIEW, ShipRenderer
 from renderers.ship_theme import (
+    DARK_ROOM,
     FACES,
     LAMP_HIGH,
     LAMP_LOW,
+    LAMPS_OFF,
+    LAMPS_ON,
+    LAST_LAMP,
     LIGHT_GRID,
+    LIT_ROOM,
     ZONES,
     ShipTheme,
     muted,
@@ -346,6 +351,37 @@ def test_relief_changes_how_a_surface_is_lit(renderer, snapshot):
         assert picture(renderer, snapshot) != lit
     finally:
         renderer.reliefs[:] = relief
+
+
+def test_a_big_room_never_goes_black_but_a_small_one_may(theme):
+    seen = theme.layers.sum(axis=0).mean(axis=-1)
+    cells = seen.reshape(theme.height, LIGHT_GRID, theme.width, LIGHT_GRID).mean(axis=(1, 3))
+    black_corners = 0
+    for room in theme._rooms():
+        middle = np.median([cells[y, x] for x, y in room])
+        lit = any(theme.light_cells.get(cell) for cell in room)
+        if len(room) >= LIT_ROOM:
+            assert lit or middle >= DARK_ROOM
+        black_corners += len(room) < LIT_ROOM and middle < DARK_ROOM
+    assert black_corners
+
+
+def test_a_lamp_that_comes_back_for_a_dark_room_is_weak(theme):
+    powers = {(int(x), int(y)): power for x, y, _, power, *_ in theme.lights}
+    weak = [
+        cell for cell, power in powers.items()
+        if cell in theme.light_cells and power < ZONES[theme.zone_at(*cell)].power
+    ]  # fmt: skip
+    assert weak
+    assert all(powers[cell] == ZONES[theme.zone_at(*cell)].power * LAST_LAMP for cell in weak)
+
+
+def test_lamps_set_by_hand_stay_on_or_off(theme):
+    lamps = [(int(x), int(y)) for x, y, *_ in theme.lights]
+    powers = {(int(x), int(y)): power for x, y, _, power, *_ in theme.lights}
+    assert all(theme.light_cells[cell] and lamps.count(cell) == 1 for cell in LAMPS_ON)
+    assert all(powers[cell] == ZONES[theme.zone_at(*cell)].power for cell in LAMPS_ON)
+    assert not any(theme.light_cells.get(cell) or cell in lamps for cell in LAMPS_OFF)
 
 
 def test_lamp_direction_leads_back_to_the_lamp(theme):
