@@ -20,7 +20,6 @@ from renderers.ship_theme import (
     HOT_PIPES,
     PIPED,
     SIGNS,
-    WARNINGS,
     ZONES,
     pick,
     stable,
@@ -580,7 +579,7 @@ def add_hull_doors(mesh, theme):
 
 
 def add_signs(mesh, theme):
-    for (x, y, face), name in (*SIGNS.items(), *WARNINGS.items()):
+    for (x, y, face), name in SIGNS.items():
         dx, dy = FACES[face]
         line = (x + (dx > 0)) if dx else (y + (dy > 0))
         along = y if dx else x

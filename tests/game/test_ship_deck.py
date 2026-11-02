@@ -20,7 +20,7 @@ from game.ship_deck import (
     WAYPOINTS,
 )
 from game.state import CoreConfig
-from renderers.ship_theme import SIGNS, WARNINGS
+from renderers.ship_theme import SIGNS
 from renderers.ship_zones import ZONE_ROWS
 
 WORLD = scenario_map(SHIP_SCENARIO)
@@ -133,7 +133,7 @@ def test_zone_rows_trace_the_same_floor():
 
 
 def test_painted_signs_face_open_floor():
-    for x, y, face in (*SIGNS, *WARNINGS):
+    for x, y, face in SIGNS:
         dx, dy = FACES[face]
         assert ROWS[y][x] == "#" and ROWS[y + dy][x + dx] == ".", (x, y, face)
 

@@ -54,7 +54,6 @@ SIGNS = {
 GUIDE_LINE = (0.3, 0.5, 1.0)  # one color all over the ship, to follow through the dark
 LIT_COPIES = ("ceiling3_lit", "ceiling4_lit")
 MADE = ("ceiling2_lit", "window_glass", "hazard", "door1_seam")
-WARNINGS = {"quarantine": "QUARANTINE", "seal": "SEAL THIS DECK", "listen": "IT HEARS YOU"}
 SEAM_HALF = 5  # texels either side of a door's middle
 FITTINGS = ("pipe", "pipe_hot", "bracket", "cable", "pane_seal")
 
@@ -64,7 +63,6 @@ def texture_names():
     names += [f"{name}_blood" for name in BLOODIED]
     names += [f"{name}_clawed" for name in CLAWED]
     names += [f"sign_{key}" for key in SIGNS]
-    names += [f"warning_{key}" for key in WARNINGS]
     return sorted(names)
 
 
@@ -355,8 +353,6 @@ def bake(directory, seed=20261030):
         textures[f"sign_{key}"] = (plate(plain, sign, rng, (222, 204, 158)), no_glow)
     textures["guide_line"] = stripe_rail(GUIDE_LINE)
     textures["hazard"] = (hazard_stripes(), no_glow)
-    for key, text in WARNINGS.items():
-        textures[f"warning_{key}"] = (plate(plain, text, rng, (190, 30, 20)), no_glow)
     add_fittings(textures, reliefs, rng)
     return textures, reliefs
 
