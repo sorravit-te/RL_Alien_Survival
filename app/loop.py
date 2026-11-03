@@ -1,7 +1,7 @@
 """Bounded fixed-step scheduling and collision-safe display interpolation."""
 
 from dataclasses import replace
-from math import floor, hypot, pi
+from math import floor, hypot, pi, radians
 from random import Random
 
 from ai.navigation import find_path
@@ -21,6 +21,13 @@ SHORTEST_ESCAPE = 30.0
 # exact. It lives here because game/ is part of a checkpoint's identity, and the Alien needs no
 # such fix: its routes never press it against a wall.
 PLAYER_RADIUS = round(0.2 * 2**26) / 2**26
+# Core starts every Survivor facing +x, which on the ship put three starts in front of a wall,
+# the crew cabin's half a cell away. A person turns into the room instead; set by eye, in degrees.
+START_FACING = {
+    (14.5, 16.5): 120,  # crew cabin: its door
+    (7.5, 31.5): 345,  # cargo hold: the aisle to the engine ring
+    (10.5, 7.5): 90,  # west lab: its door to the command ring
+}
 
 
 def press_in_stride(command, snapshot):
@@ -31,6 +38,21 @@ def press_in_stride(command, snapshot):
     if command.interact and snapshot.interaction_target is not None:
         return replace(command, forward=0.0, strafe=0.0)
     return command
+
+
+class PlayerCore(GameCore):
+    """The Core a person plays: the same rounds, but no start faces a bare wall.
+
+    game/ is part of a checkpoint's identity, so bots and training still start facing +x.
+    """
+
+    def reset(self, seed=None):
+        super().reset(seed)
+        survivor = self._survivor
+        facing = START_FACING.get((survivor.x, survivor.y))
+        if facing is not None:
+            self._survivor = replace(survivor, yaw=radians(facing))
+        return self.snapshot()
 
 
 def round_start(snapshot):

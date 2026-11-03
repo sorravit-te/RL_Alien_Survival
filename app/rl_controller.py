@@ -7,8 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from app.loop import PLAYER_RADIUS
-from game.core import GameCore
+from app.loop import PLAYER_RADIUS, PlayerCore
 from game.map import DEFAULT_SCENARIO, scenario_map
 from game.state import CoreConfig
 from rl.alien_view import allowed_view, record_waypoint_visits, target_source
@@ -174,7 +173,7 @@ def load_human_rl(run_dir, checkpoint, sampling_seed, scenario_seed=0):
     ):
         raise ValueError("RL play requires the selected, replay-verified best checkpoint")
     model.policy.set_training_mode(False)
-    core = GameCore(
+    core = PlayerCore(
         scenario_map(config.get("scenario", DEFAULT_SCENARIO)),
         CoreConfig(radius=PLAYER_RADIUS),
         alien_control="external",

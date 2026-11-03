@@ -3,7 +3,30 @@
 A university survival game project where a human player faces a reinforcement learning Alien agent.
 The project targets first-person raycasting over a 2D world.
 
-A small test scene is playable against a trained Alien. The full map and hiding systems are next.
+The full 40x40 ship deck is playable against a trained Alien.
+
+## Play
+
+Run from the repo root in PowerShell. The trained Alien loads from a local run in the ignored `experiments/` folder.
+
+Against the trained Alien:
+
+```powershell
+.venv\Scripts\python.exe -B -m app.play --controller rl --run-dir experiments/ship_deck_full_v1_s2/run --checkpoint experiments/ship_deck_full_v1_s2/run/checkpoints/best.zip --sampling-seed 310003 --scenario-seed 310002 --fps-limit 60
+```
+
+Against the scripted Alien, or alone on the ship:
+
+```powershell
+.venv\Scripts\python.exe -B -m app.play --scenario ship_deck_v1 --scenario-seed 1 --fps-limit 60
+.venv\Scripts\python.exe -B -m app.play --scenario ship_deck_v1 --scenario-seed 1 --fps-limit 60 --no-alien
+```
+
+- The game opens paused. Press N for a new round, since a command's seeds always deal the same first round. R replays the last round exactly, Esc pauses, and Q quits from the pause menu.
+- WASD to move, Shift to run, E to interact, the mouse to look and the arrow keys to turn.
+- `--windowed` stays in a window, `--fov` sets the view from 60 to 120 degrees (default 100), and `--scenario-seed <n>` picks a round.
+- To record every round, add `--record-dir experiments/human_dev_<name>` to the trained Alien command. Review it with `.venv\Scripts\python.exe -m tools.review_recording experiments/human_dev_<name>`.
+- In VS Code, Terminal > Run Task > "Alien RL: Play against trained Alien" runs the first command.
 
 ## Assets
 

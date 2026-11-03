@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import torch
 
-from app.loop import PLAYER_RADIUS, FixedStepLoop
+from app.loop import PLAYER_RADIUS, FixedStepLoop, PlayerCore
 from app.rl_controller import HumanRLController, load_human_rl, rng_state
 from game.core import GameCore
 from game.map import MapObject, WorldMap
@@ -401,12 +401,12 @@ def test_selected_best_binding_failure_prevents_core_creation(monkeypatch, tmp_p
     def no_core(*args, **kwargs):
         pytest.fail("Invalid metadata reached Core construction")
 
-    monkeypatch.setattr("app.rl_controller.GameCore", no_core)
+    monkeypatch.setattr("app.rl_controller.PlayerCore", no_core)
     with pytest.raises(ValueError, match="selected, replay-verified"):
         load_human_rl(tmp_path, path, 123)
 
 
-def test_a_loaded_checkpoint_plays_with_the_players_exact_radius(monkeypatch, tmp_path):
+def test_a_loaded_checkpoint_plays_with_the_players_core_and_radius(monkeypatch, tmp_path):
     import rl.pipeline as pipeline
 
     class Loaded(Policy):
@@ -426,4 +426,5 @@ def test_a_loaded_checkpoint_plays_with_the_players_exact_radius(monkeypatch, tm
     metadata = {"role": "best_validation", "actual_steps": 20224, "optimizer_update_epochs": 790}
     monkeypatch.setattr(pipeline, "read_run", lambda p: ({"torch_threads": 1}, {}, {}))
     monkeypatch.setattr(pipeline, "load_checkpoint", lambda *a: (Loaded(), metadata))
-    assert load_human_rl(tmp_path, path, 123).config.radius == PLAYER_RADIUS
+    loaded = load_human_rl(tmp_path, path, 123)
+    assert isinstance(loaded.core, PlayerCore) and loaded.config.radius == PLAYER_RADIUS

@@ -69,7 +69,7 @@
       "id": "run",
       "type": "promptString",
       "description": "Run folder inside experiments/",
-      "default": "ship_deck_pilot_v3_s4"
+      "default": "ship_deck_full_v1_s2"
     }
   ]
 }
