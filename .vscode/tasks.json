@@ -52,7 +52,7 @@
         "-B", "-m", "app.play", "--controller", "rl",
         "--run-dir", "experiments/${input:run}/run",
         "--checkpoint", "experiments/${input:run}/run/checkpoints/best.zip",
-        "--sampling-seed", "310003", "--scenario-seed", "310001", "--fps-limit", "60"
+        "--sampling-seed", "310003", "--scenario-seed", "310002", "--fps-limit", "60"
       ],
       "options": {"cwd": "${workspaceFolder}"},
       "problemMatcher": []

@@ -13,6 +13,9 @@ from game.motion import segment_has_clearance
 NEW_ROUND_TRIES = 64  # a map with a single start stops looking for a different one
 SEED_LIMIT = 2**32  # the range EpisodeSampler accepts
 START_GRACE_SECONDS = 5.0  # to look around before a searching Alien can have you in sight range
+# Cells from the start to the card and on to the nearest exit. On the ship 3 of the 24 start and
+# card pairs fall short: the card waits beside the start with an exit behind it, a 4 to 6 second run.
+SHORTEST_ESCAPE = 30.0
 # 0.2 has no exact binary form. Against walls to the south and east it rounds to just inside the
 # wall, so the seams between wall cells stop the player dead. This is 0.2 to eight places and
 # exact. It lives here because game/ is part of a checkpoint's identity, and the Alien needs no
@@ -42,10 +45,32 @@ def alien_starts_far(snapshot):
     alien, survivor, config = snapshot.alien, snapshot.survivor, snapshot.config
     if alien is None:
         return True
-    start = (alien.x, alien.y)
-    route = find_path(snapshot.world_map, start, (survivor.x, survivor.y), config.alien_radius)
-    walk = sum(hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip((start, *route), route))
+    walk = walk_length(
+        snapshot.world_map, (alien.x, alien.y), (survivor.x, survivor.y), config.alien_radius
+    )
     return walk >= config.alien_sight_range + START_GRACE_SECONDS * config.alien_search_speed
+
+
+def escape_takes_long(snapshot):
+    """Start, card, then the nearest exit, walked; human rounds only.
+
+    Which exit works stays private to Core and never counts here: a round left out for it would
+    tell the player that the exit beside a close card is the one that works.
+    """
+    world, survivor, radius = snapshot.world_map, snapshot.survivor, snapshot.config.radius
+    card = next((obj for obj in world.objects if obj.kind == "keycard"), None)
+    exits = [obj for obj in world.objects if obj.kind == "exit"]
+    if card is None or not exits:
+        return True
+    to_card = walk_length(world, (survivor.x, survivor.y), (card.x, card.y), radius)
+    onward = min(walk_length(world, (card.x, card.y), (out.x, out.y), radius) for out in exits)
+    return to_card + onward >= SHORTEST_ESCAPE
+
+
+def walk_length(world, start, end, radius):
+    """Along the route a body of this radius walks; no route at all counts as no distance."""
+    route = find_path(world, start, end, radius)
+    return sum(hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip((start, *route), route))
 
 
 class FixedStepLoop:
@@ -77,7 +102,10 @@ class FixedStepLoop:
         self.synchronize()
 
     def new_round(self):
-        """Leave the played start, card and Alien spawn; a new sampling seed varies its choices."""
+        """Leave the played start, card and Alien spawn; a new sampling seed varies its choices.
+
+        It also passes over rounds with the Alien close or the card and an exit beside the start.
+        """
         core = getattr(self.core, "core", self.core)
         preview = GameCore(core.world_map, core.config, alien_control=core.alien_control)
         played = round_start(preview.reset(self.current.seed))
@@ -87,7 +115,7 @@ class FixedStepLoop:
             start = preview.reset(candidate)
             if round_start(start) != played:
                 seed = candidate
-                if alien_starts_far(start):
+                if alien_starts_far(start) and escape_takes_long(start):
                     break
         if hasattr(self.core, "sampling_seed"):
             self.core.sampling_seed = self.rounds.randrange(SEED_LIMIT)

@@ -11,7 +11,13 @@ import pygame
 import pytest
 
 from app.input import InputState
-from app.loop import PLAYER_RADIUS, FixedStepLoop, alien_starts_far, round_start
+from app.loop import (
+    PLAYER_RADIUS,
+    FixedStepLoop,
+    alien_starts_far,
+    escape_takes_long,
+    round_start,
+)
 from app.play import PlaySession
 from game.core import GameCore
 from game.map import WorldMap, scenario_map
@@ -596,7 +602,9 @@ def test_new_round_compares_the_start_not_where_the_round_got_to():
     other = next(
         s
         for s in range(2, 9999)
-        if round_start(snapshot := core.reset(s)) != played and alien_starts_far(snapshot)
+        if round_start(snapshot := core.reset(s)) != played
+        and alien_starts_far(snapshot)
+        and escape_takes_long(snapshot)
     )
     core.reset(1)
     loop = FixedStepLoop(core)
@@ -629,9 +637,26 @@ def test_new_rounds_leave_out_the_closest_ship_starts():
     pairs = set()
     for _ in range(150):
         loop.new_round()
-        assert alien_starts_far(loop.current)
+        assert alien_starts_far(loop.current) and escape_takes_long(loop.current)
         pairs.add(round_start(loop.current)[:2])
     assert len(pairs) == 12
+
+
+def test_new_rounds_leave_out_a_card_and_exit_beside_the_start():
+    core = GameCore(scenario_map(SHIP_SCENARIO))
+    answers = {}
+    for seed in range(400):
+        start = core.reset(seed)
+        card = next(obj.object_id for obj in start.world_map.objects if obj.kind == "keycard")
+        pair = (start.survivor.x, start.survivor.y), card
+        answers.setdefault(pair, set()).add(escape_takes_long(start))
+    # Which exit works never counts, so a start and card always get the same answer.
+    assert len(answers) == 24 and all(len(answer) == 1 for answer in answers.values())
+    assert sorted(pair for pair, answer in answers.items() if answer == {False}) == [
+        ((7.5, 31.5), "keycard_cargo"),
+        ((14.5, 16.5), "keycard_cabin"),
+        ((24.5, 18.5), "keycard_medbay"),
+    ]
 
 
 def test_a_map_of_close_starts_still_leaves_the_start_just_played():
