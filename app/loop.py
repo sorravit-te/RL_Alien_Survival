@@ -1,7 +1,7 @@
 """Bounded fixed-step scheduling and collision-safe display interpolation."""
 
 from dataclasses import replace
-from math import floor, hypot, pi, radians
+from math import floor, hypot, pi
 from random import Random
 
 from ai.navigation import find_path
@@ -16,43 +16,6 @@ START_GRACE_SECONDS = 5.0  # to look around before a searching Alien can have yo
 # Cells from the start to the card and on to the nearest exit. On the ship 3 of the 24 start and
 # card pairs fall short: the card waits beside the start with an exit behind it, a 4 to 6 second run.
 SHORTEST_ESCAPE = 30.0
-# 0.2 has no exact binary form. Against walls to the south and east it rounds to just inside the
-# wall, so the seams between wall cells stop the player dead. This is 0.2 to eight places and
-# exact. It lives here because game/ is part of a checkpoint's identity, and the Alien needs no
-# such fix: its routes never press it against a wall.
-PLAYER_RADIUS = round(0.2 * 2**26) / 2**26
-# Core starts every Survivor facing +x, which on the ship put three starts in front of a wall,
-# the crew cabin's half a cell away. A person turns into the room instead; set by eye, in degrees.
-START_FACING = {
-    (14.5, 16.5): 120,  # crew cabin: its door
-    (7.5, 31.5): 345,  # cargo hold: the aisle to the engine ring
-    (10.5, 7.5): 90,  # west lab: its door to the command ring
-}
-
-
-def press_in_stride(command, snapshot):
-    """Core takes E only from a body at rest, and game/ is part of a checkpoint's identity.
-
-    So the player stands for the one tick a press lands, and held keys carry straight on.
-    """
-    if command.interact and snapshot.interaction_target is not None:
-        return replace(command, forward=0.0, strafe=0.0)
-    return command
-
-
-class PlayerCore(GameCore):
-    """The Core a person plays: the same rounds, but no start faces a bare wall.
-
-    game/ is part of a checkpoint's identity, so bots and training still start facing +x.
-    """
-
-    def reset(self, seed=None):
-        super().reset(seed)
-        survivor = self._survivor
-        facing = START_FACING.get((survivor.x, survivor.y))
-        if facing is not None:
-            self._survivor = replace(survivor, yaw=radians(facing))
-        return self.snapshot()
 
 
 def round_start(snapshot):
@@ -154,7 +117,7 @@ class FixedStepLoop:
         while self.accumulator + 1e-12 >= self.dt and count < self.max_steps:
             self.previous = self.current
             self.previous_pitch = self.current_pitch
-            self.current = self.core.step(press_in_stride(self.inputs.consume(self.dt), self.current))
+            self.current = self.core.step(self.inputs.consume(self.dt))
             if self.on_tick is not None:
                 self.on_tick(self.current)
             self.current_pitch = self.inputs.pitch

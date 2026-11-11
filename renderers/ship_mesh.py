@@ -538,15 +538,10 @@ def add_block(wall, kind):
         wall.flat(0, length, 0, 1.0, "other1", repeat=(length, 1.0))
         wall.flat(0, length, 1.0, 1.1, "walltrim5", repeat=(length, 1.0), shade=0.7)
         wall.flat(0, length, 1.1, wall.top, "other2", repeat=(length, 1.0))
-    elif kind == "reactor":
+    else:
         wall.flat(0, length, 0, 0.5, "wall12", repeat=(length, 0.4), shade=0.8)
         wall.flat(0, length, 0.5, 1.5, "rack1", repeat=(length, 1.0))
         wall.flat(0, length, 1.5, wall.top, "columna2", repeat=(length / 2, 1.0), shade=0.8)
-    else:
-        # The ship's centre: glowing conduits ringed by plate, seen from every corridor.
-        wall.flat(0, length, 0, 0.5, "columna1", repeat=(length, 1.0), shade=0.9)
-        wall.flat(0, length, 0.5, 1.7, "wall12", repeat=(length, 1.0))
-        wall.flat(0, length, 1.7, wall.top + RAISED, "columna2", repeat=(length, 1.0), shade=0.9)
 
 
 def add_viewport(wall):

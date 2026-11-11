@@ -215,7 +215,7 @@ class ShipRenderer:
             },
         }
         self.alien_art = AlienSprites(alien_path)
-        spawn = self.theme.world.spawn_points[0]
+        spawn = self.theme.world.spawn_points[0][:2]
         picture = self.sprites["exit"][0][0]
         light, *_ = self._draw(*spawn, 0.0, self.height / 2, 0, (picture, (0, 0, 1, 1), 1.0))  # compile first
         self._draw_sprite(light, self.height / 2, 1.0, 0.0, "exit", *spawn)

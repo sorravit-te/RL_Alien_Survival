@@ -76,7 +76,9 @@ DOORS = (
     (17, 36),
     (21, 36),
 )
-SURVIVOR_SPAWNS = ((14.5, 16.5), (24.5, 18.5), (7.5, 31.5), (10.5, 7.5))
+# Each start faces into its room, picked by eye from renders: the crew cabin's door, the mess,
+# the cargo aisle to the engine ring and the west lab's door. Facing +x put a wall ahead of three.
+SURVIVOR_SPAWNS = ((14.5, 16.5, 2.0944), (24.5, 18.5, 0.0), (7.5, 31.5, 6.0214), (10.5, 7.5, 1.5708))
 ALIEN_SPAWNS = ((19.5, 4.5, 1.5708), (31.5, 36.5, 3.1416), (36.5, 16.5, 3.1416), (3.5, 24.5, 0.0))
 KEYCARDS = (
     ("keycard_bridge", 19.5, 3.5),
@@ -113,13 +115,4 @@ WAYPOINTS = (
     (27.5, 7.5),  # east lab
     (19.5, 4.5),  # bridge
     (11.5, 7.5),  # west lab
-)
-# Reserved for the hiding system; nothing reads these until lockers exist.
-LOCKER_SPOTS = (
-    (11.5, 15.5),
-    (14.5, 24.5),
-    (26.5, 25.5),
-    (9.5, 5.5),
-    (15.5, 37.5),
-    (32.5, 31.5),
 )

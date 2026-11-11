@@ -32,7 +32,6 @@ BAY_LAMP_TOP = 1.6  # hidden light in a wall bay sits at the head of its panel
 BAY_POWER = 3.2
 TONE_STEPS = 1024  # the curve spans twice full white, so highlights roll off, not clip
 TRI_FIELDS = 24
-FRAME_FIELDS = 9  # across, up and out of a surface, in world space
 SKY = 0.0  # a surface with this shade is window glass with open space behind it
 GLASS_TINT = 0.93, 0.97, 1.0  # thick glass takes a little red out of what passes
 GLASS_MIRROR = 0.07  # what it reflects looking straight on; grazing it, nearly all

@@ -155,7 +155,6 @@ ZONES = {
 FURNITURE = {  # solid cells drawn as objects rather than ship walls
     "C": "crate",
     "R": "reactor",
-    "Z": "column",
 }
 SIGNS = {  # (cell x, y, face): a stencil beside the doorway it names
     (17, 17, 1): "sign_crew",

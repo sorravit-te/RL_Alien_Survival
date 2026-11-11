@@ -34,7 +34,7 @@ class MapObject:
 @dataclass(frozen=True)
 class WorldMap:
     rows: tuple[str, ...]
-    spawn_points: tuple[tuple[float, float], ...]
+    spawn_points: tuple[tuple[float, ...], ...]  # x, y and an optional yaw; without one, +x
     objects: tuple[MapObject, ...] = ()
     alien_spawn: tuple[float, float, float] | None = None
     patrol_waypoints: tuple[tuple[float, float], ...] = ()
@@ -73,7 +73,7 @@ class WorldMap:
             raise ValueError("Map must be rectangular and contain only # or .")
         if not self.spawn_points:
             raise ValueError("Map needs at least one spawn point")
-        if any(len(p) != 2 or not all(isfinite(v) for v in p) for p in self.spawn_points):
+        if any(len(p) not in (2, 3) or not all(isfinite(v) for v in p) for p in self.spawn_points):
             raise ValueError("Invalid spawn point")
 
         if any(self.blocked(floor(obj.x), floor(obj.y)) for obj in self.objects):

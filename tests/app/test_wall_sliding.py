@@ -1,6 +1,5 @@
 """A body pressed against a wall slides along it, past the seams between wall cells."""
 
-from app.loop import PLAYER_RADIUS
 from game.core import GameCore
 from game.map import scenario_map
 from game.ship_deck import SHIP_SCENARIO
@@ -64,16 +63,6 @@ def stuck_walks(radius):
     return stuck
 
 
-def test_the_player_slides_past_every_seam_on_the_ship():
-    assert stuck_walks(PLAYER_RADIUS) == []
-
-
-def test_the_radius_the_alien_was_trained_with_still_catches_on_them():
-    """Drop this and PLAYER_RADIUS once a new VERSION can fix sweep_axis in game/ itself."""
-    assert stuck_walks(CoreConfig().radius)
-
-
-def test_the_player_radius_is_exact_and_still_practically_the_trained_one():
-    assert all((k + PLAYER_RADIUS) - k == PLAYER_RADIUS for k in range(WORLD.width + 1))
-    assert all(k - (k - PLAYER_RADIUS) == PLAYER_RADIUS for k in range(1, WORLD.width + 1))
-    assert abs(PLAYER_RADIUS - CoreConfig().radius) < 1e-8
+def test_a_body_slides_past_every_seam_on_the_ship():
+    """0.2 has no exact binary form, and a wall to the south or east once stopped it at seams."""
+    assert stuck_walks(CoreConfig().radius) == []

@@ -175,7 +175,7 @@ def test_the_renderer_draws_the_baked_view_facing_the_camera(fake_textures, bake
     world = scenario_map(SHIP_SCENARIO)
     renderer = ShipRenderer(world, fake_textures, size=(80, 45), alien_path=baked)
     core = GameCore(world, CoreConfig())
-    x, y = world.spawn_points[0]
+    x, y, _ = world.spawn_points[0]
 
     def centre(alien_yaw):
         snapshot = replace(

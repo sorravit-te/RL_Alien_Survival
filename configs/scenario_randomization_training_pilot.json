@@ -49,5 +49,5 @@
   "defer_final_test": true,
   "scenario_sha256": "2a14286ecbf8e17c91caa5931fd8baa4c392e691db4027c69b7694133626bbb9",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v11-wide-patrol"
+  "contract_version": "alien-vector-v12-balanced-deck"
 }

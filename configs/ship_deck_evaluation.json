@@ -74,8 +74,8 @@
   "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
   "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
   "scenario": "ship_deck_v1",
-  "scenario_sha256": "2c2082b184108f6d4eb730e78563a0bccd10f24a97b7db105c7e2643f16060e0",
+  "scenario_sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v11-wide-patrol",
+  "contract_version": "alien-vector-v12-balanced-deck",
   "bot_mix": "runner_mix: per case one third Runner, the rest the 50/50 plain and wall-loop mix, chosen from bot_seed"
 }

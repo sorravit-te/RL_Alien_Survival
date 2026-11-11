@@ -12,7 +12,9 @@ def sweep_axis(world, radius, position, other, delta, *, horizontal):
         return target
     for across in range(floor(other - radius), floor(other + radius) + 1):
         gap = abs(other - min(max(other, across), across + 1))
-        if gap >= radius:
+        # The same slack as WorldMap.overlaps: a body resting on a wall row only touches it,
+        # even when rounding puts it a hair inside, so the row's seams never stop a slide.
+        if gap * gap >= radius * radius - 1e-12:
             continue
         padding = sqrt(max(0.0, radius * radius - gap * gap))
         for along in range(

@@ -1,7 +1,7 @@
 """The full deck: a connected, loop-rich layout whose every scenario can start and finish."""
 
 from collections import deque
-from math import floor, hypot
+from math import cos, floor, hypot, sin
 from random import Random
 
 import pytest
@@ -14,9 +14,9 @@ from game.ship_deck import (
     ALIEN_SPAWNS,
     EXITS,
     KEYCARDS,
-    LOCKER_SPOTS,
     ROWS,
     SHIP_SCENARIO,
+    SURVIVOR_SPAWNS,
     WAYPOINTS,
 )
 from game.state import CoreConfig
@@ -56,7 +56,6 @@ def cell_of(point):
 def test_counts_match_the_plan():
     assert (WORLD.width, WORLD.height) == (40, 40)
     assert len(WAYPOINTS) == 20 and len(KEYCARDS) == 6 and len(EXITS) == 3
-    assert len(LOCKER_SPOTS) == 6
     assert len({zone for row in ZONE_ROWS for zone in row}) >= 10
 
 
@@ -67,11 +66,9 @@ def test_every_floor_cell_connects():
 
 def test_all_points_stand_clear_of_walls():
     points = (
-        *WORLD.spawn_points,
-        *(spawn[:2] for spawn in ALIEN_SPAWNS),
+        *(spawn[:2] for spawn in (*SURVIVOR_SPAWNS, *ALIEN_SPAWNS)),
         *WAYPOINTS,
         *((x, y) for _, x, y in (*KEYCARDS, *EXITS)),
-        *LOCKER_SPOTS,
     )
     assert not any(WORLD.overlaps(*point, CONFIG.radius) for point in points)
 
@@ -79,11 +76,18 @@ def test_all_points_stand_clear_of_walls():
 @pytest.mark.parametrize("start", WORLD.spawn_points)
 def test_each_spawn_reaches_every_card_and_exit(start):
     for _, x, y in (*KEYCARDS, *EXITS):
-        assert find_path(WORLD, start, (x, y), CONFIG.radius)
+        assert find_path(WORLD, start[:2], (x, y), CONFIG.radius)
+
+
+@pytest.mark.parametrize("start", SURVIVOR_SPAWNS)
+def test_each_start_faces_into_its_room(start):
+    """Facing +x put the crew cabin start half a cell from a wall; now three cells stay clear."""
+    x, y, yaw = start
+    assert segment_clear(WORLD, x, y, x + 3 * cos(yaw), y + 3 * sin(yaw))
 
 
 def test_no_spawn_pair_starts_in_sight():
-    for sx, sy in WORLD.spawn_points:
+    for sx, sy, _ in WORLD.spawn_points:
         for ax, ay, _ in ALIEN_SPAWNS:
             near = hypot(ax - sx, ay - sy) <= CONFIG.alien_sight_range
             assert not (near and segment_clear(WORLD, sx, sy, ax, ay))
@@ -142,7 +146,8 @@ def test_core_starts_every_seeded_scenario_inside_the_ship():
     core = GameCore(WORLD)
     for seed in range(120):
         snapshot = core.reset(seed)
-        assert (snapshot.survivor.x, snapshot.survivor.y) in WORLD.spawn_points
+        survivor = snapshot.survivor
+        assert (survivor.x, survivor.y, survivor.yaw) in WORLD.spawn_points
         assert sum(obj.kind == "keycard" for obj in snapshot.world_map.objects) == 1
         assert sum(obj.kind == "exit" for obj in snapshot.world_map.objects) == 3
 

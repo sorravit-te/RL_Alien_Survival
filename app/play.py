@@ -11,8 +11,9 @@ from time import perf_counter
 import pygame
 
 from app.audio import ShipAudio, Speaker
-from app.loop import PLAYER_RADIUS, FixedStepLoop, PlayerCore
+from app.loop import FixedStepLoop
 from app.recorder import GameplayRecorder, validate_record_directory
+from game.core import GameCore
 from game.map import DEFAULT_SCENARIO, SCENARIOS, scenario_map
 from game.ship_deck import ROWS as SHIP_ROWS
 from game.state import CoreConfig
@@ -293,8 +294,8 @@ def main(argv=None):
     else:
         if any(value is not None for value in (args.run_dir, args.checkpoint, args.sampling_seed)):
             parser.error("RL checkpoint options require --controller rl")
-        config = CoreConfig(radius=PLAYER_RADIUS, alien_enabled=not args.no_alien)
-        core = PlayerCore(scenario_map(args.scenario or DEFAULT_SCENARIO), config)
+        config = CoreConfig(alien_enabled=not args.no_alien)
+        core = GameCore(scenario_map(args.scenario or DEFAULT_SCENARIO), config)
         core.reset(args.scenario_seed)
     recorder = None
     completed, end_reason = False, "exception"

@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import replace
-from math import cos, pi, radians, sin, tan
+from math import pi, tan
 from random import Random
 
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -12,17 +12,14 @@ import pytest
 
 from app.input import InputState
 from app.loop import (
-    PLAYER_RADIUS,
-    START_FACING,
     FixedStepLoop,
-    PlayerCore,
     alien_starts_far,
     escape_takes_long,
     round_start,
 )
 from app.play import PlaySession
 from game.core import GameCore
-from game.map import SCENARIOS, WorldMap, scenario_map
+from game.map import WorldMap, scenario_map
 from game.ship_deck import SHIP_SCENARIO, SURVIVOR_SPAWNS
 from game.state import CoreConfig, SurvivorCommand, SurvivorState
 from renderers.raycasting import RaycastingRenderer, cast_ray
@@ -538,11 +535,11 @@ def test_no_alien_walks_the_map_alone_and_keeps_new_rounds(monkeypatch):
     from app import play
 
     def stop_at_the_core(world, config):
-        made.append(PlayerCore(world, config))
+        made.append(GameCore(world, config))
         raise SystemExit
 
     made = []
-    monkeypatch.setattr(play, "PlayerCore", stop_at_the_core)
+    monkeypatch.setattr(play, "GameCore", stop_at_the_core)
     with pytest.raises(SystemExit):
         play.main(["--scenario", "ship_deck_v1", "--no-alien"])
     loop = FixedStepLoop(made[0])
@@ -550,21 +547,6 @@ def test_no_alien_walks_the_map_alone_and_keeps_new_rounds(monkeypatch):
     seed = loop.current.seed
     loop.new_round()
     assert loop.current.alien is None and loop.current.seed != seed
-
-
-@pytest.mark.parametrize("extra", [[], ["--no-alien"]])
-def test_a_played_round_uses_the_players_exact_radius(monkeypatch, extra):
-    from app import play
-
-    def stop_at_the_core(world, config):
-        made.append(config)
-        raise SystemExit
-
-    made = []
-    monkeypatch.setattr(play, "PlayerCore", stop_at_the_core)
-    with pytest.raises(SystemExit):
-        play.main(["--scenario", "ship_deck_v1", *extra])
-    assert made[0].radius == PLAYER_RADIUS and made[0].alien_enabled is not bool(extra)
 
 
 def test_no_alien_refuses_an_rl_controller(capsys):
@@ -661,38 +643,21 @@ def test_new_rounds_leave_out_a_card_and_exit_beside_the_start():
     ]
 
 
-def test_a_player_never_starts_facing_a_close_wall():
-    world = scenario_map(SHIP_SCENARIO)
-    bots, player = GameCore(world), PlayerCore(world, CoreConfig(radius=PLAYER_RADIUS))
-    facings = {}
-    for seed in range(200):
-        assert bots.reset(seed).survivor.yaw == 0.0  # training and checkpoints keep +x
-        start = player.reset(seed).survivor
-        facings.setdefault((start.x, start.y), set()).add(start.yaw)
-    # One facing per start whatever the card, exit or Alien, so a facing gives nothing away.
-    assert set(facings) == set(SURVIVOR_SPAWNS)
-    for (x, y), (yaw,) in facings.items():
-        assert cast_ray(world, x, y, cos(yaw), sin(yaw)).distance >= 3.0
-    assert cast_ray(world, 14.5, 16.5, 1.0, 0.0).distance == 0.5  # the crew cabin's old view
-    others = {p for name in SCENARIOS if name != SHIP_SCENARIO for p in scenario_map(name).spawn_points}
-    assert set(START_FACING) <= set(SURVIVOR_SPAWNS) and not set(START_FACING) & others
-
-
-def test_replay_and_new_rounds_keep_the_players_facing():
-    loop = FixedStepLoop(PlayerCore(scenario_map(SHIP_SCENARIO)))
+def test_replay_and_new_rounds_keep_each_starts_facing():
+    loop = FixedStepLoop(GameCore(scenario_map(SHIP_SCENARIO)))
     loop.rounds = Random(2)
     seen = set()
     for _ in range(12):
         loop.new_round()
         start = loop.current.survivor
         seen.add((start.x, start.y))
-        facing = radians(START_FACING.get((start.x, start.y), 0))
+        facing = next(yaw for x, y, yaw in SURVIVOR_SPAWNS if (x, y) == (start.x, start.y))
         loop.inputs.mouse(300)
         loop.advance(loop.dt)
         assert loop.current.survivor.yaw != start.yaw == facing
         loop.reset()
         assert loop.current.survivor == start
-    assert seen == set(SURVIVOR_SPAWNS)
+    assert seen == {(x, y) for x, y, _ in SURVIVOR_SPAWNS}
 
 
 def test_a_map_of_close_starts_still_leaves_the_start_just_played():
@@ -926,7 +891,7 @@ def tap_e(loop):
 
 
 @pytest.mark.parametrize('held', [('w',), ('w', 'shift_left'), ('d',)])
-def test_e_lands_at_a_walk_or_run_and_the_held_keys_carry_on(held):
+def test_e_lands_at_a_walk_or_run_without_breaking_stride(held):
     loop = loop_facing_a_card()
     for key in held:
         loop.inputs.key(key, True)
@@ -934,9 +899,7 @@ def test_e_lands_at_a_walk_or_run_and_the_held_keys_carry_on(held):
     stride = loop.current.survivor
     assert stride != SurvivorState(2.5, 2.5)
     tap_e(loop)
-    assert loop.current.has_keycard and loop.current.survivor == stride
-    loop.advance(loop.dt)
-    assert loop.current.survivor != stride
+    assert loop.current.has_keycard and loop.current.survivor != stride
 
 
 def test_the_exit_opens_on_the_move_too():

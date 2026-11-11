@@ -37,14 +37,14 @@ class GameCore:
         self.alien_control = alien_control
         self.world_map = world_map if world_map is not None else small_test_map()
         self.config = config if config is not None else CoreConfig()
-        for x, y in self.world_map.spawn_points:
+        for x, y, *_ in self.world_map.spawn_points:
             if self.world_map.overlaps(x, y, self.config.radius):
                 raise ValueError("Spawn does not have character clearance")
         if self.config.alien_enabled and self.world_map.alien_spawn is not None:
             for ax, ay, _ in self._alien_spawns():
                 if self.world_map.overlaps(ax, ay, self.config.alien_radius):
                     raise ValueError("Alien spawn does not have character clearance")
-                for x, y in self.world_map.spawn_points:
+                for x, y, *_ in self.world_map.spawn_points:
                     distance = hypot(ax - x, ay - y)
                     contact = (
                         self.config.radius + self.config.alien_radius + self.config.capture_padding
@@ -77,8 +77,7 @@ class GameCore:
         """Explicit seed replays a spawn; None requests a fresh local RNG seed."""
         self._seed = seed
         rng = Random(seed)
-        x, y = rng.choice(self.world_map.spawn_points)
-        self._survivor = SurvivorState(x, y)
+        self._survivor = SurvivorState(*rng.choice(self.world_map.spawn_points))
         self._episode_map = self._scenario_objects(rng)
         self._ruled_out_exits = ()
         self._doors = Doors(self.world_map, self.config)
@@ -379,8 +378,6 @@ class GameCore:
         target = select_target(self._episode_map, self._survivor, self.config, self._has_keycard)
         eligible = (
             command.interact
-            and command.forward == 0
-            and command.strafe == 0
             and target is not None
             and (target.kind != "exit" or self._has_keycard)
         )

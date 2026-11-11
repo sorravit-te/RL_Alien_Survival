@@ -188,14 +188,15 @@ def validate_environment_config(config):
         raise ValueError("Scenario requires Alien spawn")
     alien_starts = [world.alien_spawn[:2], *(p[:2] for p in world.alien_spawn_options)]
     objects = [(obj.x, obj.y) for obj in world.objects]
-    for point in (*world.spawn_points, *alien_starts, *world.patrol_waypoints, *objects):
+    starts = [p[:2] for p in world.spawn_points]
+    for point in (*starts, *alien_starts, *world.patrol_waypoints, *objects):
         if world.overlaps(*point, core.alien_radius):
             raise ValueError("Scenario lacks body clearance")
     for start in alien_starts:
         for point in world.patrol_waypoints:
             if not find_path(world, start, point, core.alien_radius):
                 raise ValueError("Static policy waypoint is unreachable")
-    for start in world.spawn_points:
+    for start in starts:
         for point in objects:
             if not find_path(world, start, point, core.radius):
                 raise ValueError("Scenario object is unreachable from a spawn")

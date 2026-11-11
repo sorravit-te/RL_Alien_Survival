@@ -172,11 +172,9 @@ def test_failed_press_is_not_deferred_until_target_is_eligible():
 
 @pytest.mark.parametrize('command', [SurvivorCommand(forward=1, interact=True),
                                     SurvivorCommand(strafe=1, interact=True)])
-def test_movement_restriction_is_unchanged(command):
-    core = scene()
-    assert not core.step(command).has_keycard
-    assert not core.step(SurvivorCommand()).has_keycard
-    assert core.step(SurvivorCommand(interact=True)).has_keycard
+def test_e_lands_on_the_move(command):
+    snapshot = scene().step(command)
+    assert snapshot.has_keycard and (snapshot.survivor.x, snapshot.survivor.y) != (2.5, 2.5)
 
 
 @pytest.mark.parametrize('kwargs', [{'interaction_range': 0}, {'interaction_half_angle': 0},
