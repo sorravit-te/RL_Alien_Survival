@@ -10,6 +10,7 @@ from rl.imitation import validate_imitation
 from rl.pipeline import ROOT, make_env, validate_environment_config
 
 TRAINING = "configs/ship_deck_training_pilot.json"
+SCRATCH = "configs/ship_deck_training_full_scratch.json"
 
 
 def read(path):
@@ -40,3 +41,10 @@ def test_pilot_starts_from_a_copy_of_the_written_alien():
 def test_pilot_budget_stays_bounded():
     budget = evaluation_budget(read(TRAINING))
     assert budget["baseline_validation_episodes"] + budget["checkpoint_validation_episodes"] <= 800
+
+def test_the_from_scratch_run_differs_from_the_full_run_only_by_the_copy():
+    """Its PPO starts untrained, so the pair shows what reward teaches without the written Alien."""
+    full, scratch = read("configs/ship_deck_training_full.json"), read(SCRATCH)
+    assert "imitation" in full and "imitation" not in scratch
+    assert {**full, "name": "", "imitation": {}} == {**scratch, "name": "", "imitation": {}}
+    validate_protocol(scratch, read(scratch["evaluation_protocol"]))
