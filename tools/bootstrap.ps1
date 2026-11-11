@@ -19,8 +19,8 @@ try {
     }
     & $pythonPath -m pip check
     if ($LASTEXITCODE -ne 0) { throw 'Dependency consistency check failed.' }
-    & $pythonPath -m tools.prepare_assets
-    if ($LASTEXITCODE -ne 0) { throw 'Texture preparation failed.' }
+    & $pythonPath -m tools.bake_ship_textures
+    if ($LASTEXITCODE -ne 0) { throw 'Texture baking failed.' }
     & $pythonPath -m tools.check_setup --rl-smoke
     if ($LASTEXITCODE -ne 0) { throw 'Setup verification failed.' }
 } finally {

@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import replace
-from math import pi, tan
+from math import pi
 from random import Random
 
 os.environ.setdefault('SDL_VIDEODRIVER', 'dummy')
@@ -22,7 +22,7 @@ from game.core import GameCore
 from game.map import WorldMap, scenario_map
 from game.ship_deck import SHIP_SCENARIO, SURVIVOR_SPAWNS
 from game.state import CoreConfig, SurvivorCommand, SurvivorState
-from renderers.raycasting import RaycastingRenderer, cast_ray
+from renderers.raycasting import cast_ray
 
 
 @pytest.fixture
@@ -52,38 +52,6 @@ def test_ray_stops_at_first_obstacle():
     assert hit.distance == pytest.approx(2.5)
     assert (hit.cell_x, hit.cell_y) == (5, 2)
     assert hit.wall_position == pytest.approx(2.75)
-
-
-def test_front_wall_has_constant_perpendicular_depth_and_no_fisheye(display, tmp_path):
-    texture = pygame.Surface((32, 16))  # exercise non-square textures too
-    texture.fill((180, 160, 140))
-    path = tmp_path / 'wall.png'
-    pygame.image.save(texture, path)
-    renderer = RaycastingRenderer(path)
-    core = GameCore(WorldMap(('.....#',) * 12, ((2.5, 5.5),)))
-    before = core.snapshot()
-    frame = renderer.render(before)
-    assert frame.get_size() == (320, 180)
-    assert len(renderer.depth) == 320
-    assert renderer.depth == pytest.approx([2.5] * 320)
-    tops = [next(y for y in range(90) if frame.get_at((x, y))[:3] == (180, 160, 140))
-            for x in (0, 80, 160, 240, 319)]
-    assert len(set(tops)) == 1
-    assert core.snapshot() == before
-    # Rendering between ticks cannot affect the deterministic simulation.
-    other = GameCore(before.world_map)
-    for _ in range(20):
-        renderer.render(core.snapshot())
-        assert core.step(SurvivorCommand(.5, .5, .02)) == other.step(
-            SurvivorCommand(.5, .5, .02))
-
-
-def test_missing_texture_explains_filename_and_preparation(tmp_path):
-    missing = tmp_path / 'missing-wall.png'
-    with pytest.raises(FileNotFoundError) as error:
-        RaycastingRenderer(missing)
-    assert str(missing) in str(error.value)
-    assert '-m tools.prepare_assets' in str(error.value)
 
 
 def test_mouse_accumulates_until_tick_then_consumed_once():
@@ -241,16 +209,30 @@ def test_device_key_mapping_matches_core_movement_at_each_yaw(yaw, key, forward,
     assert loop.current == expected.snapshot()
 
 
-def test_normal_window_close_releases_pygame(monkeypatch, tmp_path):
+def test_normal_window_close_releases_pygame(monkeypatch):
     from app import play
 
-    texture_path = tmp_path / 'wall.png'
-    pygame.image.save(pygame.Surface((16, 16)), texture_path)
-    monkeypatch.setattr(play, 'RaycastingRenderer', lambda: RaycastingRenderer(texture_path))
+    drawn = []
+    monkeypatch.setattr(play, 'make_renderer', lambda world, fov: drawn.append(world) or Blank())
     monkeypatch.setattr(pygame.event, 'get', lambda: [event(pygame.QUIT)])
     play.main(["--windowed"])
     assert not pygame.display.get_init()
     assert not pygame.font.get_init()
+    assert drawn[0].rows == scenario_map(SHIP_SCENARIO).rows  # the ship, with no --scenario
+
+
+class Blank:
+    """Stands in for the ship renderer where a test needs frames, not pictures."""
+
+    def render(self, *args, **kwargs):
+        return pygame.Surface((320, 180))
+
+
+def test_only_the_ship_is_drawn():
+    from app import play
+
+    with pytest.raises(ValueError, match="ship"):
+        play.make_renderer(scenario_map("small_test_map_v1"))
 
 
 @pytest.mark.parametrize('dy,expected', [(-20, .2), (20, -.2), (-10000, 25*pi/180),
@@ -344,32 +326,6 @@ def test_pitch_preserved_on_pause_focus_resume_but_reset_clears_it(display):
     loop.advance(loop.dt)
     assert loop.inputs.pitch == 0
     assert loop.current.survivor.yaw == 0
-
-
-def test_pitch_projection_fully_repaints_extremes_and_preserves_depth(display, tmp_path):
-    texture = pygame.Surface((16, 16))
-    wall_color = (180, 160, 140)
-    texture.fill(wall_color)
-    path = tmp_path / 'wall.png'
-    pygame.image.save(texture, path)
-    renderer = RaycastingRenderer(path)
-    core = GameCore(WorldMap(('.' * 24,) * 24, ((12., 12.),)))
-    initial = core.snapshot()
-    zero = pygame.image.tobytes(renderer.render(initial), 'RGB')
-    depths = renderer.depth
-    tops = {}
-    for pitch in (25*pi/180, -25*pi/180, 0):
-        renderer.frame.fill((253, 0, 253))  # detect any stale/unpainted pixels
-        frame = renderer.render(initial, pitch=pitch)
-        assert all(frame.get_at((x, y))[:3] in
-                   ((29, 33, 40), (48, 44, 40), wall_color)
-                   for x in range(320) for y in range(180))
-        assert renderer.depth == depths
-        assert core.snapshot() == initial
-        tops[pitch] = next(y for y in range(180)
-                           if frame.get_at((160, y))[:3] == wall_color)
-    assert tops[25*pi/180] > tops[0] > tops[-25*pi/180]
-    assert pygame.image.tobytes(renderer.frame, 'RGB') == zero
 
 
 @pytest.mark.parametrize('alpha', [0, .25, .5, .75, .999])
@@ -525,7 +481,7 @@ def test_a_field_of_view_that_would_look_wrong_is_refused(fov, capsys):
 def test_the_ship_is_drawn_pixel_for_pixel_and_never_stretched_by_windows(monkeypatch):
     from app import play
 
-    assert play.frame_size(scenario_map(SHIP_SCENARIO)) == play.WINDOW
+    assert play.SHIP_FRAME == play.WINDOW
     monkeypatch.delenv("SDL_WINDOWS_DPI_AWARENESS", raising=False)
     play.keep_window_sharp()
     assert os.environ["SDL_WINDOWS_DPI_AWARENESS"] == "permonitorv2"
@@ -816,55 +772,6 @@ def test_locked_exit_hint_and_occluded_object_no_hint(display):
     assert not any('Exit -' in label for label in hud_labels(FixedStepLoop(core)))
 
 
-def test_sprite_wall_occlusion_and_pitch_shift(display, tmp_path):
-    from game.map import MapObject
-
-    path = tmp_path / 'plain.png'
-    texture = pygame.Surface((16, 16))
-    texture.fill((100, 100, 100))
-    pygame.image.save(texture, path)
-    renderer = RaycastingRenderer(path)
-    rows = tuple('....#...' if y == 4 else '........' for y in range(8))
-    hidden = GameCore(WorldMap(rows, ((2.5, 4.5),),
-                               (MapObject('card', 'keycard', 5.5, 4.5),)),
-                      CoreConfig(interaction_range=5)).snapshot()
-    empty = replace(hidden, world_map=replace(hidden.world_map, objects=()))
-    baseline = pygame.image.tobytes(renderer.render(empty), 'RGB')
-    assert pygame.image.tobytes(renderer.render(hidden), 'RGB') == baseline
-    assert hidden.interaction_target is None
-    # A wide sign straddles a wall edge: only unobstructed columns may change.
-    partial = replace(hidden, world_map=replace(hidden.world_map,
-                      objects=(MapObject('exit', 'exit', 5.2, 3.7),)))
-    base = renderer.render(empty).copy()
-    shown = renderer.render(partial).copy()
-    changed = [x for x in range(320) if any(
-        shown.get_at((x,y)) != base.get_at((x,y)) for y in range(180))]
-    assert changed
-    assert all(renderer.depth[x] > 2.7 for x in changed)
-    # The unblocked projection has more visible columns than the occluded one.
-    open_world = replace(partial.world_map, rows=('........',) * 8)
-    unblocked = replace(partial, world_map=open_world)
-    unblocked_base = renderer.render(replace(unblocked,
-                              world_map=replace(open_world, objects=()))).copy()
-    unblocked_frame = renderer.render(unblocked).copy()
-    full_changed = [x for x in range(320) if any(
-        unblocked_frame.get_at((x,y)) != unblocked_base.get_at((x,y)) for y in range(180))]
-    assert len(full_changed) > len(changed)
-    # Sprite and wall share precisely the same horizon shift.
-    positions = []
-    for pitch in (0, .1, -.1):
-        no_object = renderer.render(replace(unblocked,
-                    world_map=replace(open_world, objects=())), pitch=pitch).copy()
-        objects = renderer.render(unblocked, pitch=pitch).copy()
-        ys = [y for y in range(180) for x in range(320)
-              if objects.get_at((x,y)) != no_object.get_at((x,y))]
-        positions.append(min(ys))
-    offset = round(renderer.focal_length * tan(.1))
-    assert positions[1] - positions[0] == offset
-    assert positions[2] - positions[0] == -offset
-
-
-
 def test_press_release_between_ticks_is_buffered_once_and_repeat_is_ignored():
     inputs = InputState()
     inputs.key('e', True)
@@ -917,28 +824,6 @@ def test_e_with_nothing_to_take_never_breaks_stride():
     loop.inputs.key('w', True)
     tap_e(loop)
     assert loop.current.survivor.x > 2.5
-
-
-def test_collected_sprite_disappears_and_rendering_cannot_change_game(display, tmp_path):
-    from game.map import MapObject
-
-    path = tmp_path / 'wall.png'
-    pygame.image.save(pygame.Surface((16, 16)), path)
-    renderer = RaycastingRenderer(path)
-    core = GameCore(WorldMap(('......',) * 6, ((2.5, 2.5),),
-                            (MapObject('card', 'keycard', 3.5, 2.5),)))
-    before = core.snapshot()
-    visible = pygame.image.tobytes(renderer.render(before), 'RGB')
-    depth = renderer.depth
-    assert core.snapshot() == before
-    collected = core.step(SurvivorCommand(interact=True))
-    hidden = pygame.image.tobytes(renderer.render(collected, pitch=.1), 'RGB')
-    no_objects = replace(collected, world_map=replace(collected.world_map, objects=()))
-    assert hidden == pygame.image.tobytes(renderer.render(no_objects, pitch=.1), 'RGB')
-    assert depth == renderer.depth
-    assert visible != pygame.image.tobytes(renderer.render(collected), 'RGB')
-    assert core.snapshot() == collected
-
 
 
 @pytest.mark.parametrize('kind', ['keycard', 'exit'])
@@ -1024,59 +909,6 @@ def test_reset_discards_queued_e_and_no_press_does_not_collect():
     loop.advance(loop.dt)
     assert not loop.current.has_keycard and not loop.current.events
 
-
-
-def test_alien_sprite_full_partial_occlusion_and_pitch(display,tmp_path):
-    from game.state import AlienState
-
-    texture=pygame.Surface((16,16))
-    texture.fill((100,100,100))
-    path=tmp_path/'plain.png'
-    pygame.image.save(texture,path)
-    renderer=RaycastingRenderer(path)
-    rows=tuple('....#...' if y==4 else '........' for y in range(8))
-    core=GameCore(WorldMap(rows,((2.5,4.5),)))
-    empty=core.snapshot()
-    base=renderer.render(empty).copy()
-    hidden=replace(empty,alien=AlienState(5.5,4.5))
-    assert pygame.image.tobytes(renderer.render(hidden),'RGB')==pygame.image.tobytes(base,'RGB')
-    partial=replace(empty,alien=AlienState(5.2,3.7))
-    frame=renderer.render(partial).copy()
-    changed=[x for x in range(320) if any(frame.get_at((x,y))!=base.get_at((x,y)) for y in range(180))]
-    assert changed and all(renderer.depth[x]>2.7 for x in changed)
-    open_world=replace(empty.world_map,rows=('........',)*8)
-    clear=replace(empty,world_map=open_world,alien=AlienState(5.5,4.5))
-    tops=[]
-    for pitch in (0,.1,-.1):
-        background=renderer.render(replace(clear,alien=None),pitch=pitch).copy()
-        alien=renderer.render(clear,pitch=pitch).copy()
-        tops.append(min(y for y in range(180) for x in range(320)
-                        if alien.get_at((x,y))!=background.get_at((x,y))))
-    offset=round(renderer.focal_length*tan(.1))
-    assert tops[1]-tops[0]==offset and tops[2]-tops[0]==-offset
-    assert core.snapshot()==empty
-
-
-def test_near_card_occludes_far_alien_and_near_alien_occludes_card(display,tmp_path):
-    from game.map import MapObject
-    from game.state import AlienState
-
-    path=tmp_path/'plain.png'
-    pygame.image.save(pygame.Surface((16,16)),path)
-    renderer=RaycastingRenderer(path)
-    core=GameCore(WorldMap(('.'*10,)*8,((2.5,4.5),),
-                            (MapObject('card','keycard',3.5,4.5),)))
-    snapshot=core.snapshot()
-    card=renderer.render(snapshot).copy()
-    combined=renderer.render(replace(snapshot,alien=AlienState(6.5,4.5))).copy()
-    assert all(combined.get_at((160,y))==card.get_at((160,y)) for y in range(75,110))
-    near_alien=replace(snapshot,world_map=replace(snapshot.world_map,objects=()),
-                       alien=AlienState(3.5,4.5))
-    alien=renderer.render(near_alien).copy()
-    far_card=replace(near_alien,world_map=replace(snapshot.world_map,
-                           objects=(MapObject('card','keycard',6.5,4.5),)))
-    combined=renderer.render(far_card).copy()
-    assert all(combined.get_at((160,y))==alien.get_at((160,y)) for y in range(85,100))
 
 
 def test_alien_pause_focus_freezes_everything_and_caught_restart_resets(display,monkeypatch):

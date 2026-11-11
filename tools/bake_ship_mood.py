@@ -19,7 +19,7 @@ from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 import numpy as np
 from PIL import Image
 
-from tools.prepare_assets import ROOT
+from tools.asset_paths import ROOT
 
 SOURCE = ROOT / "assets" / "mood" / "source"
 OUTPUT = ROOT / "assets" / "mood" / "ship_mood.npz"

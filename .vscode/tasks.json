@@ -10,14 +10,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Alien RL: Prepare textures",
-      "type": "process",
-      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
-      "args": ["-m", "tools.prepare_assets"],
-      "options": {"cwd": "${workspaceFolder}"},
-      "problemMatcher": []
-    },
-    {
       "label": "Alien RL: Bake ship textures",
       "type": "process",
       "command": "${workspaceFolder}/.venv/Scripts/python.exe",

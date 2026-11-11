@@ -155,7 +155,7 @@ def test_cli_debug_flag_is_off_by_default_and_pygame_closes(monkeypatch, enabled
         def render(self, *args, **kwargs):
             return pygame.Surface((320, 180))
 
-    monkeypatch.setattr(play, "RaycastingRenderer", Renderer)
+    monkeypatch.setattr(play, "make_renderer", lambda world, fov: Renderer())
     seen = []
     original = play.hud_labels
 

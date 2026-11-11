@@ -14,10 +14,10 @@ from app.audio import ShipAudio, Speaker
 from app.loop import FixedStepLoop
 from app.recorder import GameplayRecorder, validate_record_directory
 from game.core import GameCore
-from game.map import DEFAULT_SCENARIO, SCENARIOS, scenario_map
+from game.map import scenario_map
 from game.ship_deck import ROWS as SHIP_ROWS
+from game.ship_deck import SHIP_SCENARIO
 from game.state import CoreConfig
-from renderers.raycasting import RaycastingRenderer
 from renderers.ship_renderer import FIELD_OF_VIEW, ShipRenderer
 
 WINDOW = (1067, 600)  # mist and grain hide the softness; a chase needs the frame rate
@@ -225,15 +225,11 @@ def show_labels(screen, fonts, labels, menu):
         screen.blit(text, ((width - text.get_width()) // 2, y))
 
 
-def frame_size(world):
-    return SHIP_FRAME if world.rows == SHIP_ROWS else (320, 180)
-
-
 def make_renderer(world, fov=FIELD_OF_VIEW):
-    """The ship deck has its own textures and light; test scenes keep the plain renderer."""
-    if world.rows == SHIP_ROWS:
-        return ShipRenderer(world, size=SHIP_FRAME, fov=fov)
-    return RaycastingRenderer()
+    """Only the ship has art; the small scenes are test fixtures and are never drawn."""
+    if world.rows != SHIP_ROWS:
+        raise ValueError("Only the ship deck can be drawn")
+    return ShipRenderer(world, size=SHIP_FRAME, fov=fov)
 
 
 def percentile(values, fraction):
@@ -248,7 +244,9 @@ def main(argv=None):
     parser.add_argument("--record-dir", type=Path, help="New local experiments folder; RL only")
     parser.add_argument("--sampling-seed", type=int)
     parser.add_argument("--scenario-seed", type=int, default=0)
-    parser.add_argument("--scenario", choices=SCENARIOS, help="Heuristic only; RL uses its run")
+    parser.add_argument(
+        "--scenario", choices=(SHIP_SCENARIO,), help="Heuristic only; RL uses its run"
+    )
     parser.add_argument("--no-alien", action="store_true", help="Walk the map alone; heuristic only")
     parser.add_argument("--windowed", action="store_true", help="Stay in a window, not full screen")
     parser.add_argument(
@@ -295,7 +293,7 @@ def main(argv=None):
         if any(value is not None for value in (args.run_dir, args.checkpoint, args.sampling_seed)):
             parser.error("RL checkpoint options require --controller rl")
         config = CoreConfig(alien_enabled=not args.no_alien)
-        core = GameCore(scenario_map(args.scenario or DEFAULT_SCENARIO), config)
+        core = GameCore(scenario_map(args.scenario or SHIP_SCENARIO), config)
         core.reset(args.scenario_seed)
     recorder = None
     completed, end_reason = False, "exception"
@@ -311,7 +309,7 @@ def main(argv=None):
                     "max_catchup_ticks": loop.max_steps,
                     "max_frame_seconds": loop.max_frame_time,
                     "fps_limit": args.fps_limit,
-                    "framebuffer": list(frame_size(core.snapshot().world_map)),
+                    "framebuffer": list(SHIP_FRAME),
                     "window": list(WINDOW),
                     "fullscreen": not args.windowed,
                     "fov_degrees": args.fov,
@@ -379,7 +377,7 @@ def main(argv=None):
             print(
                 json.dumps(
                     {
-                        "framebuffer": list(frame_size(core.snapshot().world_map)),
+                        "framebuffer": list(SHIP_FRAME),
                         "window": list(WINDOW),
                         "fullscreen": not args.windowed,
                         "screen": list(pygame.display.get_window_size()),

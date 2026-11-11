@@ -384,7 +384,7 @@ def test_cli_recording_cleanup_no_real_policy_or_assets(root, monkeypatch, capsy
         def render(self, *a, **kw):
             return pygame.Surface((320, 180))
 
-    monkeypatch.setattr(play, "RaycastingRenderer", Renderer)
+    monkeypatch.setattr(play, "make_renderer", lambda world, fov: Renderer())
     if mode == "tick_error":
         monkeypatch.setattr(pygame.key, "get_focused", lambda: True)
         batches = iter([[pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)], []])

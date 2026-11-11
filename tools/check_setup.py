@@ -20,27 +20,18 @@ def check_graphics() -> dict:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
     import pygame
 
-    manifest_path = ROOT / "assets" / "stradex" / "prepared" / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if len(manifest["textures"]) != 4:
-        raise RuntimeError("The setup requires four prepared textures.")
+    baked = ROOT / "assets" / "stradex" / "prepared" / "ship_textures.npz"
+    manifest = json.loads(baked.with_suffix(".json").read_text(encoding="utf-8"))
+    if hashlib.sha256(baked.read_bytes()).hexdigest() != manifest["output_sha256"]:
+        raise RuntimeError(f"Baked ship textures do not match their manifest: {baked}")
     pygame.display.init()
     try:
         screen = pygame.display.set_mode((320, 180))
-        for entry in manifest["textures"]:
-            source = ROOT / Path(manifest["source_root"]) / entry["source"]
-            output = ROOT / entry["output"]
-            for path, key in [(source, "source_sha256"), (output, "output_sha256")]:
-                if hashlib.sha256(path.read_bytes()).hexdigest() != entry[key]:
-                    raise RuntimeError(f"Texture hash mismatch: {path}")
-            texture = pygame.image.load(str(output)).convert()
-            if list(texture.get_size()) != entry["output_size"]:
-                raise RuntimeError(f"Texture dimensions mismatch: {output}")
-            screen.blit(texture, (0, 0))
+        screen.fill((40, 44, 48))
         pygame.display.flip()
     finally:
         pygame.display.quit()
-    return {"status": "passed", "driver": "dummy", "textures_checked": 4}
+    return {"status": "passed", "driver": "dummy", "baked_textures": len(manifest["materials"])}
 
 
 def check_rl() -> dict:

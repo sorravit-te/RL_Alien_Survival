@@ -22,7 +22,7 @@ import numpy as np
 from PIL import Image
 
 from renderers.alien_sprites import FRAMES, POSES
-from tools.prepare_assets import ROOT
+from tools.asset_paths import ROOT
 
 MODEL_FILES = "https://opengameart.org/sites/default/files/"
 ARCHIVES = ("Poses.zip", "Colors.zip")

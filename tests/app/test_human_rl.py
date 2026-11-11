@@ -340,19 +340,20 @@ def test_pygame_focus_pause_preserves_partial_decision_clock_and_retry(monkeypat
         pygame.quit()
 
 
-def test_rl_window_close_releases_pygame_with_placeholder_texture(monkeypatch, tmp_path):
+def test_rl_window_close_releases_pygame(monkeypatch):
     import pygame
 
     from app import play
-    from renderers.raycasting import RaycastingRenderer
+
+    class Blank:
+        def render(self, *args, **kwargs):
+            return pygame.Surface((320, 180))
 
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     pygame.display.init()
-    texture = tmp_path / "wall.png"
-    pygame.image.save(pygame.Surface((16, 16)), texture)
     app = HumanRLController(GameCore(arena(), alien_control="external"), Policy(), 123)
     monkeypatch.setattr("app.rl_controller.load_human_rl", lambda *a: app)
-    monkeypatch.setattr(play, "RaycastingRenderer", lambda: RaycastingRenderer(texture))
+    monkeypatch.setattr(play, "make_renderer", lambda world, fov: Blank())
     monkeypatch.setattr(pygame.event, "get", lambda: [pygame.event.Event(pygame.QUIT)])
     play.main(
         [

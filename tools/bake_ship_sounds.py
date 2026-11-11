@@ -20,7 +20,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame  # noqa: E402
 
-from tools.prepare_assets import ROOT  # noqa: E402
+from tools.asset_paths import ROOT  # noqa: E402
 
 RATE = 44100
 SOURCE = ROOT / "assets" / "sounds" / "source"

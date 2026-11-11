@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 import numpy as np
 from PIL import Image
 
-from tools.prepare_assets import ROOT
+from tools.asset_paths import ROOT
 
 SOURCE = ROOT / "assets" / "space" / "source"
 OUTPUT = ROOT / "assets" / "space" / "ship_sky.npz"

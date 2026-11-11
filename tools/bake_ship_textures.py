@@ -11,12 +11,13 @@ assets/stradex/prepared/ folder.
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from tools.prepare_assets import ROOT, resolve_source_root
+from tools.asset_paths import ROOT, resolve_source_root
 
 SIZE = 512
 OUTPUT = ROOT / "assets" / "stradex" / "prepared" / "ship_textures.npz"
@@ -384,8 +385,10 @@ def main():
     args = parser.parse_args()
     source_root = resolve_source_root(args.source_root)
     directory = source_root / "Materials"
-    if not directory.is_dir():
-        raise FileNotFoundError(f"Required Stradex folder is missing: {directory}")
+    license_path = source_root / "LICENSE.txt"
+    if not directory.is_dir() or not license_path.is_file():
+        missing = f"Required Stradex Materials/ or LICENSE.txt is missing: {source_root}"
+        raise FileNotFoundError(missing)
     textures, reliefs = bake(directory)
     names = texture_names()
     levels = {"level0": np.stack([pack(*textures[name]) for name in names])}
@@ -397,10 +400,12 @@ def main():
         levels[f"{kind}2"] = half(levels[f"{kind}1"]).astype(np.uint8)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     np.savez(OUTPUT, names=np.array(names), **levels)
+    shutil.copyfile(license_path, OUTPUT.parent / "STRADEX_LICENSE.txt")  # travels with the bake
     manifest = {
         "creator": "Stradex / Maximiliano Ruben Viamonte",
         "source_url": "https://stradex.itch.io/scifi-tech-hall-texture-pack",
         "use": "Local project assets. Do not redistribute as standalone artwork.",
+        "license": "STRADEX_LICENSE.txt",
         "output_sha256": hashlib.sha256(OUTPUT.read_bytes()).hexdigest(),
         "materials": list(MATERIALS),
     }
