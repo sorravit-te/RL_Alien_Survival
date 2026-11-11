@@ -47,7 +47,7 @@
   "scenario": "ship_deck_v1",
   "fresh_run": true,
   "defer_final_test": true,
-  "scenario_sha256": "7729a67d40a332200e28c9263d847cd019ae22ab10bafba9f4ab55ada0fdf5a6",
+  "scenario_sha256": "2c2082b184108f6d4eb730e78563a0bccd10f24a97b7db105c7e2643f16060e0",
   "search_control": "continue_cancel_waypoint_commitment_v1",
   "contract_version": "alien-vector-v11-wide-patrol",
   "imitation": {

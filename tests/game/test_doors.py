@@ -115,7 +115,7 @@ def test_scenes_without_doors_see_as_before(scenario):
 
 def test_every_ship_door_stands_in_a_one_cell_passage():
     world = scenario_map(SHIP_SCENARIO)
-    assert world.doors == DOORS and len(DOORS) == 27
+    assert world.doors == DOORS and len(DOORS) == 25
     for x, y in DOORS:
         along_x = not world.blocked(x - 1, y) and not world.blocked(x + 1, y)
         along_y = not world.blocked(x, y - 1) and not world.blocked(x, y + 1)

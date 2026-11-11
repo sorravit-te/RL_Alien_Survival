@@ -23,8 +23,18 @@ LIT_ROOM = 8  # a room this many cells or more never goes black; smaller ones ma
 DARK_ROOM = 0.1  # light in a room's middle cells below which the screen shows black there
 LAST_LAMP = 0.6  # the lamp that comes back on is a weak one, so the room stays dim
 # Set by eye in play, over whatever the rules above decide.
-LAMPS_ON = ((11, 16), (11, 23))  # two crew cabins, as bright as the two lit ones beside them
-LAMPS_OFF = ((8, 13),)  # the command ring's corner, where it turns into the crew ring
+# Balancing the deck about the spine moved the rules' lamps, so these keep the light the user
+# chose before it.
+LAMPS_ON = (
+    (11, 16), (11, 23), (14, 16),  # all four crew cabins alike
+    (36, 24),  # cryo keeps both its lamps
+    (34, 33),  # the east crawlway's lamp, where it meets the reactor
+)
+LAMPS_OFF = (
+    (7, 15),  # the crew ring's head, where it turns into the command ring
+    (2, 18),  # pods: dim, from the weak lamp a dark room gets back
+    (27, 9),  # east lab: dim like the west one
+)
 STEADY, FLICKER, PULSE = 0, 1, 2
 LIGHT_LAYERS = 3
 
@@ -155,18 +165,17 @@ SIGNS = {  # (cell x, y, face): a stencil beside the doorway it names
     (21, 11, 0): "sign_command",
     (17, 26, 1): "sign_engine",
     (21, 26, 0): "sign_engine",
-    (6, 18, 1): "sign_crewring",
+    (5, 18, 1): "sign_crewring",
     (33, 18, 0): "sign_medical",
-    (22, 18, 0): "sign_plaza",
     (17, 30, 1): "sign_cargo",
     (21, 30, 0): "sign_reactor",
     (17, 9, 1): "sign_bridge",
     (21, 9, 0): "sign_bridge",
-    (6, 15, 1): "sign_pods",
+    (5, 15, 1): "sign_pods",
     (33, 15, 0): "sign_cryo",
     (17, 33, 1): "sign_shuttle",
     (12, 11, 3): "sign_lab",
-    (27, 11, 3): "sign_lab",
+    (26, 11, 3): "sign_lab",
 }
 FACES =((-1, 0), (1, 0), (0, -1), (0, 1))  # west, east, north, south face of a solid cell
 PIPED ={"S": 0.7, "O": 0.6, "W": 0.7, "E": 0.6, "G": 1.0, "C": 0.5, "R": 1.0}  # share of walls

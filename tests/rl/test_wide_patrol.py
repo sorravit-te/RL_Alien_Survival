@@ -97,7 +97,7 @@ def test_a_small_scene_keeps_its_whole_choice():
 def test_the_written_alien_joins_the_loop_at_the_nearest_waypoint():
     selector = HeuristicSelector(0.15)
     action = selector.choose(view(position=(36.0, 21.0)))
-    assert WAYPOINTS[action] == (36.5, 20.5)
+    assert WAYPOINTS[action] == (35.5, 20.5)
 
 
 def test_a_small_scene_still_starts_the_written_order_at_the_beginning():

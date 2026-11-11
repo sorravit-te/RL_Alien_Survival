@@ -551,7 +551,7 @@ def add_block(wall, kind):
 
 def add_viewport(wall):
     """Windows on the bow: pillars frame deep openings onto open space."""
-    count = max(int(wall.length / 2), 1)
+    count = max(int(wall.length / 1.5), 1)  # the 3-cell nose gets two panes and a middle pillar
     span = (wall.length - (count + 1) * PILLAR) / count
     if span < 0.6:
         wall.panelled("walltrim6")

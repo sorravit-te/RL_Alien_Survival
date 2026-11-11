@@ -161,7 +161,7 @@ def test_space_keeps_east_on_the_right_through_the_windows(textures, tmp_path, s
     assert left[:, 0].mean() > left[:, 2].mean() and right[:, 2].mean() > right[:, 0].mean()
 
 
-@pytest.mark.parametrize(("x", "y"), [(19.1, 3.0), (20.9, 3.0), (19.1, 14.0)])
+@pytest.mark.parametrize(("x", "y"), [(19.1, 3.0), (19.9, 3.0), (19.1, 14.0)])  # either side of the bow's middle
 def test_space_ignores_where_the_player_stands(textures, tmp_path, snapshot, x, y):
     """Like a real window: anything that scaled with distance would read as a picture on the wall."""
     red, blue = 0x0000FF, 0xFF0000
@@ -207,7 +207,7 @@ def test_nothing_stands_where_the_player_could_walk_into_it():
 def test_furniture_is_only_what_stands_inside_a_room(theme):
     assert theme.blocks[32, 8]  # cargo crates
     assert theme.blocks[33, 27]  # reactor core
-    assert theme.blocks[20, 19]  # plaza column
+    assert not theme.blocks[20, 19]  # the plaza column is gone, so the spine runs clear
     assert not theme.blocks[20, 22]  # the wall between plaza and mess
 
 
@@ -218,7 +218,7 @@ def test_small_rooms_stand_open(theme):
         for dx, dy in FACES
         if theme.is_open(x + dx, y + dy)
     }
-    assert faced == set("CRZ")
+    assert faced == set("CR")
 
 
 def test_depth_matches_the_plain_ray_caster(renderer, snapshot):

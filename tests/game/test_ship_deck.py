@@ -103,7 +103,7 @@ def test_each_exit_faces_a_different_side():
 PLAZA, WEST_RING, EAST_RING = (20, 19), (7, 20), (32, 20)
 
 
-@pytest.mark.parametrize("door", [(6, 16), (10, 29), (22, 19), (29, 16), (17, 31), (24, 29)])
+@pytest.mark.parametrize("door", [(5, 16), (10, 29), (22, 19), (29, 16), (17, 31), (23, 29)])
 def test_main_rooms_survive_one_blocked_doorway(door):
     """No single door traps the player: every waypoint still connects without it."""
     cells = floor_cells(blocked={door})
@@ -113,7 +113,7 @@ def test_main_rooms_survive_one_blocked_doorway(door):
 
 def test_corridors_form_loops():
     """Removing either ring corridor leaves the spine linked, so a chase can always circle."""
-    west = {(x, 17) for x in (7, 8)}
+    west = {(x, 17) for x in (6, 7, 8)}
     east = {(x, 17) for x in (30, 31, 32)}
     for blocked in (west, east):
         cells = floor_cells(blocked=blocked)
