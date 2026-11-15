@@ -12,7 +12,7 @@ Run from the repo root in PowerShell. The trained Alien loads from a local run i
 Against the trained Alien:
 
 ```powershell
-.venv\Scripts\python.exe -B -m app.play --controller rl --run-dir experiments/ship_deck_full_v2_scratch_s4/run --checkpoint experiments/ship_deck_full_v2_scratch_s4/run/checkpoints/best.zip --sampling-seed 310003 --scenario-seed 310002 --fps-limit 60
+.venv\Scripts\python.exe -B -m app.play --controller rl --run-dir experiments/ship_deck_full_v3_scratch_s3/run --checkpoint experiments/ship_deck_full_v3_scratch_s3/run/checkpoints/best.zip --sampling-seed 310003 --scenario-seed 310002 --fps-limit 60
 ```
 
 Against the scripted Alien, or alone on the ship:
