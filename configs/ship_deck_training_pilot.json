@@ -1,5 +1,5 @@
 {
-  "name": "ship_deck_training_pilot_v5",
+  "name": "ship_deck_training_pilot_v6",
   "training_seed": 2026103101,
   "manifest_seed": 2026103102,
   "manifest_counts": {
@@ -49,7 +49,7 @@
   "defer_final_test": true,
   "scenario_sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
   "search_control": "continue_cancel_waypoint_commitment_v1",
-  "contract_version": "alien-vector-v12-balanced-deck",
+  "contract_version": "alien-vector-v13-fast-chase",
   "imitation": {
     "decisions": 12000,
     "random_action_share": 0.2,

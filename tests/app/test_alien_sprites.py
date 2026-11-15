@@ -99,7 +99,8 @@ def test_it_walks_on_patrol_and_runs_in_a_chase():
 def test_a_chase_cycles_faster_because_it_moves_faster():
     walking = pose_now(scene(path=((5.5, 1.5),)))[1]
     running = pose_now(scene(path=((5.5, 1.5),), mode="chase"))[1]
-    assert running == pytest.approx(2 * walking)
+    config = CoreConfig()
+    assert running == pytest.approx(walking * config.alien_chase_speed / config.alien_search_speed)
 
 
 def test_idle_cycle_repeats_on_its_own_clock():

@@ -1,6 +1,11 @@
-"""Summarize a human-play recording: outcomes, pursuit, search and patrol commitment.
+"""Summarize human-play recordings: outcomes, pursuit, search and patrol commitment.
 
-Usage: python -m tools.review_recording experiments/<recording_directory>
+Usage: python -m tools.review_recording experiments/<recording> [experiments/<recording> ...]
+
+Give each player their own recording. Difficulty counts first tries only: the first round in a
+recording with its start, Alien start and card (what `round_start` in app/loop.py tells apart).
+Replays, and other seeds that deal a round already seen, are repeats. So is a seen layout whose
+hidden working exit differs, because the player already knows where the card lies.
 
 Reads saved records only; it never loads a policy or advances a simulation. Survivor
 truth in the trace explains behavior here and must never reach a policy.
@@ -11,6 +16,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from math import hypot
 from pathlib import Path
+from statistics import median
 
 from app.recorder import read_records
 from game.state import CoreConfig
@@ -25,10 +31,21 @@ def distance(a, b):
     return hypot(a["x"] - b["x"], a["y"] - b["y"])
 
 
+def round_key(state):
+    """The recorded twin of `round_start`: start, Alien start and card, never the working exit."""
+    survivor, alien = state["survivor"], state.get("alien")
+    cards = tuple(o["object_id"] for o in state["world_map"]["objects"] if o["kind"] == "keycard")
+    return (survivor["x"], survivor["y"]), alien and (alien["x"], alien["y"]), cards
+
+
 @dataclass
 class EpisodeReview:
     episode: int
     scenario_seed: int | None = None
+    round: tuple | None = None
+    repeat_of: int | None = None  # the earlier episode that dealt this round; None on a first try
+    card_tick: int | None = None
+    offline_exits: int = 0
     outcome: str | None = None
     status: str = "incomplete"
     ticks: int = 0
@@ -109,6 +126,11 @@ class EpisodeReview:
             self.open_wait["alien_still_ticks"] += still
         else:
             self.close_wait()
+        for event in record.get("core_events", ()):
+            if event["kind"] == "keycard_collected":
+                self.card_tick = event["tick"]
+            elif event["kind"] == "exit_offline":
+                self.offline_exits += 1
 
 
 def review_records(records):
@@ -120,6 +142,7 @@ def review_records(records):
         review = episodes.setdefault(record["episode"], EpisodeReview(record["episode"]))
         if kind == "episode_start":
             review.scenario_seed = record["scenario_seed"]
+            review.round = round_key(record["diagnostic_initial_state_only"])
         elif kind == "decision":
             review.decision(record)
         elif kind == "tick":
@@ -128,18 +151,50 @@ def review_records(records):
             review.outcome, review.status = record["outcome"], record["status"]
     for review in episodes.values():
         review.close_wait()
-    return [episodes[key] for key in sorted(episodes)]
+    reviews = [episodes[key] for key in sorted(episodes)]
+    seen = {}
+    for review in reviews:
+        if review.round is None or not review.ticks:
+            continue  # a round left before its first tick, such as the opening one, was never played
+        if review.round in seen:
+            review.repeat_of = seen[review.round]
+        else:
+            seen[review.round] = review.episode
+    return reviews
 
 
 def seconds(ticks):
     return ticks / CONFIG.tick_hz
 
 
+def print_first_tries(label, reviews):
+    played = [r for r in reviews if r.ticks]
+    firsts = [r for r in played if r.repeat_of is None]
+    outcomes = Counter(r.outcome or "unfinished" for r in firsts)
+    cards = sum(r.card_tick is not None for r in firsts)
+    print(
+        f"{label}: first tries {len(firsts)} of {len(played)} played rounds: "
+        f"escaped {outcomes['escaped']}, captured {outcomes['captured']}, "
+        f"unfinished {outcomes['unfinished']}; card collected in {cards}"
+    )
+    for outcome in ("escaped", "captured"):
+        times = [seconds(r.ticks) for r in firsts if r.outcome == outcome]
+        if times:
+            print(f"  {outcome} after a median {median(times):.1f}s over {len(times)}")
+
+
 def print_report(reviews):
     for r in reviews:
+        tried = (
+            "not played" if not r.ticks
+            else "first try" if r.repeat_of is None
+            else f"repeat of episode {r.repeat_of}"
+        )
+        card = "no card" if r.card_tick is None else f"card at {seconds(r.card_tick):.1f}s"
         print(
             f"episode {r.episode}: {r.outcome} ({r.status}) {seconds(r.ticks):.1f}s, "
-            f"scenario seed {r.scenario_seed}"
+            f"scenario seed {r.scenario_seed}, {tried}, {card}, "
+            f"offline exits tried {r.offline_exits}"
         )
         print(
             f"  sight: visible {r.visible_ticks} ticks, "
@@ -167,6 +222,7 @@ def print_report(reviews):
             )
     seeds = {r.scenario_seed for r in reviews}
     print(f"rounds {len(reviews)}, different scenario seeds {len(seeds)}")
+    print_first_tries("this recording", reviews)
     route = sum((r.route for r in reviews), Counter())
     decisions = route["kept"] + route["switched"] + route["other"]
     if decisions:
@@ -179,9 +235,17 @@ def print_report(reviews):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("recording", type=Path)
+    parser.add_argument("recordings", type=Path, nargs="+", help="one recording per player")
     args = parser.parse_args(argv)
-    print_report(review_records(read_records(args.recording, allow_partial_tail=True)))
+    everyone = []
+    for path in args.recordings:
+        if len(args.recordings) > 1:
+            print(f"== {path}")
+        reviews = review_records(read_records(path, allow_partial_tail=True))
+        print_report(reviews)
+        everyone += reviews
+    if len(args.recordings) > 1:
+        print_first_tries(f"all {len(args.recordings)} recordings", everyone)
 
 
 if __name__ == "__main__":

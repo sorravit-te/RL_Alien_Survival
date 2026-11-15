@@ -172,7 +172,7 @@ def test_current_checkpoint_identifiers_save_and_load_without_training(tmp_path,
     from rl.contract import VERSION
     from rl.pipeline import map_identity
 
-    assert VERSION == "alien-vector-v12-balanced-deck"
+    assert VERSION == "alien-vector-v13-fast-chase"
     assert CHECKPOINT_FORMAT == "alien-maskable-checkpoint-v1"
     assert map_identity()["name"] == "small_test_map_v1"
     manifest = manifest_of(config)

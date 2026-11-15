@@ -302,7 +302,7 @@ def test_observation_mapping_exposes_phase_target_progress_current_revision_and_
     select(core)
     advance(core, 22)
     values = dict(zip(BASE_FIELDS, build_observation(view(core))[:32]))
-    assert VERSION == "alien-vector-v12-balanced-deck" and len(values) == 32
+    assert VERSION == "alien-vector-v13-fast-chase" and len(values) == 32
     assert values["investigation_active"] == values["investigation_sweeping"] == 1
     assert values["investigation_progress"] == pytest.approx(22 / 45)
     assert values["investigation_target_valid"] == 1

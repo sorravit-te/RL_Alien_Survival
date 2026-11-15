@@ -25,7 +25,7 @@ class CoreConfig:
     alien_enabled: bool = True
     alien_radius: float = 0.2
     alien_search_speed: float = 2.2
-    alien_chase_speed: float = 4.4
+    alien_chase_speed: float = 5.0
     alien_fov: float = 2 * pi / 3
     alien_sight_range: float = 8.0
     alien_near_range: float = 1.0
