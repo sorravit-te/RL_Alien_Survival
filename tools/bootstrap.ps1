@@ -35,6 +35,12 @@ try {
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
         throw 'Git is required, because the trained Alien checks the source it loads with: https://git-scm.com/download/win'
     }
+    # A copy handed over without .git still needs a commit for that check to read.
+    if (-not (Test-Path -LiteralPath (Join-Path $projectRoot '.git'))) {
+        & git -c init.defaultBranch=main init -q
+        & git -c user.name='Alien Survival' -c user.email='setup@localhost' commit -q --allow-empty -m 'Unpacked copy'
+        if ($LASTEXITCODE -ne 0) { throw 'Could not start the git repository the checkpoint check reads.' }
+    }
     if ((Test-Path -LiteralPath $pythonPath) -and (Get-PythonVersion @($pythonPath)) -ne $pythonVersion) {
         throw "The existing .venv is not Python $pythonVersion. Delete the .venv folder and run this script again."
     }
