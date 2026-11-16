@@ -1,0 +1,81 @@
+{
+  "name": "ship_deck_sampled_evaluation_v4",
+  "status": "implementation_only_runtime_requires_separate_authorization",
+  "primary_inference": "sampled_masked_policy",
+  "secondary_inference": "deterministic_argmax_diagnostic",
+  "manifest_seed": 2026103102,
+  "manifest_counts": {
+    "train": 200,
+    "validation": 30,
+    "test": 50
+  },
+  "sampling_repeat_seeds": [
+    2311,
+    4621,
+    6947
+  ],
+  "selector_seed_rule": "SeedSequence([case.selector_seed, repeat_seed]).generate_state(1)[0]; seed once per episode; isolate and restore global RNG streams",
+  "controllers": [
+    {
+      "name": "random_valid_mask",
+      "inference": "uniform_valid",
+      "repeats": 3,
+      "available": "baseline"
+    },
+    {
+      "name": "untrained_sampled",
+      "inference": "sampled_masked",
+      "repeats": 3,
+      "available": "new compatible initial policy"
+    },
+    {
+      "name": "untrained_deterministic",
+      "inference": "argmax_masked",
+      "repeats": 1,
+      "available": "new compatible initial policy"
+    },
+    {
+      "name": "heuristic",
+      "inference": "scripted_catalog",
+      "repeats": 1,
+      "available": "baseline"
+    },
+    {
+      "name": "wait",
+      "inference": "constant_wait",
+      "repeats": 1,
+      "available": "baseline"
+    },
+    {
+      "name": "trained_sampled",
+      "inference": "sampled_masked",
+      "repeats": 3,
+      "available": "future compatible checkpoint only"
+    },
+    {
+      "name": "trained_deterministic",
+      "inference": "argmax_masked",
+      "repeats": 1,
+      "available": "future compatible checkpoint only"
+    }
+  ],
+  "selection": {
+    "split": "validation",
+    "primary": "mean_of_sampled_catch_rate_and_hunt_catch_rates",
+    "tie_1": "min_sampled_unresolved_rate",
+    "tie_2": "earliest_trained_checkpoint",
+    "exclude": "test outcomes and untrained baseline cannot select trained best"
+  },
+  "statistics": {
+    "unit": "case cluster; retain all3 action-sampling repeats together",
+    "paired": "same cases/selector seed list per controller",
+    "warning": "Three sampling repeats are not training seeds; fixed layout/two spawns and seed changes can repeat routes; no unseen-layout generalization."
+  },
+  "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
+  "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
+  "scenario": "ship_deck_v1",
+  "scenario_sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
+  "search_control": "continue_cancel_waypoint_commitment_v1",
+  "contract_version": "alien-vector-v13-fast-chase",
+  "bot_mix": "runner_mix: per case one third Runner, the rest the 50/50 plain and wall-loop mix, chosen from bot_seed"
+}

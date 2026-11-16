@@ -296,7 +296,7 @@ def bake(seed=20261101):
 def main():
     sky = bake()
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(OUTPUT, sky=sky)
+    np.savez_compressed(OUTPUT, sky=sky)
     print(f"Baked the sky seen from the bridge, {sky.shape[1]}x{sky.shape[0]}: {OUTPUT}")
 
 

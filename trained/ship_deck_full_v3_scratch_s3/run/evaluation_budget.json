@@ -1,0 +1,9 @@
+{
+  "rollout_rounded_decisions": 300032,
+  "baseline_validation_episodes": 270,
+  "checkpoint_validation_calls": 16,
+  "checkpoint_validation_episodes": 1920,
+  "fresh_best_validation_replay_episodes": 120,
+  "final_test_episodes": 650,
+  "max_episode_seconds": 600
+}

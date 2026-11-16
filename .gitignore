@@ -20,11 +20,15 @@ __pycache__/
 # Baked by tools.bake_ship_sounds from free recordings.
 /assets/sounds/
 
-# Baked by tools.bake_alien_sprites from a free model.
-/assets/alien/
+# Baked by tools.bake_alien_sprites from a free CC0 model. The packed frames are kept,
+# because baking them needs Blender.
+/assets/alien/*
+!/assets/alien/prepared/
 
-# Baked by tools.bake_ship_sky from NASA maps.
-/assets/space/
+# Baked by tools.bake_ship_sky from NASA maps. The baked sky is kept, because NASA's
+# servers are not always reachable.
+/assets/space/*
+!/assets/space/ship_sky.npz
 
 # Baked by tools.bake_ship_mood; the color grade's license forbids passing its files on.
 /assets/mood/

@@ -42,8 +42,8 @@
       "command": "${workspaceFolder}/.venv/Scripts/python.exe",
       "args": [
         "-B", "-m", "app.play", "--controller", "rl",
-        "--run-dir", "experiments/${input:run}/run",
-        "--checkpoint", "experiments/${input:run}/run/checkpoints/best.zip",
+        "--run-dir", "${input:run}",
+        "--checkpoint", "${input:run}/checkpoints/best.zip",
         "--sampling-seed", "310003", "--scenario-seed", "310002", "--fps-limit", "60"
       ],
       "options": {"cwd": "${workspaceFolder}"},
@@ -60,8 +60,8 @@
     {
       "id": "run",
       "type": "promptString",
-      "description": "Run folder inside experiments/",
-      "default": "ship_deck_full_v3_scratch_s3"
+      "description": "Run folder, e.g. trained/<name>/run or experiments/<name>/run",
+      "default": "trained/ship_deck_full_v3_scratch_s3/run"
     }
   ]
 }

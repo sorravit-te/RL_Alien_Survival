@@ -1,0 +1,5 @@
+# A checkpoint loads only if its run files hash the same as when they were written,
+# so git must never rewrite their line endings.
+/trained/** -text
+*.npz binary
+*.zip binary

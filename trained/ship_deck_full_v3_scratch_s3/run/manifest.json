@@ -1,0 +1,2027 @@
+{
+  "seed": 2026103102,
+  "map": {
+    "name": "ship_deck_v1",
+    "sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
+    "spawn_points": [
+      [
+        14.5,
+        16.5,
+        2.0944
+      ],
+      [
+        24.5,
+        18.5,
+        0.0
+      ],
+      [
+        7.5,
+        31.5,
+        6.0214
+      ],
+      [
+        10.5,
+        7.5,
+        1.5708
+      ]
+    ],
+    "alien_spawn_options": [
+      [
+        31.5,
+        36.5,
+        3.1416
+      ],
+      [
+        36.5,
+        16.5,
+        3.1416
+      ],
+      [
+        3.5,
+        24.5,
+        0.0
+      ]
+    ],
+    "objects": [
+      "keycard_bridge",
+      "keycard_lab",
+      "keycard_cabin",
+      "keycard_medbay",
+      "keycard_cargo",
+      "keycard_reactor",
+      "exit_pods",
+      "exit_cryo",
+      "exit_shuttle"
+    ],
+    "warning": "Fixed layout; seeds are NOT a layout or scenario-tuple holdout."
+  },
+  "splits": {
+    "train": [
+      {
+        "id": "train_0000",
+        "reset_seed": 640169127,
+        "scenario_seed": 1526506855,
+        "bot_seed": 1106162683,
+        "selector_seed": 932256312
+      },
+      {
+        "id": "train_0001",
+        "reset_seed": 762363031,
+        "scenario_seed": 1325165699,
+        "bot_seed": 1453365906,
+        "selector_seed": 542871315
+      },
+      {
+        "id": "train_0002",
+        "reset_seed": 29300045,
+        "scenario_seed": 693267710,
+        "bot_seed": 915447065,
+        "selector_seed": 33985163
+      },
+      {
+        "id": "train_0003",
+        "reset_seed": 226312079,
+        "scenario_seed": 1295456023,
+        "bot_seed": 2039789967,
+        "selector_seed": 1011992522
+      },
+      {
+        "id": "train_0004",
+        "reset_seed": 174716035,
+        "scenario_seed": 1444048897,
+        "bot_seed": 1389397848,
+        "selector_seed": 1053818144
+      },
+      {
+        "id": "train_0005",
+        "reset_seed": 1964058928,
+        "scenario_seed": 1297773584,
+        "bot_seed": 719850516,
+        "selector_seed": 992952640
+      },
+      {
+        "id": "train_0006",
+        "reset_seed": 1208914992,
+        "scenario_seed": 1201100382,
+        "bot_seed": 1582988390,
+        "selector_seed": 1991928547
+      },
+      {
+        "id": "train_0007",
+        "reset_seed": 178171162,
+        "scenario_seed": 1592001270,
+        "bot_seed": 1478935018,
+        "selector_seed": 363672319
+      },
+      {
+        "id": "train_0008",
+        "reset_seed": 1362198311,
+        "scenario_seed": 1745927927,
+        "bot_seed": 211025445,
+        "selector_seed": 1001942014
+      },
+      {
+        "id": "train_0009",
+        "reset_seed": 921856827,
+        "scenario_seed": 756965459,
+        "bot_seed": 896566350,
+        "selector_seed": 564429721
+      },
+      {
+        "id": "train_0010",
+        "reset_seed": 1145168832,
+        "scenario_seed": 467880378,
+        "bot_seed": 1379115444,
+        "selector_seed": 135979855
+      },
+      {
+        "id": "train_0011",
+        "reset_seed": 1257392204,
+        "scenario_seed": 1928860496,
+        "bot_seed": 134993853,
+        "selector_seed": 210316407
+      },
+      {
+        "id": "train_0012",
+        "reset_seed": 226815604,
+        "scenario_seed": 145525006,
+        "bot_seed": 397427739,
+        "selector_seed": 138878897
+      },
+      {
+        "id": "train_0013",
+        "reset_seed": 1281579619,
+        "scenario_seed": 1109532772,
+        "bot_seed": 1164598292,
+        "selector_seed": 1969904557
+      },
+      {
+        "id": "train_0014",
+        "reset_seed": 1064646055,
+        "scenario_seed": 64154236,
+        "bot_seed": 923186337,
+        "selector_seed": 1452188850
+      },
+      {
+        "id": "train_0015",
+        "reset_seed": 169455236,
+        "scenario_seed": 1990861830,
+        "bot_seed": 1559732360,
+        "selector_seed": 1906006854
+      },
+      {
+        "id": "train_0016",
+        "reset_seed": 1952597475,
+        "scenario_seed": 1716854387,
+        "bot_seed": 1721078091,
+        "selector_seed": 1079732596
+      },
+      {
+        "id": "train_0017",
+        "reset_seed": 770446733,
+        "scenario_seed": 1712514349,
+        "bot_seed": 1971662448,
+        "selector_seed": 950889108
+      },
+      {
+        "id": "train_0018",
+        "reset_seed": 1792473214,
+        "scenario_seed": 1449676419,
+        "bot_seed": 2104521881,
+        "selector_seed": 164293248
+      },
+      {
+        "id": "train_0019",
+        "reset_seed": 736991956,
+        "scenario_seed": 1626825515,
+        "bot_seed": 1235890543,
+        "selector_seed": 318910346
+      },
+      {
+        "id": "train_0020",
+        "reset_seed": 1348087355,
+        "scenario_seed": 442684276,
+        "bot_seed": 1527416848,
+        "selector_seed": 152604027
+      },
+      {
+        "id": "train_0021",
+        "reset_seed": 615095988,
+        "scenario_seed": 90727080,
+        "bot_seed": 1537024501,
+        "selector_seed": 2111365125
+      },
+      {
+        "id": "train_0022",
+        "reset_seed": 1397163047,
+        "scenario_seed": 2126398136,
+        "bot_seed": 934096439,
+        "selector_seed": 24163551
+      },
+      {
+        "id": "train_0023",
+        "reset_seed": 1822936792,
+        "scenario_seed": 862853951,
+        "bot_seed": 829096941,
+        "selector_seed": 1924233463
+      },
+      {
+        "id": "train_0024",
+        "reset_seed": 1109764547,
+        "scenario_seed": 955748771,
+        "bot_seed": 18084328,
+        "selector_seed": 1310691726
+      },
+      {
+        "id": "train_0025",
+        "reset_seed": 301096945,
+        "scenario_seed": 1365068992,
+        "bot_seed": 647534877,
+        "selector_seed": 1069509881
+      },
+      {
+        "id": "train_0026",
+        "reset_seed": 638485082,
+        "scenario_seed": 627551158,
+        "bot_seed": 2127469952,
+        "selector_seed": 1746670703
+      },
+      {
+        "id": "train_0027",
+        "reset_seed": 1773962264,
+        "scenario_seed": 187978110,
+        "bot_seed": 665113827,
+        "selector_seed": 1046077314
+      },
+      {
+        "id": "train_0028",
+        "reset_seed": 688891063,
+        "scenario_seed": 377778213,
+        "bot_seed": 460147132,
+        "selector_seed": 890034377
+      },
+      {
+        "id": "train_0029",
+        "reset_seed": 346355013,
+        "scenario_seed": 1497608244,
+        "bot_seed": 1851643380,
+        "selector_seed": 663633951
+      },
+      {
+        "id": "train_0030",
+        "reset_seed": 164808982,
+        "scenario_seed": 454410516,
+        "bot_seed": 1670277707,
+        "selector_seed": 1837717197
+      },
+      {
+        "id": "train_0031",
+        "reset_seed": 725124153,
+        "scenario_seed": 592337082,
+        "bot_seed": 423070837,
+        "selector_seed": 1584547699
+      },
+      {
+        "id": "train_0032",
+        "reset_seed": 1061229473,
+        "scenario_seed": 1562939271,
+        "bot_seed": 1533609026,
+        "selector_seed": 765326692
+      },
+      {
+        "id": "train_0033",
+        "reset_seed": 1039222317,
+        "scenario_seed": 1422221467,
+        "bot_seed": 1585117338,
+        "selector_seed": 268160406
+      },
+      {
+        "id": "train_0034",
+        "reset_seed": 987866625,
+        "scenario_seed": 1884941705,
+        "bot_seed": 1595625190,
+        "selector_seed": 399267547
+      },
+      {
+        "id": "train_0035",
+        "reset_seed": 1809018771,
+        "scenario_seed": 652635425,
+        "bot_seed": 667015353,
+        "selector_seed": 1298948942
+      },
+      {
+        "id": "train_0036",
+        "reset_seed": 1124101075,
+        "scenario_seed": 1146454673,
+        "bot_seed": 83617227,
+        "selector_seed": 777208811
+      },
+      {
+        "id": "train_0037",
+        "reset_seed": 923861717,
+        "scenario_seed": 1483787836,
+        "bot_seed": 343222798,
+        "selector_seed": 3179250
+      },
+      {
+        "id": "train_0038",
+        "reset_seed": 1947197079,
+        "scenario_seed": 160848833,
+        "bot_seed": 1462067953,
+        "selector_seed": 793906025
+      },
+      {
+        "id": "train_0039",
+        "reset_seed": 864233231,
+        "scenario_seed": 2097313990,
+        "bot_seed": 1718228089,
+        "selector_seed": 1248042974
+      },
+      {
+        "id": "train_0040",
+        "reset_seed": 6786160,
+        "scenario_seed": 954439540,
+        "bot_seed": 901852755,
+        "selector_seed": 1580703526
+      },
+      {
+        "id": "train_0041",
+        "reset_seed": 1995897534,
+        "scenario_seed": 604859172,
+        "bot_seed": 1876423557,
+        "selector_seed": 1916807227
+      },
+      {
+        "id": "train_0042",
+        "reset_seed": 2019921249,
+        "scenario_seed": 1456973406,
+        "bot_seed": 358006024,
+        "selector_seed": 1820277889
+      },
+      {
+        "id": "train_0043",
+        "reset_seed": 1193172794,
+        "scenario_seed": 1216068649,
+        "bot_seed": 2066430843,
+        "selector_seed": 1023351504
+      },
+      {
+        "id": "train_0044",
+        "reset_seed": 837719571,
+        "scenario_seed": 1179505198,
+        "bot_seed": 950885433,
+        "selector_seed": 1982280116
+      },
+      {
+        "id": "train_0045",
+        "reset_seed": 477193380,
+        "scenario_seed": 472354390,
+        "bot_seed": 1943526405,
+        "selector_seed": 461567712
+      },
+      {
+        "id": "train_0046",
+        "reset_seed": 1584274314,
+        "scenario_seed": 588351971,
+        "bot_seed": 1097857738,
+        "selector_seed": 1340792277
+      },
+      {
+        "id": "train_0047",
+        "reset_seed": 143406378,
+        "scenario_seed": 904541851,
+        "bot_seed": 1456488785,
+        "selector_seed": 1502094956
+      },
+      {
+        "id": "train_0048",
+        "reset_seed": 1348191688,
+        "scenario_seed": 1908138290,
+        "bot_seed": 1417370642,
+        "selector_seed": 504009500
+      },
+      {
+        "id": "train_0049",
+        "reset_seed": 2013182589,
+        "scenario_seed": 185561417,
+        "bot_seed": 985968906,
+        "selector_seed": 1289809726
+      },
+      {
+        "id": "train_0050",
+        "reset_seed": 167079073,
+        "scenario_seed": 1530723692,
+        "bot_seed": 1523091443,
+        "selector_seed": 1971451114
+      },
+      {
+        "id": "train_0051",
+        "reset_seed": 1840467374,
+        "scenario_seed": 835823937,
+        "bot_seed": 1930955446,
+        "selector_seed": 1134769201
+      },
+      {
+        "id": "train_0052",
+        "reset_seed": 497481512,
+        "scenario_seed": 1956293263,
+        "bot_seed": 90155347,
+        "selector_seed": 1149445914
+      },
+      {
+        "id": "train_0053",
+        "reset_seed": 953702670,
+        "scenario_seed": 1079417872,
+        "bot_seed": 152325624,
+        "selector_seed": 435334732
+      },
+      {
+        "id": "train_0054",
+        "reset_seed": 1757395255,
+        "scenario_seed": 626398613,
+        "bot_seed": 1835365442,
+        "selector_seed": 1877051723
+      },
+      {
+        "id": "train_0055",
+        "reset_seed": 382461439,
+        "scenario_seed": 1426779209,
+        "bot_seed": 850752166,
+        "selector_seed": 1039169003
+      },
+      {
+        "id": "train_0056",
+        "reset_seed": 1289674677,
+        "scenario_seed": 119581676,
+        "bot_seed": 488790080,
+        "selector_seed": 867079910
+      },
+      {
+        "id": "train_0057",
+        "reset_seed": 964409086,
+        "scenario_seed": 695022744,
+        "bot_seed": 2053997994,
+        "selector_seed": 1194561782
+      },
+      {
+        "id": "train_0058",
+        "reset_seed": 2061646666,
+        "scenario_seed": 274472641,
+        "bot_seed": 319543808,
+        "selector_seed": 1819426331
+      },
+      {
+        "id": "train_0059",
+        "reset_seed": 1109853039,
+        "scenario_seed": 1820508354,
+        "bot_seed": 1774638890,
+        "selector_seed": 293894889
+      },
+      {
+        "id": "train_0060",
+        "reset_seed": 683572180,
+        "scenario_seed": 2108634853,
+        "bot_seed": 1814867045,
+        "selector_seed": 651845009
+      },
+      {
+        "id": "train_0061",
+        "reset_seed": 578814054,
+        "scenario_seed": 91266096,
+        "bot_seed": 1893989097,
+        "selector_seed": 643457482
+      },
+      {
+        "id": "train_0062",
+        "reset_seed": 480812789,
+        "scenario_seed": 1628228129,
+        "bot_seed": 42198680,
+        "selector_seed": 1405022449
+      },
+      {
+        "id": "train_0063",
+        "reset_seed": 854448114,
+        "scenario_seed": 1527578787,
+        "bot_seed": 324500326,
+        "selector_seed": 1066440031
+      },
+      {
+        "id": "train_0064",
+        "reset_seed": 1655149323,
+        "scenario_seed": 934514880,
+        "bot_seed": 1580389734,
+        "selector_seed": 1007122207
+      },
+      {
+        "id": "train_0065",
+        "reset_seed": 1196168779,
+        "scenario_seed": 1145355564,
+        "bot_seed": 1511390831,
+        "selector_seed": 743115380
+      },
+      {
+        "id": "train_0066",
+        "reset_seed": 1035952878,
+        "scenario_seed": 1067189722,
+        "bot_seed": 566911359,
+        "selector_seed": 14803422
+      },
+      {
+        "id": "train_0067",
+        "reset_seed": 292756959,
+        "scenario_seed": 711973787,
+        "bot_seed": 317253955,
+        "selector_seed": 990748711
+      },
+      {
+        "id": "train_0068",
+        "reset_seed": 1894786818,
+        "scenario_seed": 2103406495,
+        "bot_seed": 1197884287,
+        "selector_seed": 1136805828
+      },
+      {
+        "id": "train_0069",
+        "reset_seed": 387959275,
+        "scenario_seed": 928458727,
+        "bot_seed": 1720099833,
+        "selector_seed": 395622884
+      },
+      {
+        "id": "train_0070",
+        "reset_seed": 1176162269,
+        "scenario_seed": 44556415,
+        "bot_seed": 1003165496,
+        "selector_seed": 271616811
+      },
+      {
+        "id": "train_0071",
+        "reset_seed": 2133224647,
+        "scenario_seed": 738288435,
+        "bot_seed": 1425026233,
+        "selector_seed": 2099068835
+      },
+      {
+        "id": "train_0072",
+        "reset_seed": 674074329,
+        "scenario_seed": 359340598,
+        "bot_seed": 978692875,
+        "selector_seed": 985250251
+      },
+      {
+        "id": "train_0073",
+        "reset_seed": 1468792196,
+        "scenario_seed": 290515419,
+        "bot_seed": 985688182,
+        "selector_seed": 297741659
+      },
+      {
+        "id": "train_0074",
+        "reset_seed": 2056903371,
+        "scenario_seed": 394274367,
+        "bot_seed": 1896105790,
+        "selector_seed": 1377991796
+      },
+      {
+        "id": "train_0075",
+        "reset_seed": 696100341,
+        "scenario_seed": 1860994625,
+        "bot_seed": 1621479614,
+        "selector_seed": 1391070594
+      },
+      {
+        "id": "train_0076",
+        "reset_seed": 377100287,
+        "scenario_seed": 1047491334,
+        "bot_seed": 189536973,
+        "selector_seed": 1880627182
+      },
+      {
+        "id": "train_0077",
+        "reset_seed": 1383352389,
+        "scenario_seed": 1128236453,
+        "bot_seed": 1749525434,
+        "selector_seed": 1015268925
+      },
+      {
+        "id": "train_0078",
+        "reset_seed": 1238423079,
+        "scenario_seed": 300811569,
+        "bot_seed": 1836615696,
+        "selector_seed": 1776548459
+      },
+      {
+        "id": "train_0079",
+        "reset_seed": 2127000474,
+        "scenario_seed": 685974124,
+        "bot_seed": 317718348,
+        "selector_seed": 1868804526
+      },
+      {
+        "id": "train_0080",
+        "reset_seed": 1962307550,
+        "scenario_seed": 118737136,
+        "bot_seed": 470782634,
+        "selector_seed": 2052286848
+      },
+      {
+        "id": "train_0081",
+        "reset_seed": 1139630100,
+        "scenario_seed": 1352353664,
+        "bot_seed": 2105644213,
+        "selector_seed": 1439790081
+      },
+      {
+        "id": "train_0082",
+        "reset_seed": 785431302,
+        "scenario_seed": 335422394,
+        "bot_seed": 788283403,
+        "selector_seed": 1858218864
+      },
+      {
+        "id": "train_0083",
+        "reset_seed": 2013789601,
+        "scenario_seed": 1491365010,
+        "bot_seed": 264511073,
+        "selector_seed": 800420101
+      },
+      {
+        "id": "train_0084",
+        "reset_seed": 1531175085,
+        "scenario_seed": 881325534,
+        "bot_seed": 683804694,
+        "selector_seed": 1607334051
+      },
+      {
+        "id": "train_0085",
+        "reset_seed": 1225865842,
+        "scenario_seed": 792778519,
+        "bot_seed": 2074504461,
+        "selector_seed": 813988133
+      },
+      {
+        "id": "train_0086",
+        "reset_seed": 2007780640,
+        "scenario_seed": 568813761,
+        "bot_seed": 1736316745,
+        "selector_seed": 18117455
+      },
+      {
+        "id": "train_0087",
+        "reset_seed": 1044298578,
+        "scenario_seed": 1479539524,
+        "bot_seed": 1183293926,
+        "selector_seed": 1572296251
+      },
+      {
+        "id": "train_0088",
+        "reset_seed": 334936090,
+        "scenario_seed": 2030254686,
+        "bot_seed": 740564817,
+        "selector_seed": 1795527185
+      },
+      {
+        "id": "train_0089",
+        "reset_seed": 762673091,
+        "scenario_seed": 1163853126,
+        "bot_seed": 475307062,
+        "selector_seed": 777666529
+      },
+      {
+        "id": "train_0090",
+        "reset_seed": 44220469,
+        "scenario_seed": 529839239,
+        "bot_seed": 46573289,
+        "selector_seed": 936626824
+      },
+      {
+        "id": "train_0091",
+        "reset_seed": 394015565,
+        "scenario_seed": 1740058870,
+        "bot_seed": 1097105418,
+        "selector_seed": 752163983
+      },
+      {
+        "id": "train_0092",
+        "reset_seed": 1154836007,
+        "scenario_seed": 1593083167,
+        "bot_seed": 2009953126,
+        "selector_seed": 1281168054
+      },
+      {
+        "id": "train_0093",
+        "reset_seed": 1015945536,
+        "scenario_seed": 1271497695,
+        "bot_seed": 1305894947,
+        "selector_seed": 387447828
+      },
+      {
+        "id": "train_0094",
+        "reset_seed": 953812637,
+        "scenario_seed": 1712986862,
+        "bot_seed": 617122218,
+        "selector_seed": 170894713
+      },
+      {
+        "id": "train_0095",
+        "reset_seed": 1409386351,
+        "scenario_seed": 1864467615,
+        "bot_seed": 24623901,
+        "selector_seed": 107146653
+      },
+      {
+        "id": "train_0096",
+        "reset_seed": 1473486165,
+        "scenario_seed": 1076012022,
+        "bot_seed": 525152548,
+        "selector_seed": 515307967
+      },
+      {
+        "id": "train_0097",
+        "reset_seed": 712128710,
+        "scenario_seed": 1172764158,
+        "bot_seed": 370752301,
+        "selector_seed": 1056107057
+      },
+      {
+        "id": "train_0098",
+        "reset_seed": 2103159385,
+        "scenario_seed": 1989065210,
+        "bot_seed": 548569306,
+        "selector_seed": 1148851462
+      },
+      {
+        "id": "train_0099",
+        "reset_seed": 1574678598,
+        "scenario_seed": 38368104,
+        "bot_seed": 786681317,
+        "selector_seed": 99601478
+      },
+      {
+        "id": "train_0100",
+        "reset_seed": 7745792,
+        "scenario_seed": 686772380,
+        "bot_seed": 626439131,
+        "selector_seed": 411806743
+      },
+      {
+        "id": "train_0101",
+        "reset_seed": 102525115,
+        "scenario_seed": 10520178,
+        "bot_seed": 1276699386,
+        "selector_seed": 662060817
+      },
+      {
+        "id": "train_0102",
+        "reset_seed": 423708904,
+        "scenario_seed": 345360295,
+        "bot_seed": 43186687,
+        "selector_seed": 387638848
+      },
+      {
+        "id": "train_0103",
+        "reset_seed": 1717040858,
+        "scenario_seed": 238315756,
+        "bot_seed": 960450082,
+        "selector_seed": 2097614042
+      },
+      {
+        "id": "train_0104",
+        "reset_seed": 1240593498,
+        "scenario_seed": 907646917,
+        "bot_seed": 1235224430,
+        "selector_seed": 952155554
+      },
+      {
+        "id": "train_0105",
+        "reset_seed": 917154220,
+        "scenario_seed": 660551275,
+        "bot_seed": 1769417595,
+        "selector_seed": 1873738807
+      },
+      {
+        "id": "train_0106",
+        "reset_seed": 320302604,
+        "scenario_seed": 1175063047,
+        "bot_seed": 958755304,
+        "selector_seed": 549621266
+      },
+      {
+        "id": "train_0107",
+        "reset_seed": 1268067023,
+        "scenario_seed": 333460563,
+        "bot_seed": 584728363,
+        "selector_seed": 1563674423
+      },
+      {
+        "id": "train_0108",
+        "reset_seed": 922052800,
+        "scenario_seed": 584849966,
+        "bot_seed": 1702848928,
+        "selector_seed": 1058421896
+      },
+      {
+        "id": "train_0109",
+        "reset_seed": 213540526,
+        "scenario_seed": 40306828,
+        "bot_seed": 1394567617,
+        "selector_seed": 1746178314
+      },
+      {
+        "id": "train_0110",
+        "reset_seed": 1082086337,
+        "scenario_seed": 1075082638,
+        "bot_seed": 29061256,
+        "selector_seed": 1356768903
+      },
+      {
+        "id": "train_0111",
+        "reset_seed": 1819842227,
+        "scenario_seed": 1672165753,
+        "bot_seed": 1509915179,
+        "selector_seed": 1661546171
+      },
+      {
+        "id": "train_0112",
+        "reset_seed": 1042712121,
+        "scenario_seed": 777925660,
+        "bot_seed": 1602638530,
+        "selector_seed": 492535439
+      },
+      {
+        "id": "train_0113",
+        "reset_seed": 1999909032,
+        "scenario_seed": 141432328,
+        "bot_seed": 686990160,
+        "selector_seed": 896369639
+      },
+      {
+        "id": "train_0114",
+        "reset_seed": 1598111288,
+        "scenario_seed": 621067879,
+        "bot_seed": 734713086,
+        "selector_seed": 1509473186
+      },
+      {
+        "id": "train_0115",
+        "reset_seed": 1434067114,
+        "scenario_seed": 417531291,
+        "bot_seed": 159700146,
+        "selector_seed": 1134258908
+      },
+      {
+        "id": "train_0116",
+        "reset_seed": 2033833013,
+        "scenario_seed": 1027070455,
+        "bot_seed": 42268967,
+        "selector_seed": 800863833
+      },
+      {
+        "id": "train_0117",
+        "reset_seed": 91778745,
+        "scenario_seed": 1431759880,
+        "bot_seed": 1904289635,
+        "selector_seed": 1997948262
+      },
+      {
+        "id": "train_0118",
+        "reset_seed": 872852635,
+        "scenario_seed": 1837153118,
+        "bot_seed": 143799062,
+        "selector_seed": 164839897
+      },
+      {
+        "id": "train_0119",
+        "reset_seed": 625359888,
+        "scenario_seed": 1254575828,
+        "bot_seed": 1071408545,
+        "selector_seed": 2016720717
+      },
+      {
+        "id": "train_0120",
+        "reset_seed": 887231237,
+        "scenario_seed": 2097321086,
+        "bot_seed": 1825075732,
+        "selector_seed": 31092897
+      },
+      {
+        "id": "train_0121",
+        "reset_seed": 1313246873,
+        "scenario_seed": 1819906316,
+        "bot_seed": 1675779056,
+        "selector_seed": 1523998061
+      },
+      {
+        "id": "train_0122",
+        "reset_seed": 1925796632,
+        "scenario_seed": 541611625,
+        "bot_seed": 675435771,
+        "selector_seed": 267954288
+      },
+      {
+        "id": "train_0123",
+        "reset_seed": 1483482417,
+        "scenario_seed": 542396372,
+        "bot_seed": 2028311017,
+        "selector_seed": 130878459
+      },
+      {
+        "id": "train_0124",
+        "reset_seed": 1512588884,
+        "scenario_seed": 190411903,
+        "bot_seed": 1806367237,
+        "selector_seed": 827294052
+      },
+      {
+        "id": "train_0125",
+        "reset_seed": 1607205064,
+        "scenario_seed": 2115436044,
+        "bot_seed": 1240656704,
+        "selector_seed": 1765751112
+      },
+      {
+        "id": "train_0126",
+        "reset_seed": 37139271,
+        "scenario_seed": 1058056787,
+        "bot_seed": 2027953633,
+        "selector_seed": 103459067
+      },
+      {
+        "id": "train_0127",
+        "reset_seed": 802804309,
+        "scenario_seed": 1317511966,
+        "bot_seed": 271238594,
+        "selector_seed": 1788970849
+      },
+      {
+        "id": "train_0128",
+        "reset_seed": 528228218,
+        "scenario_seed": 1151224277,
+        "bot_seed": 1916586460,
+        "selector_seed": 1793313017
+      },
+      {
+        "id": "train_0129",
+        "reset_seed": 488117934,
+        "scenario_seed": 1394985224,
+        "bot_seed": 1796750082,
+        "selector_seed": 2100347149
+      },
+      {
+        "id": "train_0130",
+        "reset_seed": 1421659766,
+        "scenario_seed": 955489419,
+        "bot_seed": 842057667,
+        "selector_seed": 127344294
+      },
+      {
+        "id": "train_0131",
+        "reset_seed": 1276899759,
+        "scenario_seed": 1113646548,
+        "bot_seed": 1164528123,
+        "selector_seed": 1184103456
+      },
+      {
+        "id": "train_0132",
+        "reset_seed": 742242510,
+        "scenario_seed": 2056264852,
+        "bot_seed": 2057200975,
+        "selector_seed": 519243536
+      },
+      {
+        "id": "train_0133",
+        "reset_seed": 795995916,
+        "scenario_seed": 1917637189,
+        "bot_seed": 1112103955,
+        "selector_seed": 350222995
+      },
+      {
+        "id": "train_0134",
+        "reset_seed": 1561308672,
+        "scenario_seed": 334525076,
+        "bot_seed": 1843212148,
+        "selector_seed": 1641838986
+      },
+      {
+        "id": "train_0135",
+        "reset_seed": 1234784984,
+        "scenario_seed": 651640331,
+        "bot_seed": 1198416645,
+        "selector_seed": 1154499993
+      },
+      {
+        "id": "train_0136",
+        "reset_seed": 289824729,
+        "scenario_seed": 2147268032,
+        "bot_seed": 1860025204,
+        "selector_seed": 110544584
+      },
+      {
+        "id": "train_0137",
+        "reset_seed": 2041173933,
+        "scenario_seed": 1797369894,
+        "bot_seed": 1652253347,
+        "selector_seed": 1513745783
+      },
+      {
+        "id": "train_0138",
+        "reset_seed": 562281311,
+        "scenario_seed": 1433385313,
+        "bot_seed": 1467096511,
+        "selector_seed": 1541304633
+      },
+      {
+        "id": "train_0139",
+        "reset_seed": 1742595519,
+        "scenario_seed": 910802683,
+        "bot_seed": 976819254,
+        "selector_seed": 1902753155
+      },
+      {
+        "id": "train_0140",
+        "reset_seed": 1394601203,
+        "scenario_seed": 413408724,
+        "bot_seed": 1261727672,
+        "selector_seed": 1813058744
+      },
+      {
+        "id": "train_0141",
+        "reset_seed": 87088499,
+        "scenario_seed": 1961581117,
+        "bot_seed": 676535648,
+        "selector_seed": 1930430739
+      },
+      {
+        "id": "train_0142",
+        "reset_seed": 834637724,
+        "scenario_seed": 1341633949,
+        "bot_seed": 579440542,
+        "selector_seed": 1960351414
+      },
+      {
+        "id": "train_0143",
+        "reset_seed": 355076812,
+        "scenario_seed": 79007333,
+        "bot_seed": 1655544588,
+        "selector_seed": 536834799
+      },
+      {
+        "id": "train_0144",
+        "reset_seed": 1544873239,
+        "scenario_seed": 2008717277,
+        "bot_seed": 1463309704,
+        "selector_seed": 1279041551
+      },
+      {
+        "id": "train_0145",
+        "reset_seed": 393265127,
+        "scenario_seed": 125007297,
+        "bot_seed": 1536165822,
+        "selector_seed": 487997195
+      },
+      {
+        "id": "train_0146",
+        "reset_seed": 1128441240,
+        "scenario_seed": 817005568,
+        "bot_seed": 1927893692,
+        "selector_seed": 1496588616
+      },
+      {
+        "id": "train_0147",
+        "reset_seed": 1681118156,
+        "scenario_seed": 1737457789,
+        "bot_seed": 1461178726,
+        "selector_seed": 1761515975
+      },
+      {
+        "id": "train_0148",
+        "reset_seed": 1746900133,
+        "scenario_seed": 843958420,
+        "bot_seed": 761689885,
+        "selector_seed": 174631485
+      },
+      {
+        "id": "train_0149",
+        "reset_seed": 1270615863,
+        "scenario_seed": 1271274270,
+        "bot_seed": 916828422,
+        "selector_seed": 1129855843
+      },
+      {
+        "id": "train_0150",
+        "reset_seed": 368015798,
+        "scenario_seed": 2140871294,
+        "bot_seed": 1098644435,
+        "selector_seed": 1844710036
+      },
+      {
+        "id": "train_0151",
+        "reset_seed": 1577924572,
+        "scenario_seed": 185477239,
+        "bot_seed": 641066890,
+        "selector_seed": 628512917
+      },
+      {
+        "id": "train_0152",
+        "reset_seed": 509342903,
+        "scenario_seed": 131853475,
+        "bot_seed": 1911792361,
+        "selector_seed": 1953801030
+      },
+      {
+        "id": "train_0153",
+        "reset_seed": 293157252,
+        "scenario_seed": 1652318445,
+        "bot_seed": 501785139,
+        "selector_seed": 2058525784
+      },
+      {
+        "id": "train_0154",
+        "reset_seed": 984249459,
+        "scenario_seed": 1696290301,
+        "bot_seed": 1742626909,
+        "selector_seed": 1648161068
+      },
+      {
+        "id": "train_0155",
+        "reset_seed": 1850292035,
+        "scenario_seed": 2082160251,
+        "bot_seed": 396888592,
+        "selector_seed": 792441269
+      },
+      {
+        "id": "train_0156",
+        "reset_seed": 961223976,
+        "scenario_seed": 726646743,
+        "bot_seed": 68769908,
+        "selector_seed": 298072765
+      },
+      {
+        "id": "train_0157",
+        "reset_seed": 486997999,
+        "scenario_seed": 2035797000,
+        "bot_seed": 1095623066,
+        "selector_seed": 1604318605
+      },
+      {
+        "id": "train_0158",
+        "reset_seed": 1091051797,
+        "scenario_seed": 1241820279,
+        "bot_seed": 340556611,
+        "selector_seed": 463337542
+      },
+      {
+        "id": "train_0159",
+        "reset_seed": 386399861,
+        "scenario_seed": 2145142869,
+        "bot_seed": 775477283,
+        "selector_seed": 1064812131
+      },
+      {
+        "id": "train_0160",
+        "reset_seed": 827881052,
+        "scenario_seed": 218246721,
+        "bot_seed": 587587772,
+        "selector_seed": 1250985900
+      },
+      {
+        "id": "train_0161",
+        "reset_seed": 910434638,
+        "scenario_seed": 1191179247,
+        "bot_seed": 1864981033,
+        "selector_seed": 11894345
+      },
+      {
+        "id": "train_0162",
+        "reset_seed": 1555870495,
+        "scenario_seed": 249689434,
+        "bot_seed": 1872278280,
+        "selector_seed": 910223162
+      },
+      {
+        "id": "train_0163",
+        "reset_seed": 1943652889,
+        "scenario_seed": 1442988472,
+        "bot_seed": 426759299,
+        "selector_seed": 1695479220
+      },
+      {
+        "id": "train_0164",
+        "reset_seed": 395185864,
+        "scenario_seed": 2021441182,
+        "bot_seed": 1949759511,
+        "selector_seed": 1326569774
+      },
+      {
+        "id": "train_0165",
+        "reset_seed": 1713287086,
+        "scenario_seed": 405803449,
+        "bot_seed": 307259558,
+        "selector_seed": 35894488
+      },
+      {
+        "id": "train_0166",
+        "reset_seed": 172058945,
+        "scenario_seed": 948429045,
+        "bot_seed": 1966473326,
+        "selector_seed": 2026709649
+      },
+      {
+        "id": "train_0167",
+        "reset_seed": 2145542130,
+        "scenario_seed": 1458254764,
+        "bot_seed": 2041494518,
+        "selector_seed": 1534827873
+      },
+      {
+        "id": "train_0168",
+        "reset_seed": 1957510917,
+        "scenario_seed": 1169821242,
+        "bot_seed": 6536874,
+        "selector_seed": 1033742924
+      },
+      {
+        "id": "train_0169",
+        "reset_seed": 335737111,
+        "scenario_seed": 801418232,
+        "bot_seed": 986526387,
+        "selector_seed": 871078342
+      },
+      {
+        "id": "train_0170",
+        "reset_seed": 1786091531,
+        "scenario_seed": 2091220940,
+        "bot_seed": 1504530349,
+        "selector_seed": 1761265913
+      },
+      {
+        "id": "train_0171",
+        "reset_seed": 1326921096,
+        "scenario_seed": 1500378411,
+        "bot_seed": 1273366070,
+        "selector_seed": 1585293928
+      },
+      {
+        "id": "train_0172",
+        "reset_seed": 731184454,
+        "scenario_seed": 828406188,
+        "bot_seed": 1424162784,
+        "selector_seed": 2060034149
+      },
+      {
+        "id": "train_0173",
+        "reset_seed": 1892141460,
+        "scenario_seed": 1514415746,
+        "bot_seed": 2109286568,
+        "selector_seed": 1135741285
+      },
+      {
+        "id": "train_0174",
+        "reset_seed": 1946534824,
+        "scenario_seed": 2023207456,
+        "bot_seed": 219375049,
+        "selector_seed": 1727905109
+      },
+      {
+        "id": "train_0175",
+        "reset_seed": 1332569398,
+        "scenario_seed": 1806961287,
+        "bot_seed": 1420242490,
+        "selector_seed": 1857714710
+      },
+      {
+        "id": "train_0176",
+        "reset_seed": 1913982241,
+        "scenario_seed": 1991085110,
+        "bot_seed": 1452029370,
+        "selector_seed": 1646543538
+      },
+      {
+        "id": "train_0177",
+        "reset_seed": 657584011,
+        "scenario_seed": 1778630676,
+        "bot_seed": 60689313,
+        "selector_seed": 2070166493
+      },
+      {
+        "id": "train_0178",
+        "reset_seed": 724194223,
+        "scenario_seed": 1295745260,
+        "bot_seed": 357450094,
+        "selector_seed": 1011635634
+      },
+      {
+        "id": "train_0179",
+        "reset_seed": 1803206917,
+        "scenario_seed": 321519980,
+        "bot_seed": 1802578580,
+        "selector_seed": 216457191
+      },
+      {
+        "id": "train_0180",
+        "reset_seed": 1456981355,
+        "scenario_seed": 1532555672,
+        "bot_seed": 2027539980,
+        "selector_seed": 1035024961
+      },
+      {
+        "id": "train_0181",
+        "reset_seed": 143227488,
+        "scenario_seed": 205366214,
+        "bot_seed": 2081078330,
+        "selector_seed": 1078320634
+      },
+      {
+        "id": "train_0182",
+        "reset_seed": 1945607063,
+        "scenario_seed": 822410901,
+        "bot_seed": 182366056,
+        "selector_seed": 1108717840
+      },
+      {
+        "id": "train_0183",
+        "reset_seed": 1190984096,
+        "scenario_seed": 563659011,
+        "bot_seed": 1467094001,
+        "selector_seed": 21616060
+      },
+      {
+        "id": "train_0184",
+        "reset_seed": 557600310,
+        "scenario_seed": 1262337602,
+        "bot_seed": 592826688,
+        "selector_seed": 1289715879
+      },
+      {
+        "id": "train_0185",
+        "reset_seed": 194979499,
+        "scenario_seed": 1361677990,
+        "bot_seed": 884212873,
+        "selector_seed": 702721128
+      },
+      {
+        "id": "train_0186",
+        "reset_seed": 2069980772,
+        "scenario_seed": 142471197,
+        "bot_seed": 321799919,
+        "selector_seed": 1067417518
+      },
+      {
+        "id": "train_0187",
+        "reset_seed": 1936605439,
+        "scenario_seed": 138475904,
+        "bot_seed": 1254819254,
+        "selector_seed": 1524450552
+      },
+      {
+        "id": "train_0188",
+        "reset_seed": 168700059,
+        "scenario_seed": 1096429540,
+        "bot_seed": 1450790275,
+        "selector_seed": 1386548758
+      },
+      {
+        "id": "train_0189",
+        "reset_seed": 1651108119,
+        "scenario_seed": 958120154,
+        "bot_seed": 1171182558,
+        "selector_seed": 713557177
+      },
+      {
+        "id": "train_0190",
+        "reset_seed": 1341227980,
+        "scenario_seed": 208095403,
+        "bot_seed": 1450914604,
+        "selector_seed": 1505213610
+      },
+      {
+        "id": "train_0191",
+        "reset_seed": 1944995479,
+        "scenario_seed": 1056977725,
+        "bot_seed": 802404624,
+        "selector_seed": 1398655087
+      },
+      {
+        "id": "train_0192",
+        "reset_seed": 1951292216,
+        "scenario_seed": 1397655346,
+        "bot_seed": 1380141928,
+        "selector_seed": 323827604
+      },
+      {
+        "id": "train_0193",
+        "reset_seed": 252255841,
+        "scenario_seed": 305847700,
+        "bot_seed": 1227409141,
+        "selector_seed": 1987328778
+      },
+      {
+        "id": "train_0194",
+        "reset_seed": 1804906376,
+        "scenario_seed": 666101696,
+        "bot_seed": 2062927572,
+        "selector_seed": 340741479
+      },
+      {
+        "id": "train_0195",
+        "reset_seed": 642312399,
+        "scenario_seed": 286207347,
+        "bot_seed": 1717335747,
+        "selector_seed": 1133748162
+      },
+      {
+        "id": "train_0196",
+        "reset_seed": 1485536912,
+        "scenario_seed": 2026200143,
+        "bot_seed": 1481290050,
+        "selector_seed": 1852834217
+      },
+      {
+        "id": "train_0197",
+        "reset_seed": 1053737267,
+        "scenario_seed": 492612536,
+        "bot_seed": 1215111372,
+        "selector_seed": 863610309
+      },
+      {
+        "id": "train_0198",
+        "reset_seed": 392786409,
+        "scenario_seed": 536416452,
+        "bot_seed": 846055610,
+        "selector_seed": 1526826043
+      },
+      {
+        "id": "train_0199",
+        "reset_seed": 706331879,
+        "scenario_seed": 1814107143,
+        "bot_seed": 1042531547,
+        "selector_seed": 719806169
+      }
+    ],
+    "validation": [
+      {
+        "id": "validation_0000",
+        "reset_seed": 292925430,
+        "scenario_seed": 288752687,
+        "bot_seed": 396961190,
+        "selector_seed": 1454819186
+      },
+      {
+        "id": "validation_0001",
+        "reset_seed": 2086116127,
+        "scenario_seed": 302456168,
+        "bot_seed": 473122843,
+        "selector_seed": 2105684967
+      },
+      {
+        "id": "validation_0002",
+        "reset_seed": 2079467728,
+        "scenario_seed": 1913386801,
+        "bot_seed": 554110692,
+        "selector_seed": 1854641813
+      },
+      {
+        "id": "validation_0003",
+        "reset_seed": 828148705,
+        "scenario_seed": 1856732938,
+        "bot_seed": 432096650,
+        "selector_seed": 25254367
+      },
+      {
+        "id": "validation_0004",
+        "reset_seed": 48570189,
+        "scenario_seed": 507432106,
+        "bot_seed": 1793929090,
+        "selector_seed": 1379649245
+      },
+      {
+        "id": "validation_0005",
+        "reset_seed": 1308491,
+        "scenario_seed": 875451662,
+        "bot_seed": 1042790859,
+        "selector_seed": 1155616923
+      },
+      {
+        "id": "validation_0006",
+        "reset_seed": 474805353,
+        "scenario_seed": 1587077068,
+        "bot_seed": 776090656,
+        "selector_seed": 561269276
+      },
+      {
+        "id": "validation_0007",
+        "reset_seed": 54057092,
+        "scenario_seed": 656583147,
+        "bot_seed": 1563844747,
+        "selector_seed": 932622185
+      },
+      {
+        "id": "validation_0008",
+        "reset_seed": 1226779737,
+        "scenario_seed": 9503292,
+        "bot_seed": 1618442776,
+        "selector_seed": 2096857768
+      },
+      {
+        "id": "validation_0009",
+        "reset_seed": 277508286,
+        "scenario_seed": 357397831,
+        "bot_seed": 932084606,
+        "selector_seed": 127556524
+      },
+      {
+        "id": "validation_0010",
+        "reset_seed": 116477839,
+        "scenario_seed": 452325242,
+        "bot_seed": 1469664520,
+        "selector_seed": 487767605
+      },
+      {
+        "id": "validation_0011",
+        "reset_seed": 554438395,
+        "scenario_seed": 891096265,
+        "bot_seed": 843756838,
+        "selector_seed": 1905045693
+      },
+      {
+        "id": "validation_0012",
+        "reset_seed": 174525806,
+        "scenario_seed": 1637019411,
+        "bot_seed": 1037827316,
+        "selector_seed": 1826257224
+      },
+      {
+        "id": "validation_0013",
+        "reset_seed": 1424558754,
+        "scenario_seed": 1713192874,
+        "bot_seed": 1216706797,
+        "selector_seed": 1904949723
+      },
+      {
+        "id": "validation_0014",
+        "reset_seed": 319985083,
+        "scenario_seed": 1128172163,
+        "bot_seed": 1560941167,
+        "selector_seed": 2071004879
+      },
+      {
+        "id": "validation_0015",
+        "reset_seed": 1216615800,
+        "scenario_seed": 39922864,
+        "bot_seed": 882090422,
+        "selector_seed": 66204420
+      },
+      {
+        "id": "validation_0016",
+        "reset_seed": 919137935,
+        "scenario_seed": 1052518573,
+        "bot_seed": 2065562521,
+        "selector_seed": 1829575565
+      },
+      {
+        "id": "validation_0017",
+        "reset_seed": 433799014,
+        "scenario_seed": 481866030,
+        "bot_seed": 245020060,
+        "selector_seed": 1531556965
+      },
+      {
+        "id": "validation_0018",
+        "reset_seed": 759402555,
+        "scenario_seed": 1125816045,
+        "bot_seed": 617375647,
+        "selector_seed": 1325001842
+      },
+      {
+        "id": "validation_0019",
+        "reset_seed": 1005437904,
+        "scenario_seed": 175296436,
+        "bot_seed": 1695447688,
+        "selector_seed": 1110487613
+      },
+      {
+        "id": "validation_0020",
+        "reset_seed": 136276559,
+        "scenario_seed": 171024238,
+        "bot_seed": 957301037,
+        "selector_seed": 293789206
+      },
+      {
+        "id": "validation_0021",
+        "reset_seed": 811601253,
+        "scenario_seed": 1243175141,
+        "bot_seed": 488860973,
+        "selector_seed": 2085901730
+      },
+      {
+        "id": "validation_0022",
+        "reset_seed": 60491504,
+        "scenario_seed": 821085809,
+        "bot_seed": 705680959,
+        "selector_seed": 453030447
+      },
+      {
+        "id": "validation_0023",
+        "reset_seed": 575410862,
+        "scenario_seed": 272074780,
+        "bot_seed": 1426473041,
+        "selector_seed": 936727132
+      },
+      {
+        "id": "validation_0024",
+        "reset_seed": 101797325,
+        "scenario_seed": 900684631,
+        "bot_seed": 1562094166,
+        "selector_seed": 356237884
+      },
+      {
+        "id": "validation_0025",
+        "reset_seed": 1678881957,
+        "scenario_seed": 76556532,
+        "bot_seed": 911181085,
+        "selector_seed": 2078966008
+      },
+      {
+        "id": "validation_0026",
+        "reset_seed": 562634903,
+        "scenario_seed": 1911515816,
+        "bot_seed": 321290292,
+        "selector_seed": 886193852
+      },
+      {
+        "id": "validation_0027",
+        "reset_seed": 255826878,
+        "scenario_seed": 649260162,
+        "bot_seed": 686743457,
+        "selector_seed": 1874659665
+      },
+      {
+        "id": "validation_0028",
+        "reset_seed": 1377683649,
+        "scenario_seed": 846624809,
+        "bot_seed": 1706212823,
+        "selector_seed": 1262461438
+      },
+      {
+        "id": "validation_0029",
+        "reset_seed": 1243876855,
+        "scenario_seed": 1028777808,
+        "bot_seed": 1709665725,
+        "selector_seed": 482351045
+      }
+    ],
+    "test": [
+      {
+        "id": "test_0000",
+        "reset_seed": 2112702861,
+        "scenario_seed": 792881118,
+        "bot_seed": 46133768,
+        "selector_seed": 212551139
+      },
+      {
+        "id": "test_0001",
+        "reset_seed": 670095939,
+        "scenario_seed": 2136610036,
+        "bot_seed": 806714582,
+        "selector_seed": 2072107470
+      },
+      {
+        "id": "test_0002",
+        "reset_seed": 1417872808,
+        "scenario_seed": 407501880,
+        "bot_seed": 1971680379,
+        "selector_seed": 1191463754
+      },
+      {
+        "id": "test_0003",
+        "reset_seed": 908829525,
+        "scenario_seed": 135666218,
+        "bot_seed": 1252257206,
+        "selector_seed": 1958737508
+      },
+      {
+        "id": "test_0004",
+        "reset_seed": 446083316,
+        "scenario_seed": 696113477,
+        "bot_seed": 1056793925,
+        "selector_seed": 453149534
+      },
+      {
+        "id": "test_0005",
+        "reset_seed": 1352533876,
+        "scenario_seed": 2142663054,
+        "bot_seed": 1950492867,
+        "selector_seed": 1555762983
+      },
+      {
+        "id": "test_0006",
+        "reset_seed": 1456967253,
+        "scenario_seed": 1088710051,
+        "bot_seed": 183600027,
+        "selector_seed": 1888499088
+      },
+      {
+        "id": "test_0007",
+        "reset_seed": 361533994,
+        "scenario_seed": 446924576,
+        "bot_seed": 1899911551,
+        "selector_seed": 2076222478
+      },
+      {
+        "id": "test_0008",
+        "reset_seed": 1775249234,
+        "scenario_seed": 2087394751,
+        "bot_seed": 1116731780,
+        "selector_seed": 2072784775
+      },
+      {
+        "id": "test_0009",
+        "reset_seed": 1406191430,
+        "scenario_seed": 128284621,
+        "bot_seed": 112233805,
+        "selector_seed": 312704122
+      },
+      {
+        "id": "test_0010",
+        "reset_seed": 1657827887,
+        "scenario_seed": 2085317341,
+        "bot_seed": 1052072336,
+        "selector_seed": 313144110
+      },
+      {
+        "id": "test_0011",
+        "reset_seed": 398386258,
+        "scenario_seed": 372901169,
+        "bot_seed": 75003264,
+        "selector_seed": 2032215326
+      },
+      {
+        "id": "test_0012",
+        "reset_seed": 1124777775,
+        "scenario_seed": 1668578528,
+        "bot_seed": 714074938,
+        "selector_seed": 13268593
+      },
+      {
+        "id": "test_0013",
+        "reset_seed": 1633719730,
+        "scenario_seed": 669977271,
+        "bot_seed": 932386297,
+        "selector_seed": 405642793
+      },
+      {
+        "id": "test_0014",
+        "reset_seed": 1263401392,
+        "scenario_seed": 1904063527,
+        "bot_seed": 478773637,
+        "selector_seed": 1367263045
+      },
+      {
+        "id": "test_0015",
+        "reset_seed": 853855316,
+        "scenario_seed": 439712448,
+        "bot_seed": 1752970702,
+        "selector_seed": 2059511518
+      },
+      {
+        "id": "test_0016",
+        "reset_seed": 1134915329,
+        "scenario_seed": 714987949,
+        "bot_seed": 431237653,
+        "selector_seed": 1570509592
+      },
+      {
+        "id": "test_0017",
+        "reset_seed": 1569787067,
+        "scenario_seed": 728444477,
+        "bot_seed": 2007666612,
+        "selector_seed": 897631588
+      },
+      {
+        "id": "test_0018",
+        "reset_seed": 660513623,
+        "scenario_seed": 479382239,
+        "bot_seed": 77131253,
+        "selector_seed": 1225075718
+      },
+      {
+        "id": "test_0019",
+        "reset_seed": 484205902,
+        "scenario_seed": 931697892,
+        "bot_seed": 297281319,
+        "selector_seed": 845760121
+      },
+      {
+        "id": "test_0020",
+        "reset_seed": 1981121789,
+        "scenario_seed": 1012249358,
+        "bot_seed": 476150,
+        "selector_seed": 1541812159
+      },
+      {
+        "id": "test_0021",
+        "reset_seed": 1573938789,
+        "scenario_seed": 555230269,
+        "bot_seed": 1958859425,
+        "selector_seed": 1751398380
+      },
+      {
+        "id": "test_0022",
+        "reset_seed": 1455716030,
+        "scenario_seed": 1581711822,
+        "bot_seed": 895437360,
+        "selector_seed": 753844488
+      },
+      {
+        "id": "test_0023",
+        "reset_seed": 544864640,
+        "scenario_seed": 266758619,
+        "bot_seed": 828382190,
+        "selector_seed": 1156956526
+      },
+      {
+        "id": "test_0024",
+        "reset_seed": 178968952,
+        "scenario_seed": 121911763,
+        "bot_seed": 265712952,
+        "selector_seed": 547206668
+      },
+      {
+        "id": "test_0025",
+        "reset_seed": 1450457839,
+        "scenario_seed": 2052239908,
+        "bot_seed": 1964376001,
+        "selector_seed": 1435400325
+      },
+      {
+        "id": "test_0026",
+        "reset_seed": 2033656250,
+        "scenario_seed": 1422816457,
+        "bot_seed": 1320304661,
+        "selector_seed": 1958661015
+      },
+      {
+        "id": "test_0027",
+        "reset_seed": 357579875,
+        "scenario_seed": 785536841,
+        "bot_seed": 78130743,
+        "selector_seed": 921152346
+      },
+      {
+        "id": "test_0028",
+        "reset_seed": 1083802714,
+        "scenario_seed": 4720382,
+        "bot_seed": 912509931,
+        "selector_seed": 344559816
+      },
+      {
+        "id": "test_0029",
+        "reset_seed": 1682156245,
+        "scenario_seed": 1141519742,
+        "bot_seed": 1527796109,
+        "selector_seed": 1022927894
+      },
+      {
+        "id": "test_0030",
+        "reset_seed": 1935503803,
+        "scenario_seed": 185834713,
+        "bot_seed": 235067066,
+        "selector_seed": 168450126
+      },
+      {
+        "id": "test_0031",
+        "reset_seed": 1255911427,
+        "scenario_seed": 1204122681,
+        "bot_seed": 1734674730,
+        "selector_seed": 762711423
+      },
+      {
+        "id": "test_0032",
+        "reset_seed": 1973632821,
+        "scenario_seed": 1800185534,
+        "bot_seed": 260707479,
+        "selector_seed": 1260082686
+      },
+      {
+        "id": "test_0033",
+        "reset_seed": 1834949254,
+        "scenario_seed": 88493145,
+        "bot_seed": 1540998844,
+        "selector_seed": 1636351278
+      },
+      {
+        "id": "test_0034",
+        "reset_seed": 168198190,
+        "scenario_seed": 272259832,
+        "bot_seed": 1231376549,
+        "selector_seed": 1578593756
+      },
+      {
+        "id": "test_0035",
+        "reset_seed": 1235578393,
+        "scenario_seed": 477120242,
+        "bot_seed": 1196844409,
+        "selector_seed": 1962328692
+      },
+      {
+        "id": "test_0036",
+        "reset_seed": 1350596157,
+        "scenario_seed": 887466551,
+        "bot_seed": 1144896088,
+        "selector_seed": 267157816
+      },
+      {
+        "id": "test_0037",
+        "reset_seed": 2038638744,
+        "scenario_seed": 255294711,
+        "bot_seed": 1940212861,
+        "selector_seed": 21188118
+      },
+      {
+        "id": "test_0038",
+        "reset_seed": 856754396,
+        "scenario_seed": 390114436,
+        "bot_seed": 73134198,
+        "selector_seed": 1751042404
+      },
+      {
+        "id": "test_0039",
+        "reset_seed": 1085149131,
+        "scenario_seed": 1242457806,
+        "bot_seed": 1405458131,
+        "selector_seed": 1528564500
+      },
+      {
+        "id": "test_0040",
+        "reset_seed": 1601944187,
+        "scenario_seed": 2125106069,
+        "bot_seed": 415387355,
+        "selector_seed": 1261002057
+      },
+      {
+        "id": "test_0041",
+        "reset_seed": 1422255259,
+        "scenario_seed": 1827061140,
+        "bot_seed": 1658134756,
+        "selector_seed": 1990296852
+      },
+      {
+        "id": "test_0042",
+        "reset_seed": 1840153101,
+        "scenario_seed": 1372417309,
+        "bot_seed": 1479336154,
+        "selector_seed": 1089306592
+      },
+      {
+        "id": "test_0043",
+        "reset_seed": 63621678,
+        "scenario_seed": 2132369093,
+        "bot_seed": 1677374373,
+        "selector_seed": 325212880
+      },
+      {
+        "id": "test_0044",
+        "reset_seed": 960014590,
+        "scenario_seed": 1287506946,
+        "bot_seed": 575756065,
+        "selector_seed": 1256396428
+      },
+      {
+        "id": "test_0045",
+        "reset_seed": 1004068121,
+        "scenario_seed": 34028388,
+        "bot_seed": 1192003380,
+        "selector_seed": 404471521
+      },
+      {
+        "id": "test_0046",
+        "reset_seed": 492589176,
+        "scenario_seed": 1817111292,
+        "bot_seed": 1758020517,
+        "selector_seed": 689655383
+      },
+      {
+        "id": "test_0047",
+        "reset_seed": 1527243702,
+        "scenario_seed": 302419035,
+        "bot_seed": 1581389313,
+        "selector_seed": 148669987
+      },
+      {
+        "id": "test_0048",
+        "reset_seed": 1173725076,
+        "scenario_seed": 258269465,
+        "bot_seed": 1068399535,
+        "selector_seed": 2024243398
+      },
+      {
+        "id": "test_0049",
+        "reset_seed": 982796703,
+        "scenario_seed": 1612353944,
+        "bot_seed": 814550498,
+        "selector_seed": 1419679711
+      }
+    ]
+  },
+  "warning": "Disjoint numeric seeds on one layout; scenario tuples may repeat across splits."
+}

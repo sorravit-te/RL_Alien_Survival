@@ -20,10 +20,14 @@ def check_graphics() -> dict:
     os.environ["SDL_VIDEODRIVER"] = "dummy"
     import pygame
 
+    # The purchased textures are not in the repo, so a fresh clone checks everything else first.
     baked = ROOT / "assets" / "stradex" / "prepared" / "ship_textures.npz"
-    manifest = json.loads(baked.with_suffix(".json").read_text(encoding="utf-8"))
-    if hashlib.sha256(baked.read_bytes()).hexdigest() != manifest["output_sha256"]:
-        raise RuntimeError(f"Baked ship textures do not match their manifest: {baked}")
+    textures = "missing"
+    if baked.is_file():
+        manifest = json.loads(baked.with_suffix(".json").read_text(encoding="utf-8"))
+        if hashlib.sha256(baked.read_bytes()).hexdigest() != manifest["output_sha256"]:
+            raise RuntimeError(f"Baked ship textures do not match their manifest: {baked}")
+        textures = len(manifest["materials"])
     pygame.display.init()
     try:
         screen = pygame.display.set_mode((320, 180))
@@ -31,7 +35,7 @@ def check_graphics() -> dict:
         pygame.display.flip()
     finally:
         pygame.display.quit()
-    return {"status": "passed", "driver": "dummy", "baked_textures": len(manifest["materials"])}
+    return {"status": "passed", "driver": "dummy", "baked_textures": textures}
 
 
 def check_rl() -> dict:

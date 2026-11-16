@@ -1,0 +1,35 @@
+{
+  "source": {
+    "revision": "6de38f49e73596f6559da1dc9925b48ca4876231",
+    "source_sha256": "90731ca498e9ac22ec6733a92a46e2df7089277e43eb5d1e433c9683403091d9",
+    "dirty_status": ""
+  },
+  "config_sha256": "dd0ebcb7f2fc71210b79e037e7d48a84e863e74ffe3869e406739b1be1f8323e",
+  "manifest_sha256": "35672cebdc9eb08e996bd322d9996bf677d59a3cc28ad26081f2fbd11fd94a15",
+  "dependencies": {
+    "python": "3.12.5",
+    "numpy": "2.5.4",
+    "torch": "2.14.1+cpu",
+    "gymnasium": "1.4.0",
+    "stable_baselines3": "2.9.0",
+    "sb3_contrib": "2.9.0",
+    "tensorboard": "2.21.0",
+    "matplotlib": "3.11.2"
+  },
+  "evaluation_mode": "sampled_primary_argmax_secondary",
+  "semantic_contract": {
+    "search_control": "continue_cancel_waypoint_commitment_v1",
+    "contract_version": "alien-vector-v13-fast-chase",
+    "observation_shape": [
+      352
+    ],
+    "action_n": 32,
+    "decision_ticks": 15
+  },
+  "evaluation_files": {
+    "evaluation_protocol.json": "c61cdfc1a3352d4280cecea47909fd7ac0a41508982946e802bfba48131e6abe",
+    "sampling_schedule.json": "341b13ec97353731d4c3e1d381638ef13eaf83e07dd6e1f8a5ac4041f62a9f02",
+    "evaluation_budget.json": "7a9932a7404df884bf600435a9e775fa748efb56cfe152ee6b521f60b3c01976"
+  },
+  "readiness": "integrated; prepare does not authorize learning"
+}

@@ -1,0 +1,5839 @@
+{
+  "format": "alien-maskable-checkpoint-v1",
+  "role": "best_validation",
+  "runtime": {
+    "device": "cpu",
+    "platform": "Windows-11-10.0.26300-SP0",
+    "processor": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+    "torch_threads": 1
+  },
+  "source": {
+    "revision": "6de38f49e73596f6559da1dc9925b48ca4876231",
+    "source_sha256": "90731ca498e9ac22ec6733a92a46e2df7089277e43eb5d1e433c9683403091d9",
+    "dirty_status": ""
+  },
+  "config_sha256": "dd0ebcb7f2fc71210b79e037e7d48a84e863e74ffe3869e406739b1be1f8323e",
+  "config": {
+    "name": "ship_deck_training_full_scratch_v2",
+    "training_seed": 2026103403,
+    "manifest_seed": 2026103102,
+    "manifest_counts": {
+      "train": 200,
+      "validation": 30,
+      "test": 50
+    },
+    "max_episode_seconds": 600,
+    "requested_steps": 300000,
+    "evaluation_interval": 20000,
+    "progress_interval": 1024,
+    "torch_threads": 1,
+    "n_envs": 1,
+    "bot_kind": "runner_mix",
+    "selection": "max mean of validation sampled catch rate and hunt catch rates, then min unresolved, then earliest trained checkpoint",
+    "ppo": {
+      "learning_rate": 0.0001,
+      "gamma": 0.995,
+      "n_steps": 256,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "ent_coef": 0.01,
+      "policy_kwargs": {
+        "net_arch": [
+          64,
+          64
+        ]
+      },
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "normalize_advantage": true
+    },
+    "survivor_threat_settings": {
+      "sight_range": 8.0,
+      "fov_degrees": 75.0,
+      "memory_seconds": 2.0,
+      "enter_distance": 4.0,
+      "safe_distance": 6.0,
+      "target_hold_seconds": 1.0,
+      "threat_clearance": 0.8
+    },
+    "evaluation_protocol": "configs/ship_deck_evaluation.json",
+    "scenario": "ship_deck_v1",
+    "fresh_run": true,
+    "defer_final_test": true,
+    "scenario_sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
+    "search_control": "continue_cancel_waypoint_commitment_v1",
+    "contract_version": "alien-vector-v13-fast-chase",
+    "frozen_evaluation": {
+      "protocol": {
+        "name": "ship_deck_sampled_evaluation_v4",
+        "status": "implementation_only_runtime_requires_separate_authorization",
+        "primary_inference": "sampled_masked_policy",
+        "secondary_inference": "deterministic_argmax_diagnostic",
+        "manifest_seed": 2026103102,
+        "manifest_counts": {
+          "train": 200,
+          "validation": 30,
+          "test": 50
+        },
+        "sampling_repeat_seeds": [
+          2311,
+          4621,
+          6947
+        ],
+        "selector_seed_rule": "SeedSequence([case.selector_seed, repeat_seed]).generate_state(1)[0]; seed once per episode; isolate and restore global RNG streams",
+        "controllers": [
+          {
+            "name": "random_valid_mask",
+            "inference": "uniform_valid",
+            "repeats": 3,
+            "available": "baseline"
+          },
+          {
+            "name": "untrained_sampled",
+            "inference": "sampled_masked",
+            "repeats": 3,
+            "available": "new compatible initial policy"
+          },
+          {
+            "name": "untrained_deterministic",
+            "inference": "argmax_masked",
+            "repeats": 1,
+            "available": "new compatible initial policy"
+          },
+          {
+            "name": "heuristic",
+            "inference": "scripted_catalog",
+            "repeats": 1,
+            "available": "baseline"
+          },
+          {
+            "name": "wait",
+            "inference": "constant_wait",
+            "repeats": 1,
+            "available": "baseline"
+          },
+          {
+            "name": "trained_sampled",
+            "inference": "sampled_masked",
+            "repeats": 3,
+            "available": "future compatible checkpoint only"
+          },
+          {
+            "name": "trained_deterministic",
+            "inference": "argmax_masked",
+            "repeats": 1,
+            "available": "future compatible checkpoint only"
+          }
+        ],
+        "selection": {
+          "split": "validation",
+          "primary": "mean_of_sampled_catch_rate_and_hunt_catch_rates",
+          "tie_1": "min_sampled_unresolved_rate",
+          "tie_2": "earliest_trained_checkpoint",
+          "exclude": "test outcomes and untrained baseline cannot select trained best"
+        },
+        "statistics": {
+          "unit": "case cluster; retain all3 action-sampling repeats together",
+          "paired": "same cases/selector seed list per controller",
+          "warning": "Three sampling repeats are not training seeds; fixed layout/two spawns and seed changes can repeat routes; no unseen-layout generalization."
+        },
+        "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
+        "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
+        "scenario": "ship_deck_v1",
+        "scenario_sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
+        "search_control": "continue_cancel_waypoint_commitment_v1",
+        "contract_version": "alien-vector-v13-fast-chase",
+        "bot_mix": "runner_mix: per case one third Runner, the rest the 50/50 plain and wall-loop mix, chosen from bot_seed"
+      },
+      "protocol_sha256": "592345ead6917560c5c9be8d28b6103665002b5f65a72a995d033ab6434685b2",
+      "protocol_file_sha256": "c61cdfc1a3352d4280cecea47909fd7ac0a41508982946e802bfba48131e6abe",
+      "schedule_sha256": "dc6527eb2dab70f6591dd87726d8960ce004652c48d855e206ba23ead8a2fd86",
+      "budget_sha256": "41c685ed133bf90138b65ee5271cd4b239bf2b46a53024bfcf9b0106183a8f96"
+    }
+  },
+  "manifest_sha256": "35672cebdc9eb08e996bd322d9996bf677d59a3cc28ad26081f2fbd11fd94a15",
+  "contract_version": "alien-vector-v13-fast-chase",
+  "observation_shape": [
+    352
+  ],
+  "action_n": 32,
+  "map": {
+    "name": "ship_deck_v1",
+    "sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
+    "spawn_points": [
+      [
+        14.5,
+        16.5,
+        2.0944
+      ],
+      [
+        24.5,
+        18.5,
+        0.0
+      ],
+      [
+        7.5,
+        31.5,
+        6.0214
+      ],
+      [
+        10.5,
+        7.5,
+        1.5708
+      ]
+    ],
+    "alien_spawn_options": [
+      [
+        31.5,
+        36.5,
+        3.1416
+      ],
+      [
+        36.5,
+        16.5,
+        3.1416
+      ],
+      [
+        3.5,
+        24.5,
+        0.0
+      ]
+    ],
+    "objects": [
+      "keycard_bridge",
+      "keycard_lab",
+      "keycard_cabin",
+      "keycard_medbay",
+      "keycard_cargo",
+      "keycard_reactor",
+      "exit_pods",
+      "exit_cryo",
+      "exit_shuttle"
+    ],
+    "warning": "Fixed layout; seeds are NOT a layout or scenario-tuple holdout."
+  },
+  "dependencies": {
+    "python": "3.12.5",
+    "numpy": "2.5.4",
+    "torch": "2.14.1+cpu",
+    "gymnasium": "1.4.0",
+    "stable_baselines3": "2.9.0",
+    "sb3_contrib": "2.9.0",
+    "tensorboard": "2.21.0",
+    "matplotlib": "3.11.2"
+  },
+  "training_seed": 2026103403,
+  "bot_kind": "runner_mix",
+  "ppo_parameters": {
+    "learning_rate": 0.0001,
+    "gamma": 0.995,
+    "n_steps": 256,
+    "batch_size": 64,
+    "n_epochs": 10,
+    "ent_coef": 0.01,
+    "policy_kwargs": {
+      "net_arch": [
+        64,
+        64
+      ]
+    },
+    "gae_lambda": 0.95,
+    "clip_range": 0.2,
+    "vf_coef": 0.5,
+    "max_grad_norm": 0.5,
+    "normalize_advantage": true
+  },
+  "actual_steps": 60000,
+  "optimizer_update_epochs": 2340,
+  "elapsed_seconds": 1911.7215420000139,
+  "validation": {
+    "trained_sampled": {
+      "inference": "sampled_masked",
+      "cases": 30,
+      "episodes": 90,
+      "captured": 87,
+      "escaped": 3,
+      "unresolved": 0,
+      "case_mean_catch_rate": 0.9666666666666667,
+      "case_mean_escape_rate": 0.03333333333333333,
+      "case_mean_unresolved_rate": 0.0,
+      "case_mean_return": 9.89111111111111,
+      "case_mean_decision_steps": 50.95555555555556,
+      "per_case": [
+        {
+          "id": "validation_0000",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 11.033333333333333,
+          "case_mean_decision_steps": 109.33333333333333,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 9
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 25,
+                "arrivals": 22,
+                "released_by_clue": 2,
+                "forced_choices": 289,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                9,
+                7,
+                6
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0001",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.333333333333334,
+          "case_mean_decision_steps": 29.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 3,
+              "denominator": 3,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 6,
+            "confirmed_losses": 6,
+            "wall_loss_episode_outcomes": {
+              "captured": 3,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 2,
+              "denominator": 6,
+              "rate": 0.3333333333333333
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "target_switching": {
+              "numerator": 2,
+              "denominator": 3,
+              "rate": 0.6666666666666666
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 1,
+                "continues": 1,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 16
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 7,
+                "arrivals": 3,
+                "released_by_clue": 4,
+                "forced_choices": 54,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1,
+                1,
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0002",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 33.333333333333336,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 13
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 6,
+                "released_by_clue": 0,
+                "forced_choices": 78,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                2,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0003",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 36.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 3,
+              "denominator": 3,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 4,
+            "confirmed_losses": 4,
+            "wall_loss_episode_outcomes": {
+              "captured": 3,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 3,
+              "denominator": 12,
+              "rate": 0.25
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 2,
+              "denominator": 2,
+              "rate": 1.0
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "target_switching": {
+              "numerator": 2,
+              "denominator": 8,
+              "rate": 0.25
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 2,
+                "continues": 2,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 16
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 6,
+                "released_by_clue": 0,
+                "forced_choices": 60,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                2,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0004",
+          "repeats": 3,
+          "captured": 1,
+          "escaped": 2,
+          "unresolved": 0,
+          "captured_rate": 0.3333333333333333,
+          "escaped_rate": 0.6666666666666666,
+          "unresolved_rate": 0.0,
+          "case_mean_return": -2.5333333333333337,
+          "case_mean_decision_steps": 93.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 1,
+                "continues": 1,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 2,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 23,
+                "arrivals": 20,
+                "released_by_clue": 1,
+                "forced_choices": 252,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                8,
+                10,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0005",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.333333333333332,
+          "case_mean_decision_steps": 25.333333333333332,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 3,
+              "denominator": 3,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 3,
+            "confirmed_losses": 3,
+            "wall_loss_episode_outcomes": {
+              "captured": 3,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 10
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 6,
+                "arrivals": 3,
+                "released_by_clue": 0,
+                "forced_choices": 56,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3,
+                0,
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0006",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.366666666666667,
+          "case_mean_decision_steps": 29.333333333333332,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 9
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 8,
+                "arrivals": 5,
+                "released_by_clue": 0,
+                "forced_choices": 59,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1,
+                1,
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0007",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.6,
+          "case_mean_decision_steps": 52.666666666666664,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 2,
+              "denominator": 3,
+              "rate": 0.6666666666666666
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 3,
+            "wall_loss_episode_outcomes": {
+              "captured": 2,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 10,
+              "denominator": 15,
+              "rate": 0.6666666666666666
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 7,
+              "denominator": 8,
+              "rate": 0.875
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 12,
+              "denominator": 39,
+              "rate": 0.3076923076923077
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 2,
+                "restarts": 1,
+                "restricted_choices": 8,
+                "continues": 7,
+                "policy_cancels": 1,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 2,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 3,
+              "actual_retarget_delays_ticks": [
+                15
+              ],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 12,
+                "arrivals": 8,
+                "released_by_clue": 4,
+                "forced_choices": 99,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                3,
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0008",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.433333333333332,
+          "case_mean_decision_steps": 32.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 3
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 8,
+                "arrivals": 4,
+                "released_by_clue": 2,
+                "forced_choices": 71,
+                "abandoned": 2
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1,
+                2,
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0009",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 28.666666666666668,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 3,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 9
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 5,
+                "released_by_clue": 0,
+                "forced_choices": 65,
+                "abandoned": 4
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                1,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0010",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.766666666666666,
+          "case_mean_decision_steps": 114.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 3,
+              "denominator": 3,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 11,
+            "confirmed_losses": 13,
+            "wall_loss_episode_outcomes": {
+              "captured": 3,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 14,
+              "denominator": 30,
+              "rate": 0.4666666666666667
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 10,
+              "denominator": 10,
+              "rate": 1.0
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 2,
+              "denominator": 2,
+              "rate": 1.0
+            },
+            "target_switching": {
+              "numerator": 16,
+              "denominator": 100,
+              "rate": 0.16
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 5,
+                "restarts": 0,
+                "restricted_choices": 17,
+                "continues": 17,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 2,
+                "helper_after_completion": 0,
+                "completed_sweeps": 3,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 27
+              },
+              "attempts": 5,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 18,
+                "arrivals": 11,
+                "released_by_clue": 6,
+                "forced_choices": 193,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                10,
+                0,
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0011",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 11.266666666666666,
+          "case_mean_decision_steps": 140.66666666666666,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 1,
+              "denominator": 2,
+              "rate": 0.5
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 8
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 33,
+                "arrivals": 30,
+                "released_by_clue": 2,
+                "forced_choices": 377,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                8,
+                11,
+                7
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0012",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 11.133333333333333,
+          "case_mean_decision_steps": 130.66666666666666,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 5,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 8,
+              "denominator": 13,
+              "rate": 0.6153846153846154
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 7,
+              "denominator": 7,
+              "rate": 1.0
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "target_switching": {
+              "numerator": 1,
+              "denominator": 11,
+              "rate": 0.09090909090909091
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 2,
+                "restarts": 0,
+                "restricted_choices": 7,
+                "continues": 7,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 2,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 12
+              },
+              "attempts": 2,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 28,
+                "arrivals": 25,
+                "released_by_clue": 1,
+                "forced_choices": 335,
+                "abandoned": 2
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3,
+                11,
+                9
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0013",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 32.666666666666664,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 11
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 6,
+                "released_by_clue": 0,
+                "forced_choices": 69,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                2,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0014",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 35.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 3,
+              "denominator": 3,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 3,
+            "confirmed_losses": 3,
+            "wall_loss_episode_outcomes": {
+              "captured": 3,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 19
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 6,
+                "released_by_clue": 0,
+                "forced_choices": 60,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                2,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0015",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.299999999999999,
+          "case_mean_decision_steps": 14.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 0,
+                "released_by_clue": 0,
+                "forced_choices": 24,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0,
+                0,
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0016",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.3,
+          "case_mean_decision_steps": 7.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 0,
+                "released_by_clue": 3,
+                "forced_choices": 12,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0,
+                0,
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0017",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.466666666666667,
+          "case_mean_decision_steps": 29.666666666666668,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 3
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 7,
+                "arrivals": 4,
+                "released_by_clue": 2,
+                "forced_choices": 78,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                0,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0018",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.566666666666668,
+          "case_mean_decision_steps": 57.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 15,
+                "arrivals": 10,
+                "released_by_clue": 1,
+                "forced_choices": 142,
+                "abandoned": 4
+              },
+              "distinct_waypoints_reached_per_episode": [
+                4,
+                3,
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0019",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 29.666666666666668,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 3,
+                "continues": 3,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 7
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 5,
+                "released_by_clue": 1,
+                "forced_choices": 67,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                2,
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0020",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.399999999999999,
+          "case_mean_decision_steps": 34.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 9
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 6,
+                "released_by_clue": 0,
+                "forced_choices": 62,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3,
+                1,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0021",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.233333333333333,
+          "case_mean_decision_steps": 12.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 10
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 6,
+                "arrivals": 0,
+                "released_by_clue": 6,
+                "forced_choices": 18,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0,
+                0,
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0022",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.466666666666667,
+          "case_mean_decision_steps": 38.666666666666664,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 16
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 11,
+                "arrivals": 8,
+                "released_by_clue": 1,
+                "forced_choices": 87,
+                "abandoned": 2
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3,
+                3,
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0023",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.533333333333333,
+          "case_mean_decision_steps": 38.333333333333336,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 9
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 14,
+                "arrivals": 9,
+                "released_by_clue": 5,
+                "forced_choices": 90,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3,
+                3,
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0024",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.466666666666667,
+          "case_mean_decision_steps": 24.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 7,
+                "arrivals": 4,
+                "released_by_clue": 2,
+                "forced_choices": 54,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2,
+                1,
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0025",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 11.200000000000001,
+          "case_mean_decision_steps": 122.66666666666667,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 2,
+              "denominator": 3,
+              "rate": 0.6666666666666666
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 2,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 6,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 2,
+              "denominator": 4,
+              "rate": 0.5
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 8
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 28,
+                "arrivals": 25,
+                "released_by_clue": 2,
+                "forced_choices": 317,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                9,
+                6,
+                10
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0026",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.6,
+          "case_mean_decision_steps": 48.666666666666664,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 2,
+              "denominator": 3,
+              "rate": 0.6666666666666666
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 2,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 6,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 2,
+              "denominator": 4,
+              "rate": 0.5
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 12
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 13,
+                "arrivals": 10,
+                "released_by_clue": 0,
+                "forced_choices": 98,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                5,
+                2,
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0027",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 35.0,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 14
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 8,
+                "arrivals": 4,
+                "released_by_clue": 1,
+                "forced_choices": 50,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1,
+                2,
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0028",
+          "repeats": 3,
+          "captured": 3,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.399999999999999,
+          "case_mean_decision_steps": 41.666666666666664,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 6
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 3,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 6,
+                "released_by_clue": 0,
+                "forced_choices": 77,
+                "abandoned": 3
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1,
+                1,
+                4
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0029",
+          "repeats": 3,
+          "captured": 2,
+          "escaped": 1,
+          "unresolved": 0,
+          "captured_rate": 0.6666666666666666,
+          "escaped_rate": 0.3333333333333333,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 3.9666666666666672,
+          "case_mean_decision_steps": 74.66666666666667,
+          "search": {
+            "episodes": 3,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 2,
+                "escaped": 1,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 17,
+                "arrivals": 14,
+                "released_by_clue": 2,
+                "forced_choices": 202,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1,
+                0,
+                11
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        }
+      ],
+      "per_repeat": {
+        "0": {
+          "episodes": 30,
+          "captured": 29,
+          "escaped": 1,
+          "unresolved": 0,
+          "catch_rate": 0.9666666666666667,
+          "escape_rate": 0.03333333333333333,
+          "unresolved_rate": 0.0,
+          "catch_wilson95": [
+            0.8332960900859082,
+            0.9940914096183874
+          ],
+          "episode_mean_return": 9.913333333333334,
+          "episode_mean_decision_steps": 53.333333333333336,
+          "episode_mean_simulation_seconds": 26.462222222222227
+        },
+        "1": {
+          "episodes": 30,
+          "captured": 29,
+          "escaped": 1,
+          "unresolved": 0,
+          "catch_rate": 0.9666666666666667,
+          "escape_rate": 0.03333333333333333,
+          "unresolved_rate": 0.0,
+          "catch_wilson95": [
+            0.8332960900859082,
+            0.9940914096183874
+          ],
+          "episode_mean_return": 9.88,
+          "episode_mean_decision_steps": 49.46666666666667,
+          "episode_mean_simulation_seconds": 24.53777777777778
+        },
+        "2": {
+          "episodes": 30,
+          "captured": 29,
+          "escaped": 1,
+          "unresolved": 0,
+          "catch_rate": 0.9666666666666667,
+          "escape_rate": 0.03333333333333333,
+          "unresolved_rate": 0.0,
+          "catch_wilson95": [
+            0.8332960900859082,
+            0.9940914096183874
+          ],
+          "episode_mean_return": 9.879999999999999,
+          "episode_mean_decision_steps": 50.06666666666667,
+          "episode_mean_simulation_seconds": 24.84111111111111
+        }
+      },
+      "statistics_unit": "case cluster; three action samples are not three training seeds",
+      "case_mean_sampled_catch_rate": 0.9666666666666667,
+      "case_mean_sampled_unresolved_rate": 0.0,
+      "search": {
+        "episodes": 90,
+        "episodes_with_wall_loss": {
+          "numerator": 26,
+          "denominator": 90,
+          "rate": 0.28888888888888886
+        },
+        "wall_loss_opportunities": 39,
+        "confirmed_losses": 52,
+        "wall_loss_episode_outcomes": {
+          "captured": 26,
+          "escaped": 0,
+          "unresolved": 0
+        },
+        "eligible_action21": {
+          "numerator": 39,
+          "denominator": 99,
+          "rate": 0.3939393939393939
+        },
+        "same_primitive_unseen_continuation": {
+          "numerator": 27,
+          "denominator": 28,
+          "rate": 0.9642857142857143
+        },
+        "cancel_on_reacquisition": {
+          "numerator": 7,
+          "denominator": 7,
+          "rate": 1.0
+        },
+        "target_switching": {
+          "numerator": 38,
+          "denominator": 171,
+          "rate": 0.2222222222222222
+        },
+        "control": {
+          "version": "continue-cancel-audit-v2-pursuit-tracking",
+          "counts": {
+            "starts": 16,
+            "restarts": 1,
+            "restricted_choices": 39,
+            "continues": 38,
+            "policy_cancels": 1,
+            "masked_retarget_requests": 0,
+            "helper_cancels": 11,
+            "helper_after_completion": 0,
+            "completed_sweeps": 5,
+            "active_but_unrestricted": 0,
+            "helper_pursuit_handoffs": 281
+          },
+          "attempts": 17,
+          "actual_retarget_delays_ticks": [
+            15
+          ],
+          "outcomes": {
+            "captured": 87,
+            "escaped": 3,
+            "unresolved": 0
+          }
+        },
+        "patrol": {
+          "version": "waypoint-commitment-audit-v1",
+          "counts": {
+            "walks": 372,
+            "arrivals": 265,
+            "released_by_clue": 48,
+            "forced_choices": 3495,
+            "abandoned": 56
+          },
+          "distinct_waypoints_reached_per_episode": [
+            9,
+            1,
+            2,
+            2,
+            8,
+            3,
+            1,
+            2,
+            1,
+            2,
+            10,
+            8,
+            3,
+            2,
+            2,
+            0,
+            0,
+            2,
+            4,
+            2,
+            3,
+            0,
+            3,
+            3,
+            2,
+            9,
+            5,
+            1,
+            1,
+            1,
+            7,
+            1,
+            2,
+            2,
+            10,
+            0,
+            1,
+            3,
+            2,
+            1,
+            0,
+            11,
+            11,
+            2,
+            2,
+            0,
+            0,
+            0,
+            3,
+            2,
+            1,
+            0,
+            3,
+            3,
+            1,
+            6,
+            2,
+            2,
+            1,
+            0,
+            6,
+            1,
+            2,
+            2,
+            2,
+            0,
+            3,
+            3,
+            1,
+            2,
+            0,
+            7,
+            9,
+            2,
+            2,
+            0,
+            0,
+            2,
+            3,
+            1,
+            2,
+            0,
+            2,
+            3,
+            1,
+            10,
+            3,
+            1,
+            4,
+            11
+          ]
+        },
+        "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+      },
+      "evaluation_role": "sampled_primary"
+    },
+    "trained_deterministic": {
+      "inference": "argmax_masked",
+      "cases": 30,
+      "episodes": 30,
+      "captured": 29,
+      "escaped": 1,
+      "unresolved": 0,
+      "case_mean_catch_rate": 0.9666666666666667,
+      "case_mean_escape_rate": 0.03333333333333333,
+      "case_mean_unresolved_rate": 0.0,
+      "case_mean_return": 9.92,
+      "case_mean_decision_steps": 54.733333333333334,
+      "per_case": [
+        {
+          "id": "validation_0000",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 12.100000000000001,
+          "case_mean_decision_steps": 240.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 19,
+                "arrivals": 18,
+                "released_by_clue": 1,
+                "forced_choices": 220,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                12
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0001",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.3,
+          "case_mean_decision_steps": 29.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 2,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 6
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 1,
+                "forced_choices": 18,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0002",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 33.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 2,
+                "released_by_clue": 0,
+                "forced_choices": 26,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0003",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 35.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 1,
+              "denominator": 2,
+              "rate": 0.5
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 2,
+                "released_by_clue": 0,
+                "forced_choices": 20,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0004",
+          "repeats": 1,
+          "captured": 0,
+          "escaped": 1,
+          "unresolved": 0,
+          "captured_rate": 0.0,
+          "escaped_rate": 1.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": -9.2,
+          "case_mean_decision_steps": 118.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 0
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 0,
+                "escaped": 1,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 8,
+                "released_by_clue": 0,
+                "forced_choices": 109,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                8
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0005",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.2,
+          "case_mean_decision_steps": 12.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 1,
+                "arrivals": 0,
+                "released_by_clue": 0,
+                "forced_choices": 6,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0006",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 29.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 18,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0007",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.6,
+          "case_mean_decision_steps": 47.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 5,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 1,
+              "denominator": 3,
+              "rate": 0.3333333333333333
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 4,
+                "arrivals": 3,
+                "released_by_clue": 1,
+                "forced_choices": 35,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0008",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 30.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 20,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0009",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 30.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 20,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0010",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.2,
+          "case_mean_decision_steps": 15.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 2,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 8
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 1,
+                "arrivals": 0,
+                "released_by_clue": 1,
+                "forced_choices": 6,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0011",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 11.1,
+          "case_mean_decision_steps": 105.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 1,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 1,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 3
+              },
+              "attempts": 1,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 9,
+                "arrivals": 8,
+                "released_by_clue": 1,
+                "forced_choices": 91,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                8
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0012",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 11.8,
+          "case_mean_decision_steps": 217.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 16,
+                "arrivals": 15,
+                "released_by_clue": 1,
+                "forced_choices": 198,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                13
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0013",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 33.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 3
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 2,
+                "released_by_clue": 0,
+                "forced_choices": 23,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0014",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 35.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 7
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 2,
+                "released_by_clue": 0,
+                "forced_choices": 20,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0015",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.299999999999999,
+          "case_mean_decision_steps": 14.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 1,
+                "arrivals": 0,
+                "released_by_clue": 0,
+                "forced_choices": 8,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0016",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.3,
+          "case_mean_decision_steps": 7.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 1,
+                "arrivals": 0,
+                "released_by_clue": 1,
+                "forced_choices": 4,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0017",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 34.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 2,
+                "released_by_clue": 1,
+                "forced_choices": 30,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0018",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.6,
+          "case_mean_decision_steps": 56.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 4,
+                "arrivals": 3,
+                "released_by_clue": 0,
+                "forced_choices": 49,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                3
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0019",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 31.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 3
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 20,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0020",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.299999999999999,
+          "case_mean_decision_steps": 31.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 17,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0021",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.2,
+          "case_mean_decision_steps": 12.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 1,
+                "arrivals": 0,
+                "released_by_clue": 1,
+                "forced_choices": 6,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0022",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.3,
+          "case_mean_decision_steps": 26.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 22,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0023",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.3,
+          "case_mean_decision_steps": 41.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 2,
+            "confirmed_losses": 2,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 4,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 2,
+              "denominator": 2,
+              "rate": 1.0
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 13
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 1,
+                "forced_choices": 22,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0024",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 25.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 1,
+                "forced_choices": 19,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0025",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 12.100000000000001,
+          "case_mean_decision_steps": 247.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 4
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 19,
+                "arrivals": 18,
+                "released_by_clue": 0,
+                "forced_choices": 222,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                12
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0026",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.5,
+          "case_mean_decision_steps": 35.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 1,
+              "denominator": 1,
+              "rate": 1.0
+            },
+            "wall_loss_opportunities": 1,
+            "confirmed_losses": 1,
+            "wall_loss_episode_outcomes": {
+              "captured": 1,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 3,
+              "rate": 0.0
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 1,
+              "denominator": 2,
+              "rate": 0.5
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 3,
+                "arrivals": 2,
+                "released_by_clue": 0,
+                "forced_choices": 20,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                2
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0027",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.4,
+          "case_mean_decision_steps": 33.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 5
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 17,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0028",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.299999999999999,
+          "case_mean_decision_steps": 34.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 1
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 2,
+                "arrivals": 1,
+                "released_by_clue": 0,
+                "forced_choices": 17,
+                "abandoned": 1
+              },
+              "distinct_waypoints_reached_per_episode": [
+                1
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        },
+        {
+          "id": "validation_0029",
+          "repeats": 1,
+          "captured": 1,
+          "escaped": 0,
+          "unresolved": 0,
+          "captured_rate": 1.0,
+          "escaped_rate": 0.0,
+          "unresolved_rate": 0.0,
+          "case_mean_return": 10.3,
+          "case_mean_decision_steps": 8.0,
+          "search": {
+            "episodes": 1,
+            "episodes_with_wall_loss": {
+              "numerator": 0,
+              "denominator": 1,
+              "rate": 0.0
+            },
+            "wall_loss_opportunities": 0,
+            "confirmed_losses": 0,
+            "wall_loss_episode_outcomes": {
+              "captured": 0,
+              "escaped": 0,
+              "unresolved": 0
+            },
+            "eligible_action21": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "same_primitive_unseen_continuation": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "cancel_on_reacquisition": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "target_switching": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "control": {
+              "version": "continue-cancel-audit-v2-pursuit-tracking",
+              "counts": {
+                "starts": 0,
+                "restarts": 0,
+                "restricted_choices": 0,
+                "continues": 0,
+                "policy_cancels": 0,
+                "masked_retarget_requests": 0,
+                "helper_cancels": 0,
+                "helper_after_completion": 0,
+                "completed_sweeps": 0,
+                "active_but_unrestricted": 0,
+                "helper_pursuit_handoffs": 2
+              },
+              "attempts": 0,
+              "actual_retarget_delays_ticks": [],
+              "outcomes": {
+                "captured": 1,
+                "escaped": 0,
+                "unresolved": 0
+              }
+            },
+            "patrol": {
+              "version": "waypoint-commitment-audit-v1",
+              "counts": {
+                "walks": 1,
+                "arrivals": 0,
+                "released_by_clue": 1,
+                "forced_choices": 4,
+                "abandoned": 0
+              },
+              "distinct_waypoints_reached_per_episode": [
+                0
+              ]
+            },
+            "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+          }
+        }
+      ],
+      "per_repeat": {
+        "0": {
+          "episodes": 30,
+          "captured": 29,
+          "escaped": 1,
+          "unresolved": 0,
+          "catch_rate": 0.9666666666666667,
+          "escape_rate": 0.03333333333333333,
+          "unresolved_rate": 0.0,
+          "catch_wilson95": [
+            0.8332960900859082,
+            0.9940914096183874
+          ],
+          "episode_mean_return": 9.92,
+          "episode_mean_decision_steps": 54.733333333333334,
+          "episode_mean_simulation_seconds": 27.14
+        }
+      },
+      "statistics_unit": "case cluster; three action samples are not three training seeds",
+      "search": {
+        "episodes": 30,
+        "episodes_with_wall_loss": {
+          "numerator": 8,
+          "denominator": 30,
+          "rate": 0.26666666666666666
+        },
+        "wall_loss_opportunities": 12,
+        "confirmed_losses": 13,
+        "wall_loss_episode_outcomes": {
+          "captured": 8,
+          "escaped": 0,
+          "unresolved": 0
+        },
+        "eligible_action21": {
+          "numerator": 0,
+          "denominator": 21,
+          "rate": 0.0
+        },
+        "same_primitive_unseen_continuation": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "cancel_on_reacquisition": {
+          "numerator": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "target_switching": {
+          "numerator": 6,
+          "denominator": 10,
+          "rate": 0.6
+        },
+        "control": {
+          "version": "continue-cancel-audit-v2-pursuit-tracking",
+          "counts": {
+            "starts": 1,
+            "restarts": 0,
+            "restricted_choices": 0,
+            "continues": 0,
+            "policy_cancels": 0,
+            "masked_retarget_requests": 0,
+            "helper_cancels": 1,
+            "helper_after_completion": 0,
+            "completed_sweeps": 0,
+            "active_but_unrestricted": 0,
+            "helper_pursuit_handoffs": 103
+          },
+          "attempts": 1,
+          "actual_retarget_delays_ticks": [],
+          "outcomes": {
+            "captured": 29,
+            "escaped": 1,
+            "unresolved": 0
+          }
+        },
+        "patrol": {
+          "version": "waypoint-commitment-audit-v1",
+          "counts": {
+            "walks": 126,
+            "arrivals": 96,
+            "released_by_clue": 12,
+            "forced_choices": 1307,
+            "abandoned": 17
+          },
+          "distinct_waypoints_reached_per_episode": [
+            12,
+            1,
+            2,
+            2,
+            8,
+            0,
+            1,
+            3,
+            1,
+            1,
+            0,
+            8,
+            13,
+            2,
+            2,
+            0,
+            0,
+            2,
+            3,
+            1,
+            1,
+            0,
+            1,
+            1,
+            1,
+            12,
+            2,
+            1,
+            1,
+            0
+          ]
+        },
+        "note": "Pooled conditional counts; case clusters/repeats remain in per-episode rows."
+      },
+      "evaluation_role": "argmax_secondary"
+    },
+    "hunt": {
+      "noisy": {
+        "cases": 32,
+        "caught": 32,
+        "median_seconds_to_catch": 18.416666666666664,
+        "noise_offered": 378,
+        "noise_followed": 368
+      },
+      "silent": {
+        "cases": 32,
+        "caught": 32,
+        "median_seconds_to_catch": 61.166666666666664,
+        "noise_offered": 0,
+        "noise_followed": 0
+      },
+      "hidden": {
+        "cases": 35,
+        "caught": 28,
+        "median_seconds_to_catch": 36.86666666666667,
+        "noise_offered": 0,
+        "noise_followed": 0
+      }
+    }
+  },
+  "checkpoint_sha256": "c70af83db34bb98f1d5606485628b106e902def9bb81d8763cecc20a56b9c600",
+  "policy_sha256": "ee085d2480708437b95cb8ca54aa45083c48d53f6690d7b325dad781497e10e5",
+  "search_control": "continue_cancel_waypoint_commitment_v1",
+  "evaluation_identity": {
+    "protocol": {
+      "name": "ship_deck_sampled_evaluation_v4",
+      "status": "implementation_only_runtime_requires_separate_authorization",
+      "primary_inference": "sampled_masked_policy",
+      "secondary_inference": "deterministic_argmax_diagnostic",
+      "manifest_seed": 2026103102,
+      "manifest_counts": {
+        "train": 200,
+        "validation": 30,
+        "test": 50
+      },
+      "sampling_repeat_seeds": [
+        2311,
+        4621,
+        6947
+      ],
+      "selector_seed_rule": "SeedSequence([case.selector_seed, repeat_seed]).generate_state(1)[0]; seed once per episode; isolate and restore global RNG streams",
+      "controllers": [
+        {
+          "name": "random_valid_mask",
+          "inference": "uniform_valid",
+          "repeats": 3,
+          "available": "baseline"
+        },
+        {
+          "name": "untrained_sampled",
+          "inference": "sampled_masked",
+          "repeats": 3,
+          "available": "new compatible initial policy"
+        },
+        {
+          "name": "untrained_deterministic",
+          "inference": "argmax_masked",
+          "repeats": 1,
+          "available": "new compatible initial policy"
+        },
+        {
+          "name": "heuristic",
+          "inference": "scripted_catalog",
+          "repeats": 1,
+          "available": "baseline"
+        },
+        {
+          "name": "wait",
+          "inference": "constant_wait",
+          "repeats": 1,
+          "available": "baseline"
+        },
+        {
+          "name": "trained_sampled",
+          "inference": "sampled_masked",
+          "repeats": 3,
+          "available": "future compatible checkpoint only"
+        },
+        {
+          "name": "trained_deterministic",
+          "inference": "argmax_masked",
+          "repeats": 1,
+          "available": "future compatible checkpoint only"
+        }
+      ],
+      "selection": {
+        "split": "validation",
+        "primary": "mean_of_sampled_catch_rate_and_hunt_catch_rates",
+        "tie_1": "min_sampled_unresolved_rate",
+        "tie_2": "earliest_trained_checkpoint",
+        "exclude": "test outcomes and untrained baseline cannot select trained best"
+      },
+      "statistics": {
+        "unit": "case cluster; retain all3 action-sampling repeats together",
+        "paired": "same cases/selector seed list per controller",
+        "warning": "Three sampling repeats are not training seeds; fixed layout/two spawns and seed changes can repeat routes; no unseen-layout generalization."
+      },
+      "test_policy": "Deferred: separately authorize final-test only after selection and fresh replay; once, no retry/tuning.",
+      "integration_gate": "Sampled runner integration requires read-only review and explicit bounded pilot authorization before learning; prepare never learns.",
+      "scenario": "ship_deck_v1",
+      "scenario_sha256": "a5c8f322696568c7740abcf789091bb9eb55d5a57eb3d9237760d47c892e0de9",
+      "search_control": "continue_cancel_waypoint_commitment_v1",
+      "contract_version": "alien-vector-v13-fast-chase",
+      "bot_mix": "runner_mix: per case one third Runner, the rest the 50/50 plain and wall-loop mix, chosen from bot_seed"
+    },
+    "protocol_sha256": "592345ead6917560c5c9be8d28b6103665002b5f65a72a995d033ab6434685b2",
+    "protocol_file_sha256": "c61cdfc1a3352d4280cecea47909fd7ac0a41508982946e802bfba48131e6abe",
+    "schedule_sha256": "dc6527eb2dab70f6591dd87726d8960ce004652c48d855e206ba23ead8a2fd86",
+    "budget_sha256": "41c685ed133bf90138b65ee5271cd4b239bf2b46a53024bfcf9b0106183a8f96"
+  },
+  "evaluated_at_decision_steps": 60000,
+  "evaluated_at_optimizer_update_epochs": 2340,
+  "evaluation_context": "rollout_callback_before_current_rollout_optimizer_update"
+}
