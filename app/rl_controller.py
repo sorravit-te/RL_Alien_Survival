@@ -1,5 +1,6 @@
 """Human-input adapter for the frozen Alien target contract; no Env or Survivor bot."""
 
+import os
 import random
 from contextlib import contextmanager
 from pathlib import Path
@@ -14,6 +15,9 @@ from rl.alien_view import allowed_view, record_waypoint_visits, target_source
 from rl.candidates import build_candidates, candidate_masks
 from rl.contract import ACTION_COUNT, DECISION_TICKS, OBSERVATION_SIZE, WAIT
 from rl.observations import build_observation
+
+# Loading checks the source with git; tools/bootstrap.ps1 fetches this copy when Windows has none.
+PORTABLE_GIT = Path(__file__).resolve().parents[1] / ".git-portable" / "cmd"
 
 
 def rng_state():
@@ -159,6 +163,8 @@ def load_human_rl(run_dir, checkpoint, sampling_seed, scenario_seed=0):
     from rl.pipeline import file_hash, load_checkpoint, read_json, read_run
 
     run_dir, checkpoint = Path(run_dir), Path(checkpoint)
+    if PORTABLE_GIT.is_dir() and str(PORTABLE_GIT) not in os.environ["PATH"]:
+        os.environ["PATH"] = f"{PORTABLE_GIT}{os.pathsep}{os.environ['PATH']}"
     with isolated_globals():
         config, _, source = read_run(run_dir)
         torch.set_num_threads(config["torch_threads"])

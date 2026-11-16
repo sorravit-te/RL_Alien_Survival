@@ -134,7 +134,7 @@ including the written one.
 
 ## Setup
 
-Windows x64 with [Git](https://git-scm.com/download/win) and [Python 3.12.5](https://www.python.org/downloads/release/python-3125/) exactly, because the trained Alien loads only on the versions it was trained with.
+Windows 10 or 11, 64-bit, and an internet connection. The trained Alien loads only on Python 3.12.5 exactly; the setup script uses it if installed and otherwise downloads the official package into `.python/`, without touching other Pythons. It does the same with portable Git, and installs the Microsoft C++ runtime PyTorch needs if Windows lacks it.
 
 ```powershell
 git clone https://github.com/sorravit-te/RL_Alien_Survival.git
@@ -142,7 +142,7 @@ cd RL_Alien_Survival
 powershell -ExecutionPolicy Bypass -File tools\bootstrap.ps1
 ```
 
-Clone into a short path such as `C:\RL_Alien_Survival`: a deep folder runs into Windows' 260-character path limit during the install. The script makes `.venv`, installs the locked packages (about 1 GB) and downloads the free sounds and the mood. If `py -3.12` finds another 3.12, add `-Python <path to python.exe 3.12.5>`.
+Clone into a short path such as `C:\RL_Alien_Survival`: a deep folder runs into Windows' 260-character path limit during the install. The script makes `.venv`, installs the locked packages (about 1 GB) and downloads the free sounds and the mood.
 
 The ship's textures come from a purchased pack that cannot be shared here, and the game does not start without them. Owners of the pack put it in `assets/stradex/` before running the script; anyone given the baked textures puts `ship_textures.npz` and `ship_textures.json` in `assets/stradex/prepared/`.
 

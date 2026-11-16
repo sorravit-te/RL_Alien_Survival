@@ -1,5 +1,8 @@
 # Python and local development
 .venv/
+# Portable Python and git that tools/bootstrap.ps1 fetches when a machine lacks them.
+/.python/
+/.git-portable/
 __pycache__/
 *.py[cod]
 .pytest_cache/
